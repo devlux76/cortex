@@ -169,3 +169,65 @@ fn hamming_scores(
 
   out_dist[i] = dist;
 }
+
+// ===============================================================
+// DOT BATCH — Dual-Tiled GEMM
+// queries : [num_queries × dim]   reuses params.k = num_queries
+// matrix  : [count × dim]
+// scores  : [num_queries × count] row-major output
+// Dispatch: (ceil(count/TILE), ceil(num_queries/TILE), 1)
+// ===============================================================
+
+const TILE : u32 = 16u;
+
+var<workgroup> q_smem : array<f32, TILE * TILE>;  // [num_queries_local × dim_tile]
+var<workgroup> m_smem : array<f32, TILE * TILE>;  // [num_matrix_local  × dim_tile]
+
+@group(0) @binding(0)
+var<storage, read> queries : array<f32>;
+
+@group(0) @binding(1)
+var<storage, read> matrix  : array<f32>;
+
+@group(0) @binding(2)
+var<storage, read_write> scores : array<f32>;
+
+@compute @workgroup_size(TILE, TILE, 1)
+fn dot_batch(
+  @builtin(local_invocation_id) lid : vec3<u32>,
+  @builtin(workgroup_id)        wid : vec3<u32>
+) {
+  let ln = lid.x;   // local matrix-row index  (0..TILE-1)
+  let lm = lid.y;   // local query-row index   (0..TILE-1)
+
+  let mat_row   = wid.x * TILE + ln;
+  let query_row = wid.y * TILE + lm;
+
+  let dim = params.dim;
+  var acc : f32 = 0.0;
+
+  for (var t : u32 = 0u; t < dim; t += TILE) {
+
+    // Collaborative load — each thread loads exactly 1 element per tile per buffer
+    // ln acts as column index for query, lm acts as column index for matrix
+    q_smem[lm * TILE + ln] = select(0.0, queries[query_row * dim + t + ln],
+                                    query_row < params.k && (t + ln) < dim);
+
+    m_smem[ln * TILE + lm] = select(0.0, matrix[mat_row * dim + t + lm],
+                                    mat_row < params.count && (t + lm) < dim);
+
+    workgroupBarrier();
+
+    let tile_end = min(TILE, dim - t);
+    for (var j : u32 = 0u; j < tile_end; j++) {
+      acc += q_smem[lm * TILE + j] * m_smem[ln * TILE + j];
+    }
+
+    workgroupBarrier();
+  }
+
+  if query_row < params.k && mat_row < params.count {
+    scores[query_row * params.count + mat_row] = acc;
+  }
+}
+
