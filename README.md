@@ -18,7 +18,7 @@ Current implementation snapshot:
 2. Model-profile-driven numeric ownership is implemented and guarded by `npm run guard:model-derived`.
 3. Adaptive embedding resolver infrastructure exists, but real providers are still being wired.
 4. Runtime harness and browser lane are implemented (`npm run dev:harness`, `npm run test:browser`).
-5. Electron lane is wired but runtime-context-sensitive on host shells; a containerized debug lane is now available to isolate from editor/runtime sandbox effects (`npm run docker:electron:up`, then attach with `Electron: Docker Main + Renderer`).
+5. Electron lane is runtime-context-sensitive on host shells; the containerized debug lane is now validated as the preferred sandbox-isolated debugging path (`Electron: Docker Main + Renderer`).
 6. Hippocampus/Cortex/Daydreamer orchestration layers remain the primary vertical-slice gap.
 
 Current delivery priorities (P0):
@@ -49,6 +49,20 @@ VS Code debugging setup (Electron docs aligned):
 Docker debug quick start:
 1. In VS Code Run and Debug, launch `Electron: Docker Main + Renderer` (this auto-runs `docker:electron:up`).
 2. If you need manual control, start the lane with `npm run docker:electron:up` and stop it with `npm run docker:electron:down`.
+
+Expected container log noise (non-fatal):
+1. `dbus/bus.cc` connection warnings are expected in slim container environments without a system DBus daemon.
+2. `WebGL2 blocklisted` is expected with software rendering in Xvfb; this does not imply Electron main-process crash.
+
+Night handoff note (2026-03-12):
+1. Runtime debugging status: `Electron: Docker Main + Renderer` is the validated sandbox-isolated debug path.
+2. Host-shell context status: local host-shell Electron runs can still fail with `SIGSEGV`; treat Docker attach as source of truth for debugger stability.
+3. Runtime realism status: Docker lane is software-rendered and is not the final GPU-realism gate.
+4. Tomorrow kickoff step 1: add real provider adapters in embeddings runtime (`Transformers` path for `webnn/webgpu/wasm`, explicit ORT path for `webgl`).
+5. Tomorrow kickoff step 2: add failing-first tests for provider registration and selection behavior, then implement to green.
+6. Tomorrow kickoff step 3: build first `Hippocampus` ingest slice with resolved model profile values.
+7. Tomorrow kickoff step 4: build first `Cortex` retrieval slice with deterministic baseline ordering.
+8. First commands for tomorrow: `npm run test:unit`, `npm run test:browser`, then `npm run docker:electron:up` with VS Code debug `Electron: Docker Main + Renderer`.
 
 Docs note:
 1. Numeric examples in design docs are illustrative unless explicitly sourced from model metadata.

@@ -90,13 +90,40 @@ Completed in this pass:
    - short `docker compose ... up` smoke with forced recreate + teardown
    - ready markers observed (`harness ready`, main inspector `9230`, renderer debugger `9222`)
    - no `SIGSEGV` observed inside container during smoke window
+23. Host-side VS Code attach behavior is now validated for the Docker lane:
+   - user desktop debug run showed both endpoints active
+   - `Debugger attached.` observed for attach sessions during `Electron: Docker Main + Renderer`
+24. Hardened Docker startup sequencing to avoid attach races:
+   - `docker/electron-debug/entrypoint.sh` now waits for live debugger endpoints before emitting ready markers
+   - `docker/electron-debug/Dockerfile` now includes `curl` for readiness probes
 
 Open items carried to next pass:
 1. Wire resolved `ModelProfile` into first concrete ingest/query orchestrator path.
 2. Add real embedding providers (ONNX/Transformers/WebNN/WebGPU/WebGL/WASM) as candidates for the resolver.
-3. Validate full VS Code host attach cycle against the Docker lane (`Electron: Docker Main + Renderer`) and codify it as the runtime-electron context contract when host-shell runs are unstable.
+3. Codify Docker lane as the default sandbox-isolated Electron debugging contract and document when host-shell Electron is still required.
 4. Define CI prerequisites for the chosen runtime-electron context (binary + graphics/runtime assumptions) and enforce one canonical gate.
 5. Implement first Hippocampus/Cortex vertical slice on top of runtime harness lanes.
+
+### Night Handoff Note (2026-03-12)
+
+Where we are now:
+1. Docker Electron debug lane is stable for sandbox-isolated debugging and VS Code attach.
+2. Host-shell Electron remains environment-sensitive and can still fail with `SIGSEGV` in constrained contexts.
+3. Browser runtime lane is validated and should remain part of the merge confidence path.
+4. Docker lane runs software rendering, so it is a debugger-stability lane rather than final GPU-realism proof.
+
+Tomorrow's first coding steps:
+1. Add failing tests for real-provider registration + capability-driven selection in embeddings runtime.
+2. Implement `embeddings/TransformersEmbeddingBackend.ts` and wire it into resolver candidates.
+3. Implement `embeddings/OrtWebglEmbeddingBackend.ts` and wire explicit `webgl` fallback path.
+4. Implement first `Hippocampus` ingest entry point with profile-derived defaults.
+5. Implement first `Cortex` retrieval entry point with deterministic baseline ordering.
+
+Tomorrow startup commands:
+1. `npm run test:unit`
+2. `npm run test:browser`
+3. `npm run docker:electron:up`
+4. VS Code debug: `Electron: Docker Main + Renderer`
 
 ### Documentation Synchronization Protocol (Required)
 
@@ -265,10 +292,10 @@ Planned commands to add in later passes:
 
 1. Blocker A - File path: `scripts/electron-harness-main.mjs`, `.vscode/launch.json`, `scripts/run-electron-runtime-smoke.mjs`
 2. Blocker A - Failure symptom: Electron exits with `SIGSEGV` (`139`) in this tool-executed terminal context for both desktop-style and headless/software-style launches, despite Electron being installed and harness server reachability.
-3. Blocker A - Next action: run the containerized attach flow (`npm run docker:electron:up` + `Electron: Docker Main + Renderer`) and treat host-shell crashes as environment-limited unless reproducible in the Docker lane.
-4. Blocker B - File path: `.vscode/launch.json`, `.vscode/tasks.json`, `docker-compose.electron-debug.yml`
-5. Blocker B - Failure symptom: Docker lane now builds and starts cleanly, but host-side VS Code attach/breakpoint workflow against that lane has not yet been validated in-session.
-6. Blocker B - Next action: run `Electron: Docker Main + Renderer` from VS Code, verify main + renderer breakpoint binding, then lock CI/runtime-electron contract to that validated context.
+3. Blocker A - Next action: use the Docker attach flow (`Electron: Docker Main + Renderer`) as the default debugging lane and treat host-shell crashes as environment-limited unless reproducible in Docker.
+4. Blocker B - File path: `docker/electron-debug/Dockerfile`, `docker/electron-debug/entrypoint.sh`, runtime lane policy docs
+5. Blocker B - Failure symptom: Docker lane runs under software rendering (`webgpu`/`webgl` unavailable or blocklisted), so it is strong for debugger stability but not a full GPU-realism proxy.
+6. Blocker B - Next action: keep Docker as debug isolation lane and define a separate GPU-capable runtime-electron gate context for realism-sensitive verification.
 
 ## Known Hardcoded Hotspots To Clean First
 

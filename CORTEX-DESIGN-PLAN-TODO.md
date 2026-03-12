@@ -94,11 +94,27 @@ Legend: `Implemented`, `Partial`, `Missing`
 | Storage contracts and persistence schema | Implemented | `core/types.ts`, `storage/OPFSVectorStore.ts`, `storage/IndexedDbMetadataStore.ts`, `tests/Persistence.test.ts` | Current tests are Node-lane with mocked browser APIs. |
 | Model-derived numeric governance | Implemented | `core/ModelProfile.ts`, `core/ModelDefaults.ts`, `core/ModelProfileResolver.ts`, `Policy.ts`, `scripts/guard-model-derived.mjs` | Guard command enforced by `npm run guard:model-derived`. |
 | Adaptive provider resolver infrastructure | Partial | `embeddings/ProviderResolver.ts`, `embeddings/EmbeddingRunner.ts` | Real providers not yet wired; dummy provider baseline exists. |
-| Browser/Electron runtime-realism lanes | Partial | `playwright.config.mjs`, `runtime/harness/index.html`, `tests/runtime/browser-harness.spec.mjs`, `tests/runtime/electron-harness.spec.mjs`, `.vscode/launch.json`, `.vscode/tasks.json`, `docker/electron-debug/Dockerfile`, `docker-compose.electron-debug.yml` | Browser lane passes; Electron host-shell runs can `SIGSEGV` in constrained contexts. Dockerized attach flow is now available, but CI/runtime-context policy is still pending. |
+| Browser/Electron runtime-realism lanes | Partial | `playwright.config.mjs`, `runtime/harness/index.html`, `tests/runtime/browser-harness.spec.mjs`, `tests/runtime/electron-harness.spec.mjs`, `.vscode/launch.json`, `.vscode/tasks.json`, `docker/electron-debug/Dockerfile`, `docker-compose.electron-debug.yml` | Browser lane passes; Electron host-shell runs can `SIGSEGV` in constrained contexts. Dockerized attach flow is validated for sandbox-isolated debugging, while CI/runtime-context policy is still pending. |
 | Hippocampus ingest orchestrator | Missing | (planned module) | No text chunking -> embed -> persist orchestration path yet. |
 | Cortex retrieval and coherence path | Missing | (planned module) | Ranking stack and open-path solver not yet implemented. |
 | Daydreamer consolidation loop | Missing | (planned module) | Idle scheduling and recalc loop not yet implemented. |
 | Crypto signing and verification helpers | Missing | (planned module `core/crypto`) | Entity fields exist in `core/types.ts`, helper module pending. |
+
+### 0.6 Night Handoff (2026-03-12)
+
+Where we are now:
+1. Browser runtime lane is passing.
+2. Dockerized Electron attach lane is validated for sandbox-isolated debugging.
+3. Host-shell Electron remains context-sensitive and can still fail with `SIGSEGV` in constrained shells.
+4. Docker lane currently runs software rendering and is not the final GPU-realism gate.
+
+Tomorrow's code-first sequence:
+1. Implement `embeddings/TransformersEmbeddingBackend.ts` for `webnn/webgpu/wasm`.
+2. Implement `embeddings/OrtWebglEmbeddingBackend.ts` for explicit `webgl` fallback.
+3. Expand resolver wiring in `embeddings/ProviderResolver.ts` so real providers participate in capability + benchmark selection.
+4. Add strict Red -> Green tests for new provider registration and selection behavior under capability constraints.
+5. Implement first `hippocampus` ingest orchestration entry point using resolved `ModelProfile` values.
+6. Implement first `cortex` retrieval orchestration entry point with deterministic baseline ordering.
 
 ## 1. Design
 

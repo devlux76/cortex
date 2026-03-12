@@ -9,6 +9,11 @@ MAIN_INSPECT_PORT="${CORTEX_DOCKER_MAIN_INSPECT_PORT:-9230}"
 RENDERER_DEBUG_PORT="${CORTEX_DOCKER_RENDERER_DEBUG_PORT:-9222}"
 
 cleanup() {
+  if [[ -n "${ELECTRON_PID:-}" ]] && kill -0 "${ELECTRON_PID}" 2>/dev/null; then
+    kill "${ELECTRON_PID}" >/dev/null 2>&1 || true
+    wait "${ELECTRON_PID}" 2>/dev/null || true
+  fi
+
   if [[ -n "${HARNESS_PID:-}" ]] && kill -0 "${HARNESS_PID}" 2>/dev/null; then
     kill "${HARNESS_PID}" >/dev/null 2>&1 || true
     wait "${HARNESS_PID}" 2>/dev/null || true
@@ -37,8 +42,29 @@ if [[ "${ready}" -ne 1 ]]; then
 fi
 
 echo "[docker-electron] harness ready at ${HARNESS_URL}"
-echo "[docker-electron] main inspector: 0.0.0.0:${MAIN_INSPECT_PORT}"
-echo "[docker-electron] renderer debugger: 0.0.0.0:${RENDERER_DEBUG_PORT}"
+
+wait_for_main_debugger() {
+  for _attempt in $(seq 1 200); do
+    if curl -fsS "http://127.0.0.1:${MAIN_INSPECT_PORT}/json/version" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 0.1
+  done
+  return 1
+}
+
+wait_for_renderer_debugger() {
+  for _attempt in $(seq 1 200); do
+    if curl -fsS "http://127.0.0.1:${RENDERER_DEBUG_PORT}/json/version" >/dev/null 2>&1; then
+      return 0
+    fi
+    if curl -fsS "http://127.0.0.1:${RENDERER_DEBUG_PORT}/json/list" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 0.1
+  done
+  return 1
+}
 
 env \
   HARNESS_URL="${HARNESS_URL}" \
@@ -54,4 +80,21 @@ env \
     --inspect="0.0.0.0:${MAIN_INSPECT_PORT}" \
     --remote-debugging-address=0.0.0.0 \
     --remote-debugging-port="${RENDERER_DEBUG_PORT}" \
-    "${ROOT_DIR}/scripts/electron-harness-main.mjs"
+    "${ROOT_DIR}/scripts/electron-harness-main.mjs" &
+
+ELECTRON_PID=$!
+
+if ! wait_for_main_debugger; then
+  echo "[docker-electron] main inspector failed to become ready on 0.0.0.0:${MAIN_INSPECT_PORT}"
+  exit 1
+fi
+
+if ! wait_for_renderer_debugger; then
+  echo "[docker-electron] renderer debugger failed to become ready on 0.0.0.0:${RENDERER_DEBUG_PORT}"
+  exit 1
+fi
+
+echo "[docker-electron] main inspector: 0.0.0.0:${MAIN_INSPECT_PORT}"
+echo "[docker-electron] renderer debugger: 0.0.0.0:${RENDERER_DEBUG_PORT}"
+
+wait "${ELECTRON_PID}"
