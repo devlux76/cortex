@@ -30,6 +30,8 @@ Completed since the prior snapshot:
 3. Guard command exists for model-related hardcoded numeric literals (`npm run guard:model-derived`).
 4. Runtime numeric constants are centralized for backend/storage internals (`core/NumericConstants.ts`).
 5. Runtime helper resolves model metadata and derives routing policy in one call (`resolveRoutingPolicyForModel` in `Policy.ts`).
+6. Deterministic dummy SHA-256 embedder exists for pre-model hotpath testing (`embeddings/DeterministicDummyEmbeddingBackend.ts`).
+7. Benchmark harness exists for dummy embedder throughput baselining (`npm run benchmark:dummy`).
 
 Next focus:
 1. Wire resolved model profiles into runtime ingest/query entry points.

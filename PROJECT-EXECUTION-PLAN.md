@@ -24,6 +24,13 @@ Completed in this pass:
 7. Added model-profile-to-policy bridge helper so runtime callers can resolve profile and derive routing in one step:
    - `resolveRoutingPolicyForModel(...)` in `Policy.ts`
    - integration tests in `tests/model/RoutingPolicy.test.ts`
+8. Added deterministic dummy embedder for hotpath benchmarking before real model wiring:
+   - `embeddings/EmbeddingBackend.ts`
+   - `embeddings/DeterministicDummyEmbeddingBackend.ts`
+   - tests: `tests/embeddings/DeterministicDummyEmbeddingBackend.test.ts`
+9. Added executable dummy hotpath benchmark harness:
+   - `tests/benchmarks/DummyEmbedderHotpath.bench.ts`
+   - `npm run benchmark:dummy`
 
 Open items carried to next pass:
 1. Wire resolved `ModelProfile` into first concrete ingest/query orchestrator path (once those runtime modules are added).
@@ -94,7 +101,10 @@ Available now:
 2. `npm run test:unit -- tests/model/ModelProfileResolver.test.ts`
 3. `npm run test:unit -- tests/model/ModelDefaults.test.ts`
 4. `npm run guard:model-derived`
-5. `npm run build && npm run lint`
+5. `npm run test:unit -- tests/embeddings/DeterministicDummyEmbeddingBackend.test.ts`
+6. `npm run benchmark:dummy`
+7. `npm run benchmark`
+8. `npm run build && npm run lint`
 
 Planned commands to add in later passes:
 1. `npm run test:unit -- tests/embeddings/ProviderResolver.test.ts`
@@ -102,7 +112,6 @@ Planned commands to add in later passes:
 3. `npm run test:browser`
 4. `npm run test:electron`
 5. `npm run test:all`
-6. `npm run benchmark`
 
 ## Known Hardcoded Hotspots To Clean First
 
