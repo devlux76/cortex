@@ -1,4 +1,9 @@
 import type { ModelProfile } from "./core/ModelProfile";
+import {
+  ModelProfileResolver,
+  type ModelProfileResolverOptions,
+  type ResolveModelProfileInput,
+} from "./core/ModelProfileResolver";
 
 export type QueryScope = "broad" | "normal" | "narrow" | "default";
 
@@ -14,6 +19,17 @@ export interface RoutingPolicy {
   broad: ProjectionHead;
   normal: ProjectionHead;
   narrow: ProjectionHead;
+}
+
+export interface ResolvedRoutingPolicy {
+  modelProfile: ModelProfile;
+  routingPolicy: RoutingPolicy;
+}
+
+export interface ResolveRoutingPolicyOptions {
+  resolver?: ModelProfileResolver;
+  resolverOptions?: ModelProfileResolverOptions;
+  routingPolicyOverrides?: Partial<RoutingPolicyDerivation>;
 }
 
 export interface RoutingPolicyDerivation {
@@ -110,5 +126,22 @@ export function createRoutingPolicy(
       dimOut: narrowDim,
       offset: narrowOffset,
     },
+  };
+}
+
+export function resolveRoutingPolicyForModel(
+  input: ResolveModelProfileInput,
+  options: ResolveRoutingPolicyOptions = {},
+): ResolvedRoutingPolicy {
+  const resolver =
+    options.resolver ?? new ModelProfileResolver(options.resolverOptions);
+  const modelProfile = resolver.resolve(input);
+
+  return {
+    modelProfile,
+    routingPolicy: createRoutingPolicy(
+      modelProfile,
+      options.routingPolicyOverrides,
+    ),
   };
 }

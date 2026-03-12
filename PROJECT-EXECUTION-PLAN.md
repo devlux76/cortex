@@ -2,22 +2,48 @@
 
 This file is the canonical carry-over plan for implementation sequencing, test gates, and next-session priority. Keep this file updated as work progresses.
 
+## Pass Status (2026-03-11)
+
+Completed in this pass:
+1. Implemented `ModelProfile` source-of-truth layer:
+   - `core/ModelProfile.ts`
+   - `core/ModelDefaults.ts`
+   - `core/ModelProfileResolver.ts`
+2. Added TDD coverage for model defaults/resolution and routing derivation:
+   - `tests/model/ModelDefaults.test.ts`
+   - `tests/model/ModelProfileResolver.test.ts`
+   - `tests/model/RoutingPolicy.test.ts`
+3. Added `createRoutingPolicy(...)` derivation from profile-owned embedding dimensions.
+4. Added runtime numeric constants surface (`core/NumericConstants.ts`) and removed repeated byte/workgroup literals from backends and storage paths.
+5. Added `guard:model-derived` command and scanner (`scripts/guard-model-derived.mjs`) to block hardcoded model-related numeric literals outside approved sources.
+6. Validation gates passed in this workspace state:
+   - `npm run test:unit`
+   - `npm run guard:model-derived`
+   - `npm run build`
+   - `npm run lint`
+7. Added model-profile-to-policy bridge helper so runtime callers can resolve profile and derive routing in one step:
+   - `resolveRoutingPolicyForModel(...)` in `Policy.ts`
+   - integration tests in `tests/model/RoutingPolicy.test.ts`
+
+Open items carried to next pass:
+1. Wire resolved `ModelProfile` into first concrete ingest/query orchestrator path (once those runtime modules are added).
+2. Add embedding provider resolver/runner modules and connect fallback policy to runtime execution.
+3. Add browser/electron runtime scripts and CI lanes for non-Node merge gating.
+
 ## Next Session Highest Priority (P0)
 
-Run a full code pass across the repository before new feature coding.
+Integrate model-profile ownership into runtime flows and start the embedding vertical slice.
 
 Instruction:
-1. Traverse all TypeScript source and tests.
-2. Remove hardcoded model-dependent assumptions.
-3. Classify every numeric constant as one of:
-   - `model-derived`: must come from resolved model metadata.
-   - `runtime-policy`: must come from explicit policy/config objects.
-4. Add or update tests first (Red), then implement (Green), then refactor.
+1. Use `ModelProfileResolver` at runtime boundaries before any policy derivation or embedding execution.
+2. Implement first embedding runner/provider resolver slice with fallback semantics.
+3. Keep strict TDD (Red -> Green -> Refactor).
+4. If a blocker appears, record it in this document under an error log entry and continue with the next actionable slice.
 
 Definition of done for this pass:
-1. No model-dependent domain constants remain in feature code.
-2. A `ModelProfile` contract is the single source of truth for model-derived values.
-3. A guard command fails CI when disallowed hardcoded literals are introduced.
+1. Runtime path resolves model metadata through `ModelProfileResolver` before use.
+2. Embedding provider resolver tests and implementation are present.
+3. Any unresolved blocker is documented with file/symptom/next action.
 
 ## Non-Negotiable Rules
 
@@ -30,11 +56,11 @@ Definition of done for this pass:
 
 1. Lock contracts and TDD workflow.
 2. Lock command contract and CI lanes.
-3. Implement model-profile layer first:
+3. ~~Implement model-profile layer first:~~ ✅ Done (2026-03-11)
    - `core/ModelProfile.ts`
    - `core/ModelProfileResolver.ts`
    - `core/ModelDefaults.ts`
-4. Replace hardcoded model-dependent values with `ModelProfile` lookups.
+4. ~~Replace hardcoded model-dependent values with `ModelProfile` lookups.~~ ✅ Done for current code paths (2026-03-11)
 5. Implement embedding runner with fallback chain and telemetry:
    - `embeddings/EmbeddingRunner.ts`
    - `embeddings/ProviderResolver.ts`
@@ -63,24 +89,27 @@ Definition of done for this pass:
 
 ## Command Contract
 
+Available now:
 1. `npm run test:unit`
 2. `npm run test:unit -- tests/model/ModelProfileResolver.test.ts`
 3. `npm run test:unit -- tests/model/ModelDefaults.test.ts`
-4. `npm run test:unit -- tests/embeddings/ProviderResolver.test.ts`
-5. `npm run test:unit -- tests/embeddings/OnnxEmbeddingRunner.test.ts`
-6. `npm run guard:model-derived`
-7. `npm run test:browser`
-8. `npm run test:electron`
-9. `npm run build && npm run lint`
-10. `npm run test:all`
-11. `npm run benchmark`
+4. `npm run guard:model-derived`
+5. `npm run build && npm run lint`
+
+Planned commands to add in later passes:
+1. `npm run test:unit -- tests/embeddings/ProviderResolver.test.ts`
+2. `npm run test:unit -- tests/embeddings/OnnxEmbeddingRunner.test.ts`
+3. `npm run test:browser`
+4. `npm run test:electron`
+5. `npm run test:all`
+6. `npm run benchmark`
 
 ## Known Hardcoded Hotspots To Clean First
 
-1. `core/types.ts` comments with sample token/dimension values.
-2. `Policy.ts` sample projection dimensions.
-3. `Cortex-sketch.md` and `Cortex-sketch-errata.md` illustrative constants (`2048`, `768`, `128`, `0.68`, `40`, etc.).
-4. Any ingest/query defaults currently assumed without model metadata backing.
+1. ~~`core/types.ts` comments with sample token/dimension values.~~ ✅ Updated to source-owned wording.
+2. ~~`Policy.ts` sample projection dimensions.~~ ✅ Replaced with derived policy implementation.
+3. ~~`Cortex-sketch.md` and `Cortex-sketch-errata.md` illustrative constants (`2048`, `768`, `128`, `0.68`, `40`, etc.).~~ ✅ Clarified as illustrative.
+4. Any ingest/query defaults currently assumed without model metadata backing. (Pending runtime module implementation)
 
 ## Scope Notes
 

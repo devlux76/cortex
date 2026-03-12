@@ -22,6 +22,20 @@ Interpretation rule for this document:
 1. Architectural intent remains here.
 2. Execution order, command contract, and test matrix are governed by `PROJECT-EXECUTION-PLAN.md`.
 
+### 0.1 Status Update (2026-03-11)
+
+Completed since the prior snapshot:
+1. Model-profile source-of-truth layer exists (`core/ModelProfile.ts`, `core/ModelDefaults.ts`, `core/ModelProfileResolver.ts`).
+2. Routing policy dimensions are now derived from profile-owned embedding dimensions (`createRoutingPolicy`).
+3. Guard command exists for model-related hardcoded numeric literals (`npm run guard:model-derived`).
+4. Runtime numeric constants are centralized for backend/storage internals (`core/NumericConstants.ts`).
+5. Runtime helper resolves model metadata and derives routing policy in one call (`resolveRoutingPolicyForModel` in `Policy.ts`).
+
+Next focus:
+1. Wire resolved model profiles into runtime ingest/query entry points.
+2. Build embedding provider resolver + runner modules and associated tests.
+3. Add browser/electron runtime test lanes to match merge-gate policy.
+
 ## 1. Design
 
 ### 1.1 Product contract
@@ -139,11 +153,10 @@ Graceful degradation:
 
 ### 1.9 Current gap analysis from repo snapshot
 Observed blockers in current PoC files:
-1. Interface mismatch: `VectorBackend.ts` method signatures differ from concrete backend implementations.
-2. `BackendKind` and `detectBackend` are referenced in code but only defined in sketch docs.
-3. No project scaffolding (`package.json`, `tsconfig`, test runner, lint config).
-4. Shader and backend files are present but not integrated into an executable runtime.
-5. No concrete OPFS or IndexedDB implementation files yet.
+1. Embedding runtime modules (provider resolver + runner) are still missing.
+2. Ingest/query orchestrators are not yet wired to resolved `ModelProfile` values.
+3. Browser/Electron runtime test lanes are not yet implemented in scripts/CI.
+4. Shader and backend files compile but are not yet integrated into a full vertical runtime path.
 
 These are Phase 0 blockers and should be fixed before feature work.
 
@@ -256,16 +269,16 @@ Priority legend:
 3. P2 = optimization, resilience, polish.
 
 ### P0 (do first)
-1. Create TypeScript project scaffolding (`package.json`, `tsconfig`, test runner).
-2. Define canonical shared types for all entities from sketch and errata.
-3. Resolve `VectorBackend` interface mismatch against all backend classes.
-4. Add `BackendKind` and `detectBackend` in real code module.
-5. Add missing imports/exports so backend factory compiles.
+1. ~~Create TypeScript project scaffolding (`package.json`, `tsconfig`, test runner).~~ ✅ Done
+2. ~~Define canonical shared types for all entities from sketch and errata.~~ ✅ Done
+3. ~~Resolve `VectorBackend` interface mismatch against all backend classes.~~ ✅ Done
+4. ~~Add `BackendKind` and `detectBackend` in real code module.~~ ✅ Done
+5. ~~Add missing imports/exports so backend factory compiles.~~ ✅ Done
 6. Decide and document naming convention: `Metroid` vs `Medoid`.
 7. Add minimal CI workflow for build and tests.
-8. Add lint/format rules for consistent style.
+8. ~~Add lint/format rules for consistent style.~~ ✅ Done
 9. Add deterministic floating-point tolerance helpers for backend parity tests.
-10. Add smoke test that instantiates each backend or cleanly falls back.
+10. ~~Add smoke test that instantiates each backend or cleanly falls back.~~ ✅ Done (`tests/BackendSmoke.test.ts`)
 
 ### P1 (v1 core)
 1. ~~Implement `OPFSVectorStore.appendVector` and `readVector`.~~ ✅ Done (Phase 1, 2026-03-11)
