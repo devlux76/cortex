@@ -23,9 +23,9 @@ This document tracks the implementation status of each major module in CORTEX. I
 | Core Types | ✅ Complete | `core/types.ts` | All entity interfaces defined (Page, Book, Volume, Shelf, Edge, MetroidNeighbor, storage interfaces) |
 | Model Profiles | ✅ Complete | `core/ModelProfile.ts`, `core/ModelDefaults.ts`, `core/ModelProfileResolver.ts`, `core/BuiltInModelProfiles.ts` | Source-of-truth for model-derived numerics; guard script enforces compliance |
 | Numeric Constants | ✅ Complete | `core/NumericConstants.ts` | Runtime constants (byte sizes, workgroup limits) centralized |
-| Crypto Helpers | ❌ Missing | `core/crypto/*` (planned) | Hash, sign, verify utilities not yet implemented |
+| Crypto Helpers | ✅ Complete | `core/crypto/hash.ts`, `core/crypto/sign.ts`, `core/crypto/verify.ts` | SHA-256 hashing; Ed25519 sign/verify; 26 tests passing |
 
-**Foundation Status:** 3/4 complete (75%)
+**Foundation Status:** 4/4 complete (100%)
 
 ---
 
@@ -148,7 +148,7 @@ This document tracks the implementation status of each major module in CORTEX. I
 
 | Module | Status | Files | Notes |
 |--------|--------|-------|-------|
-| Unit Tests | ✅ Complete | `tests/*.test.ts`, `tests/**/*.test.ts` | 89 tests across 10 files; all passing |
+| Unit Tests | ✅ Complete | `tests/*.test.ts`, `tests/**/*.test.ts` | 115 tests across 13 files; all passing |
 | Persistence Tests | ✅ Complete | `tests/Persistence.test.ts` | Full storage layer coverage (OPFS, IndexedDB, Metroid neighbors) |
 | Model Tests | ✅ Complete | `tests/model/*.test.ts` | Profile resolution, defaults, routing policy |
 | Embedding Tests | ✅ Complete | `tests/embeddings/*.test.ts` | Provider resolver, runner, real/dummy backends |
@@ -180,7 +180,7 @@ This document tracks the implementation status of each major module in CORTEX. I
 
 | Layer | Completion | Critical Gap |
 |-------|-----------|--------------|
-| Foundation | 75% | Crypto helpers |
+| Foundation | 100% | — |
 | Storage | 100% | — |
 | Vector Compute | 100% | — |
 | Embedding | 83% | WebGL provider (low priority) |
@@ -203,14 +203,14 @@ This document tracks the implementation status of each major module in CORTEX. I
 - ✅ Generate real embeddings via Transformers.js
 - ✅ Resolve model profiles and derive routing policies
 - ✅ Run browser/Electron runtime harness
-- ✅ Pass 89 unit tests
+- ✅ Pass 115 unit tests
+- ✅ Hash text/binary content (SHA-256) and sign/verify Ed25519 signatures
 
 ## What Doesn't Work Today
 
 - ❌ **Cannot ingest text** — No chunking or hierarchy builder
 - ❌ **Cannot query memories** — No ranking pipeline or TSP solver
 - ❌ **Cannot consolidate** — No Daydreamer loop
-- ❌ **Cannot sign/verify** — No crypto helpers
 
 ---
 
@@ -220,10 +220,10 @@ This document tracks the implementation status of each major module in CORTEX. I
 
 **Goal:** Enable ingest and retrieval for a single user session.
 
-1. **Crypto Helpers** (`core/crypto/*`)
-   - Implement SHA-256 hashing
-   - Implement Ed25519 signing/verification
-   - Test coverage
+1. **Crypto Helpers** (`core/crypto/*`) ✅ **Complete**
+   - SHA-256 hashing for text and binary
+   - Ed25519 signing/verification
+   - 26 tests passing
 
 2. **Text Chunking** (`hippocampus/Chunker.ts`)
    - Token-aware splitting respecting ModelProfile limits
@@ -335,10 +335,6 @@ This document tracks the implementation status of each major module in CORTEX. I
 ### Blocker 2: No Query Orchestration
 **Impact:** Cannot retrieve memories.
 **Mitigation:** Phase 1 priority; flat ranking acceptable for v0.1.
-
-### Blocker 3: No Crypto Helpers
-**Impact:** Cannot sign/verify pages (integrity risk).
-**Mitigation:** Phase 1 priority; required for trustworthy storage.
 
 ### Risk 1: TSP Complexity
 Open TSP is NP-hard; heuristic may be slow on large subgraphs.
