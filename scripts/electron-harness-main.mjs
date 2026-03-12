@@ -5,9 +5,15 @@ import process from "node:process";
 
 const HARNESS_URL = process.env.HARNESS_URL ?? "http://127.0.0.1:4173";
 const SHOW_WINDOW = process.env.CORTEX_ELECTRON_SHOW === "1";
+const OZONE_PLATFORM = process.env.CORTEX_OZONE_PLATFORM ?? "x11";
+const DISABLE_VULKAN = process.env.CORTEX_DISABLE_VULKAN !== "0";
 
 app.commandLine.appendSwitch("enable-unsafe-webgpu");
 app.commandLine.appendSwitch("ignore-gpu-blocklist");
+app.commandLine.appendSwitch("ozone-platform", OZONE_PLATFORM);
+if (DISABLE_VULKAN) {
+  app.commandLine.appendSwitch("disable-vulkan");
+}
 
 app.on("gpu-info-update", async () => {
   try {
