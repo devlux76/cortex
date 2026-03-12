@@ -2,6 +2,11 @@
 
 This file is the canonical carry-over plan for implementation sequencing, test gates, and next-session priority. Keep this file updated as work progresses.
 
+Canonical document contract:
+1. Product vision and non-negotiables: `README.md`
+2. Architecture contracts and backlog: `CORTEX-DESIGN-PLAN-TODO.md`
+3. Execution sequencing, command contract, and test gates: `PROJECT-EXECUTION-PLAN.md`
+
 ## Pass Status (2026-03-11)
 
 Completed in this pass:
@@ -41,12 +46,48 @@ Completed in this pass:
    - `npm run build`
    - `npm run benchmark:dummy`
    - ad hoc `Vectors.wat` compile + instantiate + export smoke (`dot_many`, `project`, `hash_binary`, `hamming_scores`, `topk_i32`, `topk_f32`) via transient `wabt`
+13. Synchronized canonical docs with anti-drift protocol and shared P0 priorities:
+   - `README.md`
+   - `CORTEX-DESIGN-PLAN-TODO.md`
+   - `PROJECT-EXECUTION-PLAN.md`
+14. Implemented browser-first runtime harness and local server:
+   - `runtime/harness/index.html`
+   - `scripts/runtime-harness-server.mjs`
+15. Implemented thin Electron wrapper and runtime lane tests:
+   - `scripts/electron-harness-main.mjs`
+   - `tests/runtime/browser-harness.spec.mjs`
+   - `tests/runtime/electron-harness.spec.mjs`
+16. Added Playwright runtime lane configuration and scripts:
+   - `playwright.config.mjs`
+   - `package.json` scripts (`dev:harness`, `test:browser`, `test:electron`, `test:runtime`, `test:all`)
+17. Added explicit Electron lane runner with actionable setup messaging and optional local soft-skip:
+   - `scripts/run-electron-runtime-tests.mjs`
+   - `CORTEX_ALLOW_ELECTRON_SKIP=1` local skip flag
+18. Validation gates executed in this pass:
+   - `npm run build`
+   - `npm run lint`
+   - `npm run guard:model-derived`
+   - `npm run test:unit`
+   - `npm run test:browser`
+   - `CORTEX_ALLOW_ELECTRON_SKIP=1 npm run test:electron`
 
 Open items carried to next pass:
 1. Wire resolved `ModelProfile` into first concrete ingest/query orchestrator path.
 2. Add real embedding providers (ONNX/Transformers/WebNN/WebGPU/WebGL/WASM) as candidates for the resolver.
-3. Add browser/electron runtime scripts and CI lanes for non-Node merge gating.
-4. Build the browser-first runtime harness described below and use it as the substrate for runtime-browser/runtime-electron lanes.
+3. Provision Electron binary availability in CI image and enforce `runtime-electron` as hard gate.
+4. Implement first Hippocampus/Cortex vertical slice on top of runtime harness lanes.
+
+### Documentation Synchronization Protocol (Required)
+
+At the end of every implementation pass, update docs in this order:
+1. `PROJECT-EXECUTION-PLAN.md`: pass status delta and exact commands executed.
+2. `CORTEX-DESIGN-PLAN-TODO.md`: design-to-code status matrix.
+3. `README.md`: top blocker and current P0 priorities.
+
+Blocker logging format:
+1. File path
+2. Failure symptom
+3. Next actionable step
 
 ### Runtime Verification Snapshot (2026-03-11)
 
@@ -106,31 +147,23 @@ Decision from this pass:
 4. Keep Chromium as the web-parity lane; use Electron as the primary GPU/runtime realism lane.
 5. Serve the harness over `http://127.0.0.1` / `http://localhost` during development and testing; do not rely on `file://` for WebGPU-sensitive execution.
 
-## Next Session Highest Priority (P0)
+## Current Pass Highest Priority (P0)
 
-Stand up the browser-first runtime harness and thin Electron wrapper so real GPU/browser validation can begin, then connect adaptive embedding selection into that runtime path.
+Move from harness scaffolding to production validation by enabling Electron gate provisioning, wiring real providers, and implementing first ingest/query orchestration slices.
 
 Instruction:
-1. Create a minimal harness renderer that reports:
-   - `navigator.gpu` availability
-   - adapter/device acquisition outcome
-   - IndexedDB + OPFS availability
-   - selected embedding backend/provider kind
-2. Add a thin Electron main-process wrapper that:
-   - loads the same harness via localhost
-   - appends required Chromium switches before `ready`
-   - logs GPU feature status and GPU info after `gpu-info-update`
-3. Add Playwright coverage for two lanes:
-   - Chromium web harness
-   - Electron harness
-4. After the harness exists, register the first real embedding providers in `ProviderResolver` and test selection inside the real runtime lane.
-5. Keep strict TDD (Red -> Green -> Refactor).
-6. If a blocker appears, record it in this document under an error log entry and continue with the next actionable slice.
+1. Keep canonical docs synchronized (`README.md`, `CORTEX-DESIGN-PLAN-TODO.md`, `PROJECT-EXECUTION-PLAN.md`) before and after implementation slices.
+2. Provision Electron in CI/runtime images and remove local soft-skip in gated contexts.
+3. Register the first real embedding providers in `ProviderResolver` and test selection inside runtime lanes.
+4. Implement first `Hippocampus` ingest orchestration entry point with profile-resolved settings.
+5. Implement first `Cortex` retrieval orchestration entry point with deterministic coherence ordering baseline.
+6. Keep strict TDD (Red -> Green -> Refactor).
+7. If a blocker appears, record it in this document under an error log entry and continue with the next actionable slice.
 
 Definition of done for this pass:
-1. A single renderer harness runs under both Chromium and Electron.
-2. Electron lane emits GPU capability diagnostics on Linux.
-3. At least one real provider candidate is wired into resolver selection from the runtime harness.
+1. Canonical docs expose the same P0 priorities and maintenance protocol.
+2. Runtime browser lane passes from Playwright against shared harness.
+3. Electron lane has explicit provisioning contract and blocker handling.
 4. Any unresolved blocker is documented with file/symptom/next action.
 
 ## Non-Negotiable Rules
@@ -190,13 +223,22 @@ Available now:
 8. `npm run benchmark:dummy`
 9. `npm run benchmark`
 10. `npm run build && npm run lint`
+11. `npm run dev:harness`
+12. `npm run test:browser`
+13. `npm run test:electron`
+14. `npm run test:runtime`
+15. `npm run test:all`
 
 Planned commands to add in later passes:
 1. `npm run test:unit -- tests/embeddings/OnnxEmbeddingRunner.test.ts`
-2. `npm run dev:harness`
-3. `npm run test:browser`
-4. `npm run test:electron`
-5. `npm run test:all`
+2. `npm run test:integration`
+3. `npm run test:runtime:strict` (no local soft-skip)
+
+## Error Log
+
+1. File path: `scripts/run-electron-runtime-tests.mjs` / `package.json`
+2. Failure symptom: Electron executable is unavailable in this environment after `npm install`; direct `npm run test:electron` cannot launch Electron.
+3. Next action: provision Electron binary in CI image (or ensure `npm install -D electron` succeeds in runtime lane environment), then run `npm run test:electron` without `CORTEX_ALLOW_ELECTRON_SKIP=1`.
 
 ## Known Hardcoded Hotspots To Clean First
 

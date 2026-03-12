@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>CORTEX Runtime Harness</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
+        background: #f4f6fb;
+        color: #10203a;
+      }
+
+      body {
+        margin: 0;
+        padding: 24px;
+        background: radial-gradient(circle at top right, #dfeaff, #f4f6fb 45%);
+      }
+
+      main {
+        max-width: 840px;
+        margin: 0 auto;
+        background: #ffffff;
+        border: 1px solid #d2dbed;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 8px 24px rgba(16, 32, 58, 0.08);
+      }
+
+      h1 {
+        margin-top: 0;
+        font-size: 1.4rem;
+      }
+
+      dl {
+        display: grid;
+        grid-template-columns: 220px 1fr;
+        gap: 10px 12px;
+      }
+
+      dt {
+        font-weight: 600;
+      }
+
+      dd {
+        margin: 0;
+      }
+
+      pre {
+        background: #eef3ff;
+        border: 1px solid #d2dbed;
+        border-radius: 8px;
+        padding: 12px;
+        overflow: auto;
+        font-size: 0.85rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>CORTEX Runtime Harness</h1>
+      <p>
+        Shared browser-first probe page used by Chromium and Electron runtime
+        lanes.
+      </p>
+      <dl>
+        <dt>Probe Ready</dt>
+        <dd data-testid="probe-ready" id="probe-ready">false</dd>
+
+        <dt>Selected Provider Kind</dt>
+        <dd data-testid="selected-provider" id="selected-provider">pending</dd>
+
+        <dt>WebGPU</dt>
+        <dd data-testid="webgpu-status" id="webgpu-status">pending</dd>
+
+        <dt>WebNN</dt>
+        <dd data-testid="webnn-status" id="webnn-status">pending</dd>
+
+        <dt>WebGL2</dt>
+        <dd data-testid="webgl2-status" id="webgl2-status">pending</dd>
+
+        <dt>IndexedDB</dt>
+        <dd data-testid="indexeddb-status" id="indexeddb-status">pending</dd>
+
+        <dt>OPFS</dt>
+        <dd data-testid="opfs-status" id="opfs-status">pending</dd>
+      </dl>
+
+      <h2>Probe Report</h2>
+      <pre data-testid="report-json" id="report-json">{}</pre>
+    </main>
+
+    <script type="module">
+      const PROVIDER_ORDER = ["webnn", "webgpu", "webgl", "wasm"];
+
+      function setText(id, value) {
+        const node = document.getElementById(id);
+        if (node) {
+          node.textContent = String(value);
+        }
+      }
+
+      function createBaseReport() {
+        return {
+          probeVersion: "2026-03-11",
+          runtime: {
+            userAgent: globalThis.navigator?.userAgent ?? "unknown",
+            secureContext: globalThis.isSecureContext === true,
+          },
+          capabilities: {
+            webgpu: {
+              available: false,
+              adapterAcquired: false,
+              deviceAcquired: false,
+              error: null,
+            },
+            webnn: {
+              available: false,
+              contextAcquired: false,
+              error: null,
+            },
+            webgl2: {
+              available: false,
+            },
+          },
+          storage: {
+            indexedDb: "unavailable",
+            opfs: "unavailable",
+            errors: [],
+          },
+          selectedProvider: "wasm",
+        };
+      }
+
+      async function probeIndexedDb(report) {
+        if (typeof globalThis.indexedDB === "undefined") {
+          report.storage.indexedDb = "unavailable";
+          return;
+        }
+
+        report.storage.indexedDb = await new Promise((resolve) => {
+          const request = globalThis.indexedDB.open("cortex-harness-probe", 1);
+          request.onerror = () => resolve("error");
+          request.onupgradeneeded = () => {
+            if (!request.result.objectStoreNames.contains("probe")) {
+              request.result.createObjectStore("probe");
+            }
+          };
+          request.onsuccess = () => {
+            request.result.close();
+            resolve("available");
+          };
+        });
+      }
+
+      async function probeOpfs(report) {
+        const storage = globalThis.navigator?.storage;
+        if (!storage || typeof storage.getDirectory !== "function") {
+          report.storage.opfs = "unavailable";
+          return;
+        }
+
+        try {
+          await storage.getDirectory();
+          report.storage.opfs = "available";
+        } catch (error) {
+          report.storage.opfs = "error";
+          report.storage.errors.push(String(error));
+        }
+      }
+
+      async function probeWebGpu(report) {
+        const nav = globalThis.navigator;
+        const gpu = nav && "gpu" in nav ? nav.gpu : undefined;
+        report.capabilities.webgpu.available = gpu !== undefined;
+
+        if (!gpu) {
+          return;
+        }
+
+        try {
+          const adapter = await gpu.requestAdapter();
+          report.capabilities.webgpu.adapterAcquired = adapter !== null;
+          if (adapter) {
+            await adapter.requestDevice();
+            report.capabilities.webgpu.deviceAcquired = true;
+          }
+        } catch (error) {
+          report.capabilities.webgpu.error = String(error);
+        }
+      }
+
+      async function probeWebNn(report) {
+        const nav = globalThis.navigator;
+        const ml = nav && "ml" in nav ? nav.ml : undefined;
+        report.capabilities.webnn.available =
+          ml !== undefined && typeof ml.createContext === "function";
+
+        if (!report.capabilities.webnn.available) {
+          return;
+        }
+
+        try {
+          await ml.createContext({ deviceType: "gpu" });
+          report.capabilities.webnn.contextAcquired = true;
+        } catch (error) {
+          report.capabilities.webnn.error = String(error);
+        }
+      }
+
+      function probeWebGl2(report) {
+        const canvas = document.createElement("canvas");
+        report.capabilities.webgl2.available =
+          canvas.getContext("webgl2") !== null;
+      }
+
+      function selectProvider(report) {
+        const isWebNnReady =
+          report.capabilities.webnn.contextAcquired ||
+          report.capabilities.webnn.available;
+        const isWebGpuReady =
+          report.capabilities.webgpu.deviceAcquired ||
+          report.capabilities.webgpu.adapterAcquired ||
+          report.capabilities.webgpu.available;
+        const isWebGlReady = report.capabilities.webgl2.available;
+
+        const availability = {
+          webnn: isWebNnReady,
+          webgpu: isWebGpuReady,
+          webgl: isWebGlReady,
+          wasm: true,
+        };
+
+        report.selectedProvider =
+          PROVIDER_ORDER.find((kind) => availability[kind]) ?? "wasm";
+      }
+
+      function renderReport(report) {
+        setText("selected-provider", report.selectedProvider);
+
+        const webgpu = report.capabilities.webgpu;
+        setText(
+          "webgpu-status",
+          `${webgpu.available ? "available" : "unavailable"}, adapter=${webgpu.adapterAcquired}, device=${webgpu.deviceAcquired}`
+        );
+
+        const webnn = report.capabilities.webnn;
+        setText(
+          "webnn-status",
+          `${webnn.available ? "available" : "unavailable"}, context=${webnn.contextAcquired}`
+        );
+
+        setText(
+          "webgl2-status",
+          report.capabilities.webgl2.available ? "available" : "unavailable"
+        );
+        setText("indexeddb-status", report.storage.indexedDb);
+        setText("opfs-status", report.storage.opfs);
+
+        const pretty = JSON.stringify(report, null, 2);
+        setText("report-json", pretty);
+      }
+
+      async function runProbe() {
+        const report = createBaseReport();
+
+        probeWebGl2(report);
+        await Promise.all([
+          probeIndexedDb(report),
+          probeOpfs(report),
+          probeWebGpu(report),
+          probeWebNn(report),
+        ]);
+
+        selectProvider(report);
+        renderReport(report);
+
+        globalThis.__cortexHarnessReport = report;
+        globalThis.__cortexHarnessReady = true;
+        setText("probe-ready", "true");
+      }
+
+      runProbe().catch((error) => {
+        const report = createBaseReport();
+        report.storage.errors.push(String(error));
+        report.selectedProvider = "wasm";
+        globalThis.__cortexHarnessReport = report;
+        globalThis.__cortexHarnessReady = true;
+        renderReport(report);
+        setText("probe-ready", "true");
+      });
+    </script>
+  </body>
+</html>

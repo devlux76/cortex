@@ -8,13 +8,31 @@ A neurobiologically inspired, fully on-device epistemic memory engine for autono
 
 ## Execution Update (2026-03-11)
 
-Canonical plan file: `PROJECT-EXECUTION-PLAN.md`.
+Canonical documentation contract:
+1. Product vision and non-negotiables: `README.md`
+2. Architecture contracts and capability backlog: `CORTEX-DESIGN-PLAN-TODO.md`
+3. Execution sequencing, command contract, and test gates: `PROJECT-EXECUTION-PLAN.md`
 
-Next session highest priority (P0):
-1. Run a full code pass before new feature coding.
-2. Remove hardcoded model-dependent assumptions.
-3. Ensure model-derived values come from resolved model metadata (`ModelProfile`).
-4. Keep strict TDD (Red -> Green -> Refactor) across all changes.
+Current implementation snapshot:
+1. Foundation, storage schema, and vector backend abstractions are implemented.
+2. Model-profile-driven numeric ownership is implemented and guarded by `npm run guard:model-derived`.
+3. Adaptive embedding resolver infrastructure exists, but real providers are still being wired.
+4. Runtime harness and browser lane are implemented (`npm run dev:harness`, `npm run test:browser`).
+5. Electron lane is wired but environment-dependent (`npm run test:electron` requires Electron binary availability).
+6. Hippocampus/Cortex/Daydreamer orchestration layers remain the primary vertical-slice gap.
+
+Current delivery priorities (P0):
+1. Keep docs synchronized to real code state on every implementation pass.
+2. Stabilize Electron provisioning in CI so `runtime-electron` can run as a hard gate.
+3. Wire first real embedding providers into runtime selection path.
+4. Implement Hippocampus ingest and Cortex retrieval vertical slices with strict TDD.
+5. Preserve model-derived defaults and avoid hardcoded model-dependent numerics.
+
+Session-close update checklist (required):
+1. Update `PROJECT-EXECUTION-PLAN.md` pass status with completed work and exact commands run.
+2. Update `CORTEX-DESIGN-PLAN-TODO.md` status matrix when implementation state changes.
+3. Record blockers with file path, failure symptom, and next action.
+4. Confirm README priorities still match the real top blocker.
 
 Docs note:
 1. Numeric examples in design docs are illustrative unless explicitly sourced from model metadata.

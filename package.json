@@ -7,14 +7,20 @@
     "build": "tsc -p tsconfig.json --noEmit",
     "typecheck": "npm run build",
     "lint": "eslint .",
-    "test": "vitest run",
-    "test:unit": "vitest run",
-    "test:watch": "vitest",
+    "test": "vitest run tests/*.test.ts tests/**/*.test.ts",
+    "test:unit": "vitest run tests/*.test.ts tests/**/*.test.ts",
+    "test:watch": "vitest tests/*.test.ts tests/**/*.test.ts",
+    "dev:harness": "node scripts/runtime-harness-server.mjs",
+    "test:browser": "playwright test tests/runtime/browser-harness.spec.mjs",
+    "test:electron": "node scripts/run-electron-runtime-tests.mjs",
+    "test:runtime": "npm run test:browser && npm run test:electron",
+    "test:all": "npm run test:unit && npm run test:runtime",
     "guard:model-derived": "node scripts/guard-model-derived.mjs",
     "benchmark:dummy": "vitest bench --watch=false tests/benchmarks/DummyEmbedderHotpath.bench.ts",
     "benchmark": "npm run benchmark:dummy"
   },
   "devDependencies": {
+    "@playwright/test": "^1.55.1",
     "@eslint/js": "^9.38.0",
     "@webgpu/types": "^0.1.64",
     "eslint": "^9.38.0",
@@ -22,5 +28,8 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.46.2",
     "vitest": "^3.2.4"
+  },
+  "optionalDependencies": {
+    "electron": "^37.2.0"
   }
 }

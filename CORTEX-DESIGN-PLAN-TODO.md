@@ -10,13 +10,17 @@ This plan is synthesized from:
 
 ## 0. Execution Synchronization (2026-03-11)
 
-Canonical execution plan: `PROJECT-EXECUTION-PLAN.md`.
+Canonical document contract:
+1. Product vision and non-negotiables: `README.md`
+2. Architecture contracts and backlog: `CORTEX-DESIGN-PLAN-TODO.md`
+3. Execution sequencing, test gates, and command contract: `PROJECT-EXECUTION-PLAN.md`
 
-Next session highest priority (P0):
-1. Perform a full code pass before feature expansion.
-2. Remove hardcoded model-dependent numbers from implementation paths.
-3. Route model-derived values through a resolved `ModelProfile` contract.
-4. Keep strict TDD and required runtime lanes (`unit-node`, `runtime-browser`, `runtime-electron`).
+Current delivery priorities (P0):
+1. Keep docs synchronized to real code state on every implementation pass.
+2. Stabilize Electron provisioning in CI so `runtime-electron` can run as a hard gate.
+3. Wire first real embedding providers into runtime selection path.
+4. Implement Hippocampus ingest and Cortex retrieval vertical slices with strict TDD.
+5. Preserve model-derived defaults and avoid hardcoded model-dependent numerics.
 
 Interpretation rule for this document:
 1. Architectural intent remains here.
@@ -67,6 +71,34 @@ Why this direction won:
 1. Electron retains Chromium's WebGPU path and limitations, so it is realistic instead of synthetic.
 2. Electron gives better observability than raw browser automation on Linux (`app.commandLine`, GPU feature status/info).
 3. The current missing confidence is browser-runtime execution, not WASM kernel validity; `Vectors.wat` and the dummy embedder hotpaths have already been executed successfully in ad hoc verification.
+
+### 0.4 Documentation Maintenance Protocol (Anti-Drift)
+
+At the end of every implementation pass, update docs in this order:
+1. `PROJECT-EXECUTION-PLAN.md`: append pass status delta and exact commands executed.
+2. `CORTEX-DESIGN-PLAN-TODO.md`: update design-to-code status matrix below.
+3. `README.md`: confirm top blocker and P0 priorities still match reality.
+
+Required blocker logging format:
+1. File path
+2. Failure symptom
+3. Next actionable step
+
+### 0.5 Design-To-Code Status Matrix (2026-03-11)
+
+Legend: `Implemented`, `Partial`, `Missing`
+
+| Capability | Status | Primary Code Anchors | Notes |
+| --- | --- | --- | --- |
+| Vector backend abstraction (`webgpu`, `webgl`, `webnn`, `wasm`) | Implemented | `VectorBackend.ts`, `CreateVectorBackend.ts`, `WebGPUVectorBackend.ts`, `WebGLVectorBackend.ts`, `WebNNVectorBackend.ts`, `WasmVectorBackend.ts` | Runtime lanes still needed for real-environment confidence. |
+| Storage contracts and persistence schema | Implemented | `core/types.ts`, `storage/OPFSVectorStore.ts`, `storage/IndexedDbMetadataStore.ts`, `tests/Persistence.test.ts` | Current tests are Node-lane with mocked browser APIs. |
+| Model-derived numeric governance | Implemented | `core/ModelProfile.ts`, `core/ModelDefaults.ts`, `core/ModelProfileResolver.ts`, `Policy.ts`, `scripts/guard-model-derived.mjs` | Guard command enforced by `npm run guard:model-derived`. |
+| Adaptive provider resolver infrastructure | Partial | `embeddings/ProviderResolver.ts`, `embeddings/EmbeddingRunner.ts` | Real providers not yet wired; dummy provider baseline exists. |
+| Browser/Electron runtime-realism lanes | Partial | `playwright.config.mjs`, `runtime/harness/index.html`, `tests/runtime/browser-harness.spec.mjs`, `tests/runtime/electron-harness.spec.mjs` | Browser lane passes; Electron lane requires installed Electron binary in environment/CI image. |
+| Hippocampus ingest orchestrator | Missing | (planned module) | No text chunking -> embed -> persist orchestration path yet. |
+| Cortex retrieval and coherence path | Missing | (planned module) | Ranking stack and open-path solver not yet implemented. |
+| Daydreamer consolidation loop | Missing | (planned module) | Idle scheduling and recalc loop not yet implemented. |
+| Crypto signing and verification helpers | Missing | (planned module `core/crypto`) | Entity fields exist in `core/types.ts`, helper module pending. |
 
 ## 1. Design
 
