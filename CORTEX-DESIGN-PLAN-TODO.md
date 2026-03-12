@@ -33,10 +33,15 @@ Completed since the prior snapshot:
 6. Deterministic dummy SHA-256 embedder exists for pre-model hotpath testing (`embeddings/DeterministicDummyEmbeddingBackend.ts`).
 7. Benchmark harness exists for dummy embedder throughput baselining (`npm run benchmark:dummy`).
 8. Baseline adaptive provider selection exists with capability filtering + benchmark-based winner choice (`embeddings/ProviderResolver.ts`, `embeddings/EmbeddingRunner.ts`).
+9. External capability verification completed for real-provider planning:
+	- Transformers.js is ONNX Runtime-backed and directly exposes `webnn`, `webgpu`, and `wasm` device paths.
+	- Transformers.js does not currently expose `webgl` as a direct device; `webgl` should remain an explicit ORT adapter path.
 
 Next focus:
 1. Wire resolved model profiles into runtime ingest/query entry points.
-2. Add real embedding providers (ONNX/Transformers/WebNN/WebGPU/WebGL/WASM) to resolver candidate sets.
+2. Add real embedding providers to resolver candidate sets, split by runtime family:
+	- Transformers.js provider (`webnn/webgpu/wasm`)
+	- Explicit ORT WebGL provider (`webgl`)
 3. Add browser/electron runtime test lanes to match merge-gate policy.
 
 ## 1. Design
@@ -150,18 +155,23 @@ Performance budget targets for v1:
 
 Graceful degradation:
 1. `webgpu` preferred.
-2. `webgl` fallback.
-3. `webnn` optional path for matmul-friendly ops.
+2. `webnn` optional path for matmul-friendly ops.
+3. `webgl` fallback via explicit ORT adapter path.
 4. `wasm` guaranteed baseline.
+
+Implementation note (verified 2026-03-11):
+1. Transformers.js path currently maps to `webnn/webgpu/wasm` (no direct `webgl` device key).
+2. Keep `webgl` in architecture through the explicit ORT adapter backend.
 
 ### 1.9 Current gap analysis from repo snapshot
 Observed blockers in current PoC files:
-1. Embedding runtime modules (provider resolver + runner) are still missing.
-2. Ingest/query orchestrators are not yet wired to resolved `ModelProfile` values.
-3. Browser/Electron runtime test lanes are not yet implemented in scripts/CI.
-4. Shader and backend files compile but are not yet integrated into a full vertical runtime path.
+1. Embedding runtime modules exist (`ProviderResolver` + `EmbeddingRunner`), but only baseline/dummy-provider flow is wired.
+2. Real provider adapters are not yet wired (Transformers.js for `webnn/webgpu/wasm`; explicit ORT adapter for `webgl`).
+3. Ingest/query orchestrators are not yet wired to resolved `ModelProfile` values.
+4. Browser/Electron runtime test lanes are not yet implemented in scripts/CI.
+5. Shader and backend files compile but are not yet integrated into a full vertical runtime path.
 
-These are Phase 0 blockers and should be fixed before feature work.
+These are the remaining vertical-slice blockers before broader feature expansion.
 
 ## 2. Implementation Plan
 
@@ -318,7 +328,7 @@ Priority legend:
 6. Add corruption recovery tooling for vector store and metadata store.
 7. Add schema migration tests across multiple versions.
 8. Add large-corpus stress tests for memory and latency.
-9. Add adaptive runtime policy based on backend capability.
+9. Extend adaptive runtime policy with real providers and runtime telemetry persistence.
 10. Add resource governance controls for Daydreamer CPU budget.
 11. Improve ranking quality with optional rerank stage.
 12. Add developer docs with architecture diagrams and troubleshooting.

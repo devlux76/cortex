@@ -38,9 +38,26 @@ Completed in this pass:
    - selection now supports capability filtering + benchmark-based winner choice
 
 Open items carried to next pass:
-1. Wire resolved `ModelProfile` into first concrete ingest/query orchestrator path (once those runtime modules are added).
+1. Wire resolved `ModelProfile` into first concrete ingest/query orchestrator path.
 2. Add real embedding providers (ONNX/Transformers/WebNN/WebGPU/WebGL/WASM) as candidates for the resolver.
 3. Add browser/electron runtime scripts and CI lanes for non-Node merge gating.
+
+### External Capability Verification (2026-03-11)
+
+Verified during this pass (hard handoff facts):
+1. Transformers.js is ONNX Runtime-backed (docs + upstream source).
+2. Transformers.js device mapping exposes `webnn`, `webnn-gpu`, `webnn-cpu`, `webnn-npu`, `webgpu`, and `wasm` for web environments.
+3. Transformers.js does not currently expose `webgl` as a direct `device` type; WebGL should remain an explicit ORT adapter path.
+4. Node-side ONNX providers (platform-dependent) include `cuda`, `dml`, and `coreml` in upstream mapping.
+
+Source anchors to re-check quickly in a new session:
+1. `huggingface/transformers.js` -> `packages/transformers/src/backends/onnx.js`:
+   - `DEVICE_TO_EXECUTION_PROVIDER_MAPPING`
+   - `deviceToExecutionProviders(...)`
+2. `huggingface/transformers.js` -> `packages/transformers/src/utils/devices.js`:
+   - `DEVICE_TYPES`
+3. Transformers.js docs (`v3.8.1` and `main`):
+   - index + WebGPU guide + ONNX backend API pages
 
 ## Next Session Highest Priority (P0)
 
@@ -61,7 +78,9 @@ Definition of done for this pass:
 
 1. Strict TDD: Red -> Green -> Refactor for every slice.
 2. Runtime realism: browser and Electron lanes are required merge gates.
-3. Provider fallback policy: `webnn -> webgpu -> webgl -> wasm`.
+3. Provider fallback policy:
+   - Transformers.js path: `webnn -> webgpu -> wasm`
+   - Explicit ORT path: `webnn -> webgpu -> webgl -> wasm`
 4. Numeric ownership: model-derived values from profile; policy values from declared policy objects.
 
 ## Execution Sequence
@@ -76,8 +95,8 @@ Definition of done for this pass:
 5. Implement embedding runner with fallback chain and telemetry:
    - `embeddings/EmbeddingRunner.ts` ✅ baseline done (2026-03-11)
    - `embeddings/ProviderResolver.ts` ✅ baseline done (2026-03-11)
-   - `embeddings/TransformersEmbeddingBackend.ts`
-   - `embeddings/OrtWebglEmbeddingBackend.ts`
+   - `embeddings/TransformersEmbeddingBackend.ts` (targeting `webnn/webgpu/wasm`)
+   - `embeddings/OrtWebglEmbeddingBackend.ts` (explicit `webgl` path)
    - `embeddings/OnnxEmbeddingRunner.ts`
 6. Build Hippocampus ingest using profile-derived chunking/dimensions.
 7. Build Cortex retrieval using profile-derived routing/truncation policies.
