@@ -99,10 +99,37 @@ Completed in this pass:
 
 Open items carried to next pass:
 1. Wire resolved `ModelProfile` into first concrete ingest/query orchestrator path.
-2. Add real embedding providers (ONNX/Transformers/WebNN/WebGPU/WebGL/WASM) as candidates for the resolver.
+2. ~~Add real embedding providers (ONNX/Transformers/WebNN/WebGPU/WebGL/WASM) as candidates for the resolver.~~ **Done (2026-03-12)**
 3. Codify Docker lane as the default sandbox-isolated Electron debugging contract and document when host-shell Electron is still required.
 4. Define CI prerequisites for the chosen runtime-electron context (binary + graphics/runtime assumptions) and enforce one canonical gate.
 5. Implement first Hippocampus/Cortex vertical slice on top of runtime harness lanes.
+6. Implement `embeddings/OrtWebglEmbeddingBackend.ts` for explicit `webgl` fallback (deferred from this pass).
+
+### Pass Status (2026-03-12) — Real Embedding Providers
+
+Completed in this pass:
+1. Added `@huggingface/transformers` (3.8.1) as a runtime dependency.
+2. Implemented `embeddings/TransformersJsEmbeddingBackend.ts`:
+   - `EmbeddingBackend`-compatible, supports `webnn`/`webgpu`/`wasm` ONNX devices.
+   - Default: `onnx-community/embeddinggemma-300m-ONNX` (Q4-quantized EmbeddingGemma-300M).
+   - Lazy pipeline load via `@huggingface/transformers` dynamic import.
+   - `embed()` for document/passage encoding, `embedQueries()` for query encoding.
+   - Matryoshka sub-dimension slicing support.
+   - Model-agnostic: any matryoshka-compatible HF model works via `options.modelId`.
+3. Added `createTransformersJsProviderCandidates()` to `embeddings/ProviderResolver.ts`:
+   - Produces `webnn`, `webgpu`, `wasm` candidates with capability checks.
+   - Drop-in input for `resolveEmbeddingBackend()` / `EmbeddingRunner.fromResolverOptions()`.
+4. Added `core/BuiltInModelProfiles.ts`:
+   - Registry entry for `onnx-community/embeddinggemma-300m-ONNX` with model-card-sourced numerics.
+   - `BUILT_IN_MODEL_REGISTRY` ready for use in `ModelProfileResolver`.
+5. Extended `scripts/guard-model-derived.mjs` to allow `core/BuiltInModelProfiles.ts`.
+6. TDD coverage: 21 new tests across 3 new/extended test files.
+
+Validation gates executed:
+- `npm run build`
+- `npm run lint`
+- `npm run guard:model-derived`
+- `npm run test:unit` (89 tests, 10 test files, all passing)
 
 ### Night Handoff Note (2026-03-12)
 
@@ -113,8 +140,8 @@ Where we are now:
 4. Docker lane runs software rendering, so it is a debugger-stability lane rather than final GPU-realism proof.
 
 Tomorrow's first coding steps:
-1. Add failing tests for real-provider registration + capability-driven selection in embeddings runtime.
-2. Implement `embeddings/TransformersEmbeddingBackend.ts` and wire it into resolver candidates.
+1. ~~Add failing tests for real-provider registration + capability-driven selection in embeddings runtime.~~ **Done (2026-03-12)**
+2. ~~Implement `embeddings/TransformersEmbeddingBackend.ts` and wire it into resolver candidates.~~ **Done (2026-03-12)**
 3. Implement `embeddings/OrtWebglEmbeddingBackend.ts` and wire explicit `webgl` fallback path.
 4. Implement first `Hippocampus` ingest entry point with profile-derived defaults.
 5. Implement first `Cortex` retrieval entry point with deterministic baseline ordering.
