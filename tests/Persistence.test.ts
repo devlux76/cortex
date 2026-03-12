@@ -14,6 +14,7 @@ import { IDBFactory, IDBKeyRange as FakeIDBKeyRange } from "fake-indexeddb";
 import { MemoryVectorStore } from "../storage/MemoryVectorStore";
 import { OPFSVectorStore } from "../storage/OPFSVectorStore";
 import { IndexedDbMetadataStore } from "../storage/IndexedDbMetadataStore";
+import { FLOAT32_BYTES } from "../core/NumericConstants";
 import type {
   Book,
   Edge,
@@ -135,7 +136,7 @@ describe("VectorStore contract (MemoryVectorStore)", () => {
     const dim = 4;
     await store.appendVector(f32(1, 2, 3, 4));
     const offset2 = await store.appendVector(f32(5, 6, 7, 8));
-    expect(offset2).toBe(dim * 4); // 4 floats × 4 bytes = 16
+    expect(offset2).toBe(dim * FLOAT32_BYTES);
   });
 
   it("readVector round-trips the appended data", async () => {
@@ -201,7 +202,7 @@ describe("OPFSVectorStore (mocked OPFS)", () => {
   it("second append offset equals first vector's byte size", async () => {
     await store.appendVector(f32(1, 2, 3, 4));
     const o2 = await store.appendVector(f32(5, 6, 7, 8));
-    expect(o2).toBe(16); // 4 floats × 4 bytes
+    expect(o2).toBe(4 * FLOAT32_BYTES);
   });
 
   it("readVector round-trips appended data", async () => {

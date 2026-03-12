@@ -8,6 +8,20 @@ This plan is synthesized from:
 - `Cortex-sketch-errata.md`
 - Existing proof-of-concept backend files in this repo
 
+## 0. Execution Synchronization (2026-03-11)
+
+Canonical execution plan: `PROJECT-EXECUTION-PLAN.md`.
+
+Next session highest priority (P0):
+1. Perform a full code pass before feature expansion.
+2. Remove hardcoded model-dependent numbers from implementation paths.
+3. Route model-derived values through a resolved `ModelProfile` contract.
+4. Keep strict TDD and required runtime lanes (`unit-node`, `runtime-browser`, `runtime-electron`).
+
+Interpretation rule for this document:
+1. Architectural intent remains here.
+2. Execution order, command contract, and test matrix are governed by `PROJECT-EXECUTION-PLAN.md`.
+
 ## 1. Design
 
 ### 1.1 Product contract

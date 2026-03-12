@@ -4,6 +4,15 @@ import type {
   ScoreResult,
   VectorBackend
 } from "./VectorBackend";
+import {
+  FLOAT32_BYTES,
+  UINT32_BITS,
+  UINT32_BYTES,
+  WEBGPU_DOT_WORKGROUP_SIZE,
+  WEBGPU_HAMMING_WORKGROUP_SIZE,
+  WEBGPU_HASH_WORKGROUP_SIZE,
+  WEBGPU_MIN_UNIFORM_BYTES,
+} from "./core/NumericConstants";
 
 const DOT_MANY_WGSL = /* wgsl */`
 struct Params { dim: u32, count: u32, words_per_code: u32, k: u32 }
@@ -11,7 +20,7 @@ struct Params { dim: u32, count: u32, words_per_code: u32, k: u32 }
 @group(0) @binding(1) var<storage, read>       matrix : array<f32>;
 @group(0) @binding(2) var<storage, read_write> scores : array<f32>;
 @group(0) @binding(3) var<uniform>             params : Params;
-@compute @workgroup_size(256)
+@compute @workgroup_size(${WEBGPU_DOT_WORKGROUP_SIZE})
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   let i = gid.x;
   if (i >= params.count) { return; }
@@ -27,7 +36,7 @@ struct Params { dim: u32, bits: u32, words_per_code: u32, _pad: u32 }
 @group(0) @binding(1) var<storage, read>            hyperplanes: array<f32>;
 @group(0) @binding(2) var<storage, read_write>      code_out   : array<atomic<u32>>;
 @group(0) @binding(3) var<uniform>                  params     : Params;
-@compute @workgroup_size(128)
+@compute @workgroup_size(${WEBGPU_HASH_WORKGROUP_SIZE})
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   let b = gid.x;
   if (b >= params.bits) { return; }
@@ -43,7 +52,7 @@ struct Params { dim: u32, count: u32, words_per_code: u32, k: u32 }
 @group(0) @binding(1) var<storage, read>        codes   : array<u32>;
 @group(0) @binding(2) var<storage, read_write>  out_dist: array<u32>;
 @group(0) @binding(3) var<uniform>              params  : Params;
-@compute @workgroup_size(256)
+@compute @workgroup_size(${WEBGPU_HAMMING_WORKGROUP_SIZE})
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   let i = gid.x;
   if (i >= params.count) { return; }
@@ -120,7 +129,7 @@ export class WebGpuVectorBackend implements VectorBackend {
 
   private uniformBuffer(data: Uint32Array): GPUBuffer {
     const buf = this.device.createBuffer({
-      size: Math.max(16, data.byteLength),  // WebGPU min uniform size = 16 bytes
+      size: Math.max(WEBGPU_MIN_UNIFORM_BYTES, data.byteLength),
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
     this.device.queue.writeBuffer(buf, 0, this.toArrayBuffer(data));
@@ -129,7 +138,7 @@ export class WebGpuVectorBackend implements VectorBackend {
 
   private async readbackF32(gpu: GPUBuffer, read: GPUBuffer, count: number): Promise<Float32Array> {
     const cmd = this.device.createCommandEncoder();
-    cmd.copyBufferToBuffer(gpu, 0, read, 0, count * 4);
+    cmd.copyBufferToBuffer(gpu, 0, read, 0, count * FLOAT32_BYTES);
     this.device.queue.submit([cmd.finish()]);
     await read.mapAsync(GPUMapMode.READ);
     const result = new Float32Array(read.getMappedRange().slice(0));
@@ -139,7 +148,7 @@ export class WebGpuVectorBackend implements VectorBackend {
 
   private async readbackU32(gpu: GPUBuffer, read: GPUBuffer, count: number): Promise<Uint32Array> {
     const cmd = this.device.createCommandEncoder();
-    cmd.copyBufferToBuffer(gpu, 0, read, 0, count * 4);
+    cmd.copyBufferToBuffer(gpu, 0, read, 0, count * UINT32_BYTES);
     this.device.queue.submit([cmd.finish()]);
     await read.mapAsync(GPUMapMode.READ);
     const result = new Uint32Array(read.getMappedRange().slice(0));
@@ -154,7 +163,7 @@ export class WebGpuVectorBackend implements VectorBackend {
   ): Promise<Float32Array> {
     const qBuf  = this.f32Buffer(query);
     const mBuf  = this.f32Buffer(matrix);
-    const { gpu: oBuf, read: rBuf } = this.outBuffer(count * 4);
+    const { gpu: oBuf, read: rBuf } = this.outBuffer(count * FLOAT32_BYTES);
     const uBuf  = this.uniformBuffer(new Uint32Array([dim, count, 0, 0]));
 
     const bg = this.device.createBindGroup({
@@ -171,7 +180,7 @@ export class WebGpuVectorBackend implements VectorBackend {
     const pass = cmd.beginComputePass();
     pass.setPipeline(this.dotPipeline);
     pass.setBindGroup(0, bg);
-    pass.dispatchWorkgroups(Math.ceil(count / 256));
+    pass.dispatchWorkgroups(Math.ceil(count / WEBGPU_DOT_WORKGROUP_SIZE));
     pass.end();
     this.device.queue.submit([cmd.finish()]);
 
@@ -192,10 +201,10 @@ export class WebGpuVectorBackend implements VectorBackend {
     projectionMatrix: Float32Array,
     dimIn: number, bits: number
   ): Promise<Uint32Array> {
-    const wordsPerCode = Math.ceil(bits / 32);
+    const wordsPerCode = Math.ceil(bits / UINT32_BITS);
     const vBuf = this.f32Buffer(vec);
     const pBuf = this.f32Buffer(projectionMatrix);
-    const { gpu: oBuf, read: rBuf } = this.outBuffer(wordsPerCode * 4);
+    const { gpu: oBuf, read: rBuf } = this.outBuffer(wordsPerCode * UINT32_BYTES);
     // zero-init the output buffer before atomicOr writes
     this.device.queue.writeBuffer(oBuf, 0, new Uint32Array(wordsPerCode));
     const uBuf = this.uniformBuffer(new Uint32Array([dimIn, bits, wordsPerCode, 0]));
@@ -214,7 +223,7 @@ export class WebGpuVectorBackend implements VectorBackend {
     const pass = cmd.beginComputePass();
     pass.setPipeline(this.hashPipeline);
     pass.setBindGroup(0, bg);
-    pass.dispatchWorkgroups(Math.ceil(bits / 128));
+    pass.dispatchWorkgroups(Math.ceil(bits / WEBGPU_HASH_WORKGROUP_SIZE));
     pass.end();
     this.device.queue.submit([cmd.finish()]);
 
@@ -228,7 +237,7 @@ export class WebGpuVectorBackend implements VectorBackend {
   ): Promise<DistanceResult[]> {
     const qBuf = this.u32Buffer(queryCode);
     const cBuf = this.u32Buffer(codes);
-    const { gpu: oBuf, read: rBuf } = this.outBuffer(count * 4);
+    const { gpu: oBuf, read: rBuf } = this.outBuffer(count * UINT32_BYTES);
     const uBuf = this.uniformBuffer(new Uint32Array([0, count, wordsPerCode, k]));
 
     const bg = this.device.createBindGroup({
@@ -245,7 +254,7 @@ export class WebGpuVectorBackend implements VectorBackend {
     const pass = cmd.beginComputePass();
     pass.setPipeline(this.hammingPipeline);
     pass.setBindGroup(0, bg);
-    pass.dispatchWorkgroups(Math.ceil(count / 256));
+    pass.dispatchWorkgroups(Math.ceil(count / WEBGPU_HAMMING_WORKGROUP_SIZE));
     pass.end();
     this.device.queue.submit([cmd.finish()]);
 

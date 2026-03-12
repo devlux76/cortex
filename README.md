@@ -6,6 +6,19 @@ A neurobiologically inspired, fully on-device epistemic memory engine for autono
 
 > "The library of dreams is not a collection of words but of things that words have touched — and how those things feel from the inside."
 
+## Execution Update (2026-03-11)
+
+Canonical plan file: `PROJECT-EXECUTION-PLAN.md`.
+
+Next session highest priority (P0):
+1. Run a full code pass before new feature coding.
+2. Remove hardcoded model-dependent assumptions.
+3. Ensure model-derived values come from resolved model metadata (`ModelProfile`).
+4. Keep strict TDD (Red -> Green -> Refactor) across all changes.
+
+Docs note:
+1. Numeric examples in design docs are illustrative unless explicitly sourced from model metadata.
+
 ## What is CORTEX?
 
 Modern agents are great at *retrieving* facts.  

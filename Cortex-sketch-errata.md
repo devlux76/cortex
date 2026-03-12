@@ -1,3 +1,15 @@
+## Execution Note (2026-03-11)
+
+Canonical execution plan: `PROJECT-EXECUTION-PLAN.md`.
+
+Next session highest priority (P0):
+1. Perform a full code pass before new feature work.
+2. Replace hardcoded model-dependent constants with resolved model metadata values.
+3. Keep strict TDD and runtime-lane validation as merge gates.
+
+Errata note:
+1. Numeric literals in this addendum are illustrative unless explicitly sourced from model metadata.
+
 Errata / Addendum: Metroid NN Radius Graph (added 11 March 2026 – integrates directly after the existing CORTEX query routing section)
 Why this exists
 The hierarchical routing already returns strong Metroids (medoids) + top pages. We now add a sparse, cosine-radius nearest-neighbor graph in IndexedDB so Cortex.query() can instantly jumpstart a connected component and hand it to an Open TSP Path solver (dummy-node trick) for a coherent linear ordering instead of a random top-k list.

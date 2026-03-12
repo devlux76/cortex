@@ -12,9 +12,9 @@ export type PublicKey = string;   // JWK or raw
 
 export interface Page {
   pageId: Hash;               // SHA-256(content)
-  content: string;            // ≤ 2 048 tokens
+  content: string;            // bounded by chunk policy derived from ModelProfile
   embeddingOffset: number;    // byte offset into the vector file
-  embeddingDim: number;       // e.g. 768
+  embeddingDim: number;       // resolved embedding dimension from ModelProfile
 
   contentHash: Hash;          // SHA-256(content)
   vectorHash: Hash;           // SHA-256(vector bytes)
@@ -45,14 +45,14 @@ export interface Volume {
   volumeId: Hash;
   bookIds: Hash[];
   prototypeOffsets: number[]; // byte offsets into the vector file
-  prototypeDim: number;       // e.g. 128
+  prototypeDim: number;       // runtime policy dimension for this prototype tier
   variance: number;
 }
 
 export interface Shelf {
   shelfId: Hash;
   volumeIds: Hash[];
-  routingPrototypeOffsets: number[]; // coarse prototype byte offsets, 32–64-dim
+  routingPrototypeOffsets: number[]; // coarse prototype byte offsets
   routingDim: number;
 }
 
@@ -69,7 +69,7 @@ export interface Edge {
 
 export interface MetroidNeighbor {
   neighborPageId: Hash;
-  cosineSimilarity: number;   // ≥ threshold (e.g. 0.68)
+  cosineSimilarity: number;   // threshold is defined by runtime policy
   distance: number;           // 1 – cosineSimilarity (ready for TSP)
 }
 

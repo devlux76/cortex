@@ -1,4 +1,5 @@
 import type { VectorStore } from "../core/types";
+import { FLOAT32_BYTES } from "../core/NumericConstants";
 
 /**
  * MemoryVectorStore — in-memory implementation of VectorStore.
@@ -20,12 +21,12 @@ export class MemoryVectorStore implements VectorStore {
   }
 
   async readVector(offset: number, dim: number): Promise<Float32Array> {
-    const byteLen = dim * 4;
+    const byteLen = dim * FLOAT32_BYTES;
     return new Float32Array(this._buf.buffer.slice(offset, offset + byteLen));
   }
 
   async readVectors(offsets: number[], dim: number): Promise<Float32Array[]> {
-    const byteLen = dim * 4;
+    const byteLen = dim * FLOAT32_BYTES;
     return offsets.map(
       (offset) => new Float32Array(this._buf.buffer.slice(offset, offset + byteLen)),
     );

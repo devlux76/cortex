@@ -8,7 +8,9 @@
     "typecheck": "npm run build",
     "lint": "eslint .",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:unit": "vitest run",
+    "test:watch": "vitest",
+    "guard:model-derived": "node scripts/guard-model-derived.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.38.0",

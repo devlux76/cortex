@@ -1,4 +1,5 @@
 import type { VectorStore } from "../core/types";
+import { FLOAT32_BYTES } from "../core/NumericConstants";
 
 /**
  * OPFSVectorStore — append-only binary vector file stored in the browser's
@@ -55,7 +56,7 @@ export class OPFSVectorStore implements VectorStore {
   async readVector(offset: number, dim: number): Promise<Float32Array> {
     const fileHandle = await this._fileHandle(false);
     const file = await fileHandle.getFile();
-    const slice = file.slice(offset, offset + dim * 4);
+    const slice = file.slice(offset, offset + dim * FLOAT32_BYTES);
     const buf = await slice.arrayBuffer();
     return new Float32Array(buf);
   }
@@ -69,7 +70,7 @@ export class OPFSVectorStore implements VectorStore {
     const fullBuf = await file.arrayBuffer();
 
     return offsets.map((offset) => {
-      const byteLen = dim * 4;
+      const byteLen = dim * FLOAT32_BYTES;
       return new Float32Array(fullBuf.slice(offset, offset + byteLen));
     });
   }

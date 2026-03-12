@@ -3,6 +3,14 @@ import type {
   ScoreResult,
   VectorBackend
 } from "./VectorBackend";
+import {
+  FLOAT32_BYTES,
+  UINT32_BITS,
+  UINT32_BYTES,
+  WASM_ALLOC_ALIGNMENT_BYTES,
+  WASM_ALLOC_GUARD_BYTES,
+  WASM_PAGE_BYTES,
+} from "./core/NumericConstants";
 
 interface WasmVectorExports {
   mem: WebAssembly.Memory;
@@ -24,7 +32,7 @@ export class WasmVectorBackend implements VectorBackend {
   readonly kind = "wasm" as const;
   private exports!: WasmVectorExports;
   private mem!: WebAssembly.Memory;
-  private bump = 1024; // first 1KB reserved as guard
+  private bump = WASM_ALLOC_GUARD_BYTES;
 
   static async create(wasmBytes: ArrayBuffer): Promise<WasmVectorBackend> {
     const b = new WasmVectorBackend();
@@ -36,15 +44,21 @@ export class WasmVectorBackend implements VectorBackend {
 
   // 16-byte-aligned bump allocator; call reset() between requests
   private alloc(bytes: number): number {
-    const ptr = (this.bump + 15) & ~15;
+    const ptr =
+      (this.bump + (WASM_ALLOC_ALIGNMENT_BYTES - 1)) &
+      ~(WASM_ALLOC_ALIGNMENT_BYTES - 1);
     this.bump = ptr + bytes;
     if (this.bump > this.mem.buffer.byteLength) {
-      this.mem.grow(Math.ceil((this.bump - this.mem.buffer.byteLength) / 65536));
+      this.mem.grow(
+        Math.ceil((this.bump - this.mem.buffer.byteLength) / WASM_PAGE_BYTES)
+      );
     }
     return ptr;
   }
 
-  reset(): void { this.bump = 1024; }
+  reset(): void {
+    this.bump = WASM_ALLOC_GUARD_BYTES;
+  }
 
   private writeF32(data: Float32Array): number {
     const ptr = this.alloc(data.byteLength);
@@ -65,9 +79,11 @@ export class WasmVectorBackend implements VectorBackend {
     this.reset();
     const q_ptr  = this.writeF32(query);
     const m_ptr  = this.writeF32(matrix);
-    const out_ptr = this.alloc(count * 4);
+    const out_ptr = this.alloc(count * FLOAT32_BYTES);
     this.exports.dot_many(q_ptr, m_ptr, out_ptr, dim, count);
-    return new Float32Array(this.mem.buffer.slice(out_ptr, out_ptr + count * 4));
+    return new Float32Array(
+      this.mem.buffer.slice(out_ptr, out_ptr + count * FLOAT32_BYTES)
+    );
   }
 
   async project(
@@ -78,9 +94,11 @@ export class WasmVectorBackend implements VectorBackend {
     this.reset();
     const v_ptr   = this.writeF32(vec);
     const P_ptr   = this.writeF32(projectionMatrix);
-    const out_ptr = this.alloc(dimOut * 4);
+    const out_ptr = this.alloc(dimOut * FLOAT32_BYTES);
     this.exports.project(v_ptr, P_ptr, out_ptr, dimIn, dimOut);
-    return new Float32Array(this.mem.buffer.slice(out_ptr, out_ptr + dimOut * 4));
+    return new Float32Array(
+      this.mem.buffer.slice(out_ptr, out_ptr + dimOut * FLOAT32_BYTES)
+    );
   }
 
   async hashToBinary(
@@ -89,12 +107,14 @@ export class WasmVectorBackend implements VectorBackend {
     dimIn: number, bits: number
   ): Promise<Uint32Array> {
     this.reset();
-    const wordsPerCode = Math.ceil(bits / 32);
+    const wordsPerCode = Math.ceil(bits / UINT32_BITS);
     const v_ptr    = this.writeF32(vec);
     const P_ptr    = this.writeF32(projectionMatrix);
-    const code_ptr = this.alloc(wordsPerCode * 4);
+    const code_ptr = this.alloc(wordsPerCode * UINT32_BYTES);
     this.exports.hash_binary(v_ptr, P_ptr, code_ptr, dimIn, bits);
-    return new Uint32Array(this.mem.buffer.slice(code_ptr, code_ptr + wordsPerCode * 4));
+    return new Uint32Array(
+      this.mem.buffer.slice(code_ptr, code_ptr + wordsPerCode * UINT32_BYTES)
+    );
   }
 
   async hammingTopK(
@@ -104,14 +124,14 @@ export class WasmVectorBackend implements VectorBackend {
     this.reset();
     const q_ptr       = this.writeU32(queryCode);
     const codes_ptr   = this.writeU32(codes);
-    const scores_ptr  = this.alloc(count * 4);
-    const out_ptr     = this.alloc(k * 4);
+    const scores_ptr  = this.alloc(count * FLOAT32_BYTES);
+    const out_ptr     = this.alloc(k * UINT32_BYTES);
 
     this.exports.hamming_scores(q_ptr, codes_ptr, scores_ptr, wordsPerCode, count);
 
     // Snapshot distances before topk_i32 mutates scores in-place
     const distances = new Int32Array(
-      this.mem.buffer.slice(scores_ptr, scores_ptr + count * 4)
+      this.mem.buffer.slice(scores_ptr, scores_ptr + count * FLOAT32_BYTES)
     );
 
     this.exports.topk_i32(scores_ptr, out_ptr, count, k);
@@ -126,7 +146,7 @@ export class WasmVectorBackend implements VectorBackend {
     this.reset();
     // copy: topk_f32 mutates in-place
     const copy_ptr = this.writeF32(new Float32Array(scores));
-    const out_ptr  = this.alloc(k * 4);
+    const out_ptr  = this.alloc(k * FLOAT32_BYTES);
     this.exports.topk_f32(copy_ptr, out_ptr, scores.length, k);
     const indices = new Int32Array(this.mem.buffer, out_ptr, k);
     return Array.from(indices).map(idx => ({ index: idx, score: scores[idx] }));

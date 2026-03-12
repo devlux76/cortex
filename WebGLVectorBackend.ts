@@ -4,6 +4,11 @@ import type {
   ScoreResult,
   VectorBackend
 } from "./VectorBackend";
+import {
+  FULLSCREEN_TRIANGLE_VERTEX_COUNT,
+  RGBA_CHANNELS,
+  UINT32_BITS,
+} from "./core/NumericConstants";
 
 const VERT_SRC = /* glsl */`#version 300 es
 out vec2 v_uv;
@@ -122,9 +127,9 @@ export class WebGlVectorBackend implements VectorBackend {
   // Pack a Float32Array into an RGBA32F texture of size (ceil(len/4), height)
   private packF32Texture(data: Float32Array, height: number): WebGLTexture {
     const gl = this.gl;
-    const texWidth = Math.ceil(data.length / height / 4);
+    const texWidth = Math.ceil(data.length / height / RGBA_CHANNELS);
     // Pad to texWidth * height * 4
-    const padded = new Float32Array(texWidth * height * 4);
+    const padded = new Float32Array(texWidth * height * RGBA_CHANNELS);
     padded.set(data);
     const tex = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D, tex);
@@ -159,9 +164,9 @@ export class WebGlVectorBackend implements VectorBackend {
     gl.useProgram(prog);
     setup(prog);
     gl.bindVertexArray(this.vao);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.drawArrays(gl.TRIANGLES, 0, FULLSCREEN_TRIANGLE_VERTEX_COUNT);
 
-    const pixels = new Float32Array(width * 4);
+    const pixels = new Float32Array(width * RGBA_CHANNELS);
     gl.readPixels(0, 0, width, 1, gl.RGBA, gl.FLOAT, pixels);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.deleteFramebuffer(fbo);
@@ -200,7 +205,10 @@ export class WebGlVectorBackend implements VectorBackend {
     this.gl.deleteTexture(mTex);
 
     // Extract r channel from RGBA pixels → scores
-    return Float32Array.from({ length: count }, (_, i) => pixels[i * 4]);
+    return Float32Array.from(
+      { length: count },
+      (_, i) => pixels[i * RGBA_CHANNELS]
+    );
   }
 
   async project(
@@ -231,11 +239,13 @@ export class WebGlVectorBackend implements VectorBackend {
     this.gl.deleteTexture(hTex);
 
     // Pack the per-bit float results (0.0 or 1.0) into Uint32 words
-    const wordsPerCode = Math.ceil(bits / 32);
+    const wordsPerCode = Math.ceil(bits / UINT32_BITS);
     const code = new Uint32Array(wordsPerCode);
     for (let b = 0; b < bits; b++) {
-      if (pixels[b * 4] >= 0.5) {
-        code[b >> 5] |= (1 << (b & 31));
+      if (pixels[b * RGBA_CHANNELS] >= 0.5) {
+        const wordIndex = Math.floor(b / UINT32_BITS);
+        const bitIndex = b % UINT32_BITS;
+        code[wordIndex] |= (1 << bitIndex);
       }
     }
     return code;

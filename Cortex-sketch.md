@@ -1,3 +1,16 @@
+## Execution Note (2026-03-11)
+
+Canonical execution plan: `PROJECT-EXECUTION-PLAN.md`.
+
+Next session highest priority (P0):
+1. Run a full code pass across implementation files.
+2. Remove hardcoded model-dependent constants.
+3. Replace them with values derived from model metadata via a `ModelProfile` layer.
+
+Sketch note:
+1. Numeric values in this sketch are examples for architectural discussion.
+2. Implementation values must be model-derived or explicit runtime policy values.
+
 A concrete TypeScript-oriented architecture that maps each conceptual element (Page → Shelf, HIPPOCAMPUS, CORTEX, backends, etc.) into interfaces, classes, and modules, staying framework-agnostic but browser-friendly.  
   
 ## Data model types  
