@@ -13,11 +13,12 @@ The engine models three biological brain regions:
 
 | File | Purpose |
 |---|---|
-| `README.md` | Product vision and non-negotiables (source of truth for priorities) |
-| `CORTEX-DESIGN-PLAN-TODO.md` | Architecture contracts and capability backlog |
-| `PROJECT-EXECUTION-PLAN.md` | Execution sequencing, command contract, and test gates |
+| `README.md` | Product vision and quick start |
+| `DESIGN.md` | Complete architecture specification and design principles |
+| `PLAN.md` | Module-by-module implementation status and development phases |
+| `TODO.md` | Prioritized actionable tasks to ship v1.0 |
 
-Keep all three documents synchronized with the real code state after every implementation pass.
+Keep all documents synchronized with the real code state after every implementation pass.
 
 ## Directory Structure
 
