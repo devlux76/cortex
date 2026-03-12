@@ -31,25 +31,30 @@ Completed in this pass:
 9. Added executable dummy hotpath benchmark harness:
    - `tests/benchmarks/DummyEmbedderHotpath.bench.ts`
    - `npm run benchmark:dummy`
+10. Implemented baseline embedding runtime selection modules:
+   - `embeddings/ProviderResolver.ts`
+   - `embeddings/EmbeddingRunner.ts`
+   - tests: `tests/embeddings/ProviderResolver.test.ts`, `tests/embeddings/EmbeddingRunner.test.ts`
+   - selection now supports capability filtering + benchmark-based winner choice
 
 Open items carried to next pass:
 1. Wire resolved `ModelProfile` into first concrete ingest/query orchestrator path (once those runtime modules are added).
-2. Add embedding provider resolver/runner modules and connect fallback policy to runtime execution.
+2. Add real embedding providers (ONNX/Transformers/WebNN/WebGPU/WebGL/WASM) as candidates for the resolver.
 3. Add browser/electron runtime scripts and CI lanes for non-Node merge gating.
 
 ## Next Session Highest Priority (P0)
 
-Integrate model-profile ownership into runtime flows and start the embedding vertical slice.
+Connect adaptive embedding selection to runtime orchestration and add real provider candidates.
 
 Instruction:
 1. Use `ModelProfileResolver` at runtime boundaries before any policy derivation or embedding execution.
-2. Implement first embedding runner/provider resolver slice with fallback semantics.
+2. Register real embedding providers in `ProviderResolver` candidate lists.
 3. Keep strict TDD (Red -> Green -> Refactor).
 4. If a blocker appears, record it in this document under an error log entry and continue with the next actionable slice.
 
 Definition of done for this pass:
 1. Runtime path resolves model metadata through `ModelProfileResolver` before use.
-2. Embedding provider resolver tests and implementation are present.
+2. At least one non-dummy real provider can be selected by capability + benchmark policy.
 3. Any unresolved blocker is documented with file/symptom/next action.
 
 ## Non-Negotiable Rules
@@ -69,8 +74,8 @@ Definition of done for this pass:
    - `core/ModelDefaults.ts`
 4. ~~Replace hardcoded model-dependent values with `ModelProfile` lookups.~~ ✅ Done for current code paths (2026-03-11)
 5. Implement embedding runner with fallback chain and telemetry:
-   - `embeddings/EmbeddingRunner.ts`
-   - `embeddings/ProviderResolver.ts`
+   - `embeddings/EmbeddingRunner.ts` ✅ baseline done (2026-03-11)
+   - `embeddings/ProviderResolver.ts` ✅ baseline done (2026-03-11)
    - `embeddings/TransformersEmbeddingBackend.ts`
    - `embeddings/OrtWebglEmbeddingBackend.ts`
    - `embeddings/OnnxEmbeddingRunner.ts`
@@ -102,16 +107,17 @@ Available now:
 3. `npm run test:unit -- tests/model/ModelDefaults.test.ts`
 4. `npm run guard:model-derived`
 5. `npm run test:unit -- tests/embeddings/DeterministicDummyEmbeddingBackend.test.ts`
-6. `npm run benchmark:dummy`
-7. `npm run benchmark`
-8. `npm run build && npm run lint`
+6. `npm run test:unit -- tests/embeddings/ProviderResolver.test.ts`
+7. `npm run test:unit -- tests/embeddings/EmbeddingRunner.test.ts`
+8. `npm run benchmark:dummy`
+9. `npm run benchmark`
+10. `npm run build && npm run lint`
 
 Planned commands to add in later passes:
-1. `npm run test:unit -- tests/embeddings/ProviderResolver.test.ts`
-2. `npm run test:unit -- tests/embeddings/OnnxEmbeddingRunner.test.ts`
-3. `npm run test:browser`
-4. `npm run test:electron`
-5. `npm run test:all`
+1. `npm run test:unit -- tests/embeddings/OnnxEmbeddingRunner.test.ts`
+2. `npm run test:browser`
+3. `npm run test:electron`
+4. `npm run test:all`
 
 ## Known Hardcoded Hotspots To Clean First
 

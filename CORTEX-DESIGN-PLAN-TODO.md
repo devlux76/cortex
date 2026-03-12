@@ -32,10 +32,11 @@ Completed since the prior snapshot:
 5. Runtime helper resolves model metadata and derives routing policy in one call (`resolveRoutingPolicyForModel` in `Policy.ts`).
 6. Deterministic dummy SHA-256 embedder exists for pre-model hotpath testing (`embeddings/DeterministicDummyEmbeddingBackend.ts`).
 7. Benchmark harness exists for dummy embedder throughput baselining (`npm run benchmark:dummy`).
+8. Baseline adaptive provider selection exists with capability filtering + benchmark-based winner choice (`embeddings/ProviderResolver.ts`, `embeddings/EmbeddingRunner.ts`).
 
 Next focus:
 1. Wire resolved model profiles into runtime ingest/query entry points.
-2. Build embedding provider resolver + runner modules and associated tests.
+2. Add real embedding providers (ONNX/Transformers/WebNN/WebGPU/WebGL/WASM) to resolver candidate sets.
 3. Add browser/electron runtime test lanes to match merge-gate policy.
 
 ## 1. Design

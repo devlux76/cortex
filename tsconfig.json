@@ -10,6 +10,13 @@
     "forceConsistentCasingInFileNames": true,
     "types": ["vitest/globals", "@webgpu/types"]
   },
-  "include": ["*.ts", "*.d.ts", "core/**/*.ts", "storage/**/*.ts", "tests/**/*.ts"],
+  "include": [
+    "*.ts",
+    "*.d.ts",
+    "core/**/*.ts",
+    "storage/**/*.ts",
+    "embeddings/**/*.ts",
+    "tests/**/*.ts"
+  ],
   "exclude": ["dist", "node_modules"]
 }
