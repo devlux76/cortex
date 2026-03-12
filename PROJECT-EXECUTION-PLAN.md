@@ -79,12 +79,24 @@ Completed in this pass:
    - `node scripts/runtime-harness-server.mjs` + Electron launch with `--remote-debugging-port=9222` (desktop-style flags)
    - same launch with headless/software flags
    - both Electron launches exited with `SIGSEGV` (`139`) in this non-desktop tooling context
+21. Added containerized Electron debug lane to isolate host/editor sandbox effects:
+   - `docker/electron-debug/Dockerfile`
+   - `docker/electron-debug/entrypoint.sh`
+   - `docker-compose.electron-debug.yml`
+   - package scripts: `docker:electron:build`, `docker:electron:up`, `docker:electron:down`, `docker:electron:logs`
+   - VS Code attach workflow: `Electron: Attach Main (Docker)`, `Electron: Attach Renderer (Docker)`, `Electron: Docker Main + Renderer`
+22. Docker lane validation in this workspace:
+   - `npm run docker:electron:build`
+   - short `docker compose ... up` smoke with forced recreate + teardown
+   - ready markers observed (`harness ready`, main inspector `9230`, renderer debugger `9222`)
+   - no `SIGSEGV` observed inside container during smoke window
 
 Open items carried to next pass:
 1. Wire resolved `ModelProfile` into first concrete ingest/query orchestrator path.
 2. Add real embedding providers (ONNX/Transformers/WebNN/WebGPU/WebGL/WASM) as candidates for the resolver.
-3. Stabilize Electron runtime lane policy for CI/non-desktop contexts (provisioning + graphics/runtime assumptions) and enforce `runtime-electron` with an explicit context contract.
-4. Implement first Hippocampus/Cortex vertical slice on top of runtime harness lanes.
+3. Validate full VS Code host attach cycle against the Docker lane (`Electron: Docker Main + Renderer`) and codify it as the runtime-electron context contract when host-shell runs are unstable.
+4. Define CI prerequisites for the chosen runtime-electron context (binary + graphics/runtime assumptions) and enforce one canonical gate.
+5. Implement first Hippocampus/Cortex vertical slice on top of runtime harness lanes.
 
 ### Documentation Synchronization Protocol (Required)
 
@@ -239,6 +251,10 @@ Available now:
 15. `npm run test:electron:desktop`
 16. `npm run test:runtime`
 17. `npm run test:all`
+18. `npm run docker:electron:build`
+19. `npm run docker:electron:up`
+20. `npm run docker:electron:down`
+21. `npm run docker:electron:logs`
 
 Planned commands to add in later passes:
 1. `npm run test:unit -- tests/embeddings/OnnxEmbeddingRunner.test.ts`
@@ -249,10 +265,10 @@ Planned commands to add in later passes:
 
 1. Blocker A - File path: `scripts/electron-harness-main.mjs`, `.vscode/launch.json`, `scripts/run-electron-runtime-smoke.mjs`
 2. Blocker A - Failure symptom: Electron exits with `SIGSEGV` (`139`) in this tool-executed terminal context for both desktop-style and headless/software-style launches, despite Electron being installed and harness server reachability.
-3. Blocker A - Next action: validate `Electron: Main + Renderer` from an interactive desktop VS Code session and treat non-desktop crash contexts as environment-limited unless reproduced there.
-4. Blocker B - File path: `package.json` / CI runtime image provisioning
-5. Blocker B - Failure symptom: Electron lane reliability still varies across environments; install and runtime assumptions are not yet codified as a strict gate contract.
-6. Blocker B - Next action: define CI/runtime prerequisites explicitly (binary availability + graphics/runtime context policy), then enforce one canonical `runtime-electron` gate configuration.
+3. Blocker A - Next action: run the containerized attach flow (`npm run docker:electron:up` + `Electron: Docker Main + Renderer`) and treat host-shell crashes as environment-limited unless reproducible in the Docker lane.
+4. Blocker B - File path: `.vscode/launch.json`, `.vscode/tasks.json`, `docker-compose.electron-debug.yml`
+5. Blocker B - Failure symptom: Docker lane now builds and starts cleanly, but host-side VS Code attach/breakpoint workflow against that lane has not yet been validated in-session.
+6. Blocker B - Next action: run `Electron: Docker Main + Renderer` from VS Code, verify main + renderer breakpoint binding, then lock CI/runtime-electron contract to that validated context.
 
 ## Known Hardcoded Hotspots To Clean First
 

@@ -19,7 +19,11 @@
     "test:all": "npm run test:unit && npm run test:runtime",
     "guard:model-derived": "node scripts/guard-model-derived.mjs",
     "benchmark:dummy": "vitest bench --watch=false tests/benchmarks/DummyEmbedderHotpath.bench.ts",
-    "benchmark": "npm run benchmark:dummy"
+    "benchmark": "npm run benchmark:dummy",
+    "docker:electron:build": "docker compose -f docker-compose.electron-debug.yml build electron-debug",
+    "docker:electron:up": "docker compose -f docker-compose.electron-debug.yml up --build --force-recreate electron-debug",
+    "docker:electron:down": "docker compose -f docker-compose.electron-debug.yml down --remove-orphans",
+    "docker:electron:logs": "docker compose -f docker-compose.electron-debug.yml logs -f electron-debug"
   },
   "devDependencies": {
     "@eslint/js": "^9.38.0",

@@ -18,7 +18,7 @@ Current implementation snapshot:
 2. Model-profile-driven numeric ownership is implemented and guarded by `npm run guard:model-derived`.
 3. Adaptive embedding resolver infrastructure exists, but real providers are still being wired.
 4. Runtime harness and browser lane are implemented (`npm run dev:harness`, `npm run test:browser`).
-5. Electron lane is wired but runtime-context-sensitive (`npm run test:electron` can still crash in constrained non-desktop shells even when Electron is installed; validate from desktop VS Code debug session).
+5. Electron lane is wired but runtime-context-sensitive on host shells; a containerized debug lane is now available to isolate from editor/runtime sandbox effects (`npm run docker:electron:up`, then attach with `Electron: Docker Main + Renderer`).
 6. Hippocampus/Cortex/Daydreamer orchestration layers remain the primary vertical-slice gap.
 
 Current delivery priorities (P0):
@@ -40,8 +40,15 @@ VS Code debugging setup (Electron docs aligned):
 3. Main-process debug entry: `Electron: Debug Main (Harness)`
 4. Renderer attach entry: `Electron: Attach Renderer`
 5. Combined session: `Electron: Main + Renderer`
-6. Shell fallback launcher: `./scripts/launch-electron-harness.sh`
-7. If Electron exits with `SIGSEGV` in a terminal-only environment, rerun from an interactive desktop VS Code session before treating it as an app-level failure.
+6. Docker combined attach session: `Electron: Docker Main + Renderer`
+7. Docker startup task (auto from launch): `docker:electron:up`
+8. Docker stop task (auto from launch): `docker:electron:down`
+9. Shell fallback launcher: `./scripts/launch-electron-harness.sh`
+10. If Electron exits with `SIGSEGV` in host shell contexts, use the Docker attach flow before treating it as an app-level failure.
+
+Docker debug quick start:
+1. In VS Code Run and Debug, launch `Electron: Docker Main + Renderer` (this auto-runs `docker:electron:up`).
+2. If you need manual control, start the lane with `npm run docker:electron:up` and stop it with `npm run docker:electron:down`.
 
 Docs note:
 1. Numeric examples in design docs are illustrative unless explicitly sourced from model metadata.

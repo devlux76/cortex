@@ -37,6 +37,31 @@
       "name": "Electron: Attach Renderer",
       "type": "pwa-chrome",
       "request": "attach",
+      "address": "127.0.0.1",
+      "port": 9222,
+      "webRoot": "${workspaceFolder}",
+      "timeout": 30000
+    },
+    {
+      "name": "Electron: Attach Main (Docker)",
+      "type": "node",
+      "request": "attach",
+      "address": "127.0.0.1",
+      "port": 9230,
+      "localRoot": "${workspaceFolder}",
+      "remoteRoot": "/workspace",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "restart": true,
+      "preLaunchTask": "docker:electron:up",
+      "postDebugTask": "docker:electron:down"
+    },
+    {
+      "name": "Electron: Attach Renderer (Docker)",
+      "type": "pwa-chrome",
+      "request": "attach",
+      "address": "127.0.0.1",
       "port": 9222,
       "webRoot": "${workspaceFolder}",
       "timeout": 30000
@@ -48,6 +73,13 @@
       "configurations": [
         "Electron: Debug Main (Harness)",
         "Electron: Attach Renderer"
+      ]
+    },
+    {
+      "name": "Electron: Docker Main + Renderer",
+      "configurations": [
+        "Electron: Attach Main (Docker)",
+        "Electron: Attach Renderer (Docker)"
       ]
     }
   ]

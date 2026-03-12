@@ -32,6 +32,38 @@
         "reveal": "never",
         "panel": "shared"
       }
+    },
+    {
+      "label": "docker:electron:up",
+      "type": "shell",
+      "command": "docker compose -f docker-compose.electron-debug.yml up --build --force-recreate electron-debug",
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "cortex-docker-electron",
+        "pattern": {
+          "regexp": "^$"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*",
+          "endsPattern": "\\[docker-electron\\] renderer debugger: .*"
+        }
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "focus": false,
+        "clear": false
+      }
+    },
+    {
+      "label": "docker:electron:down",
+      "type": "shell",
+      "command": "docker compose -f docker-compose.electron-debug.yml down --remove-orphans",
+      "presentation": {
+        "reveal": "never",
+        "panel": "shared"
+      }
     }
   ]
 }

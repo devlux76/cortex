@@ -1,0 +1,24 @@
+services:
+  electron-debug:
+    build:
+      context: .
+      dockerfile: docker/electron-debug/Dockerfile
+    container_name: cortex-electron-debug
+    shm_size: 2gb
+    ports:
+      - "4173:4173"
+      - "9222:9222"
+      - "9230:9230"
+    environment:
+      HARNESS_HOST: "0.0.0.0"
+      HARNESS_PORT: "4173"
+      HARNESS_URL: "http://127.0.0.1:4173"
+      CORTEX_OZONE_PLATFORM: "x11"
+      CORTEX_DISABLE_VULKAN: "1"
+      CORTEX_ELECTRON_HEADLESS: "0"
+      CORTEX_ELECTRON_SHOW: "0"
+      CORTEX_ENABLE_UNSAFE_WEBGPU: "0"
+      CORTEX_IGNORE_GPU_BLOCKLIST: "0"
+      CORTEX_DOCKER_MAIN_INSPECT_PORT: "9230"
+      CORTEX_DOCKER_RENDERER_DEBUG_PORT: "9222"
+    restart: "no"
