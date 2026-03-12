@@ -54,6 +54,20 @@ Their durable content is preserved as canonical implementation/doc contracts:
 4. Model-derived numeric ownership is canonical in `core/ModelDefaults.ts`, `core/ModelProfileResolver.ts`, and `Policy.ts`.
 5. Naming convention is settled: use `Metroid` for project-domain graph terms; keep `medoid` only when referring to the underlying clustering statistic.
 
+### 0.3 Runtime Harness Direction (2026-03-11)
+
+Decision from runtime research and hotpath verification:
+1. Keep the test harness browser-first; do not fork into a large Electron-specific app shell.
+2. Use one renderer harness that can run unchanged in Chromium and Electron.
+3. Wrap it in a thin Electron launcher for Linux GPU/WebGPU realism, switch control, and GPU diagnostics.
+4. Keep Chromium as the web-parity lane and Electron as the primary runtime-realism lane.
+5. Serve the harness over localhost during development/testing so WebGPU secure-context requirements are satisfied.
+
+Why this direction won:
+1. Electron retains Chromium's WebGPU path and limitations, so it is realistic instead of synthetic.
+2. Electron gives better observability than raw browser automation on Linux (`app.commandLine`, GPU feature status/info).
+3. The current missing confidence is browser-runtime execution, not WASM kernel validity; `Vectors.wat` and the dummy embedder hotpaths have already been executed successfully in ad hoc verification.
+
 ## 1. Design
 
 ### 1.1 Product contract

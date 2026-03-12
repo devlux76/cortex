@@ -36,11 +36,33 @@ Completed in this pass:
    - `embeddings/EmbeddingRunner.ts`
    - tests: `tests/embeddings/ProviderResolver.test.ts`, `tests/embeddings/EmbeddingRunner.test.ts`
    - selection now supports capability filtering + benchmark-based winner choice
+11. Retired legacy design-note docs after full code/doc audit and preserved canonical pointers in current docs.
+12. Verified current hotpath elements compile/run in this workspace state:
+   - `npm run build`
+   - `npm run benchmark:dummy`
+   - ad hoc `Vectors.wat` compile + instantiate + export smoke (`dot_many`, `project`, `hash_binary`, `hamming_scores`, `topk_i32`, `topk_f32`) via transient `wabt`
 
 Open items carried to next pass:
 1. Wire resolved `ModelProfile` into first concrete ingest/query orchestrator path.
 2. Add real embedding providers (ONNX/Transformers/WebNN/WebGPU/WebGL/WASM) as candidates for the resolver.
 3. Add browser/electron runtime scripts and CI lanes for non-Node merge gating.
+4. Build the browser-first runtime harness described below and use it as the substrate for runtime-browser/runtime-electron lanes.
+
+### Runtime Verification Snapshot (2026-03-11)
+
+Verified directly in this workspace:
+1. TypeScript compile/typecheck passes.
+2. Dummy embedding hotpath benchmark executes successfully in Vitest bench mode.
+3. `Vectors.wat` is not just present as source text: it was compiled to wasm bytes and executed successfully through a one-off smoke harness.
+4. The current terminal-only Node runtime cannot execute browser GPU paths directly:
+   - `document` is unavailable
+   - `navigator.gpu` is unavailable
+   - `navigator.ml` is unavailable
+
+Interpretation:
+1. WASM and deterministic embedding hotpaths are validated.
+2. WebGPU/WebNN/WebGL paths still require a real browser/Electron runtime lane.
+3. The missing confidence is now runtime-environment realism, not core kernel syntax.
 
 ### External Capability Verification (2026-03-11)
 
@@ -49,6 +71,13 @@ Verified during this pass (hard handoff facts):
 2. Transformers.js device mapping exposes `webnn`, `webnn-gpu`, `webnn-cpu`, `webnn-npu`, `webgpu`, and `wasm` for web environments.
 3. Transformers.js does not currently expose `webgl` as a direct `device` type; WebGL should remain an explicit ORT adapter path.
 4. Node-side ONNX providers (platform-dependent) include `cuda`, `dml`, and `coreml` in upstream mapping.
+5. Electron inherits Chromium GPU/WebGPU capability rather than bypassing it; it is still subject to host GPU drivers and Linux graphics stack limitations.
+6. Electron is still the preferred Linux realism harness because it gives explicit Chromium switch control via `app.commandLine.appendSwitch(...)` before `ready`, plus GPU diagnostics via `app.getGPUFeatureStatus()` / `app.getGPUInfo()` after `gpu-info-update`.
+7. Chrome WebGPU guidance confirms Linux support exists but can still require environment fixes when `navigator.gpu` is undefined or `requestAdapter()` returns `null`:
+   - secure context is required (`http://localhost` is acceptable for local dev)
+   - hardware acceleration must be enabled
+   - Linux experimental cases may need unsafe WebGPU / Vulkan enablement
+   - some hardware may require blocklist override for testing
 
 Source anchors to re-check quickly in a new session:
 1. `huggingface/transformers.js` -> `packages/transformers/src/backends/onnx.js`:
@@ -58,21 +87,51 @@ Source anchors to re-check quickly in a new session:
    - `DEVICE_TYPES`
 3. Transformers.js docs (`v3.8.1` and `main`):
    - index + WebGPU guide + ONNX backend API pages
+4. Electron docs:
+   - `app.commandLine.appendSwitch(...)`
+   - `app.getGPUFeatureStatus()`
+   - `app.getGPUInfo()`
+   - `gpu-info-update`
+5. Chrome WebGPU troubleshooting docs:
+   - secure-context requirement
+   - Linux Vulkan / unsafe WebGPU notes
+   - blocklist / hardware acceleration troubleshooting
+
+### Runtime Harness Direction (2026-03-11)
+
+Decision from this pass:
+1. Do not build a full Electron-first app shell just for testing.
+2. Build one browser-first harness page/app that can run unchanged in Chromium and Electron.
+3. Wrap that harness in a thin Electron launcher for Linux GPU realism and observability.
+4. Keep Chromium as the web-parity lane; use Electron as the primary GPU/runtime realism lane.
+5. Serve the harness over `http://127.0.0.1` / `http://localhost` during development and testing; do not rely on `file://` for WebGPU-sensitive execution.
 
 ## Next Session Highest Priority (P0)
 
-Connect adaptive embedding selection to runtime orchestration and add real provider candidates.
+Stand up the browser-first runtime harness and thin Electron wrapper so real GPU/browser validation can begin, then connect adaptive embedding selection into that runtime path.
 
 Instruction:
-1. Use `ModelProfileResolver` at runtime boundaries before any policy derivation or embedding execution.
-2. Register real embedding providers in `ProviderResolver` candidate lists.
-3. Keep strict TDD (Red -> Green -> Refactor).
-4. If a blocker appears, record it in this document under an error log entry and continue with the next actionable slice.
+1. Create a minimal harness renderer that reports:
+   - `navigator.gpu` availability
+   - adapter/device acquisition outcome
+   - IndexedDB + OPFS availability
+   - selected embedding backend/provider kind
+2. Add a thin Electron main-process wrapper that:
+   - loads the same harness via localhost
+   - appends required Chromium switches before `ready`
+   - logs GPU feature status and GPU info after `gpu-info-update`
+3. Add Playwright coverage for two lanes:
+   - Chromium web harness
+   - Electron harness
+4. After the harness exists, register the first real embedding providers in `ProviderResolver` and test selection inside the real runtime lane.
+5. Keep strict TDD (Red -> Green -> Refactor).
+6. If a blocker appears, record it in this document under an error log entry and continue with the next actionable slice.
 
 Definition of done for this pass:
-1. Runtime path resolves model metadata through `ModelProfileResolver` before use.
-2. At least one non-dummy real provider can be selected by capability + benchmark policy.
-3. Any unresolved blocker is documented with file/symptom/next action.
+1. A single renderer harness runs under both Chromium and Electron.
+2. Electron lane emits GPU capability diagnostics on Linux.
+3. At least one real provider candidate is wired into resolver selection from the runtime harness.
+4. Any unresolved blocker is documented with file/symptom/next action.
 
 ## Non-Negotiable Rules
 
@@ -134,9 +193,10 @@ Available now:
 
 Planned commands to add in later passes:
 1. `npm run test:unit -- tests/embeddings/OnnxEmbeddingRunner.test.ts`
-2. `npm run test:browser`
-3. `npm run test:electron`
-4. `npm run test:all`
+2. `npm run dev:harness`
+3. `npm run test:browser`
+4. `npm run test:electron`
+5. `npm run test:all`
 
 ## Known Hardcoded Hotspots To Clean First
 
