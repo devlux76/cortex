@@ -15,13 +15,22 @@ async function hasElectronInstalled() {
 }
 
 function runPlaywrightElectronTests() {
+  const env = {
+    ...process.env,
+    CORTEX_ELECTRON_HEADLESS: process.env.CORTEX_ELECTRON_HEADLESS ?? "1",
+    CORTEX_ELECTRON_SHOW: process.env.CORTEX_ELECTRON_SHOW ?? "0",
+    CORTEX_DISABLE_VULKAN: process.env.CORTEX_DISABLE_VULKAN ?? "1",
+    CORTEX_ENABLE_UNSAFE_WEBGPU: process.env.CORTEX_ENABLE_UNSAFE_WEBGPU ?? "0",
+    CORTEX_IGNORE_GPU_BLOCKLIST: process.env.CORTEX_IGNORE_GPU_BLOCKLIST ?? "0",
+  };
+
   const child = spawn(
     "npx",
     ["playwright", "test", "tests/runtime/electron-harness.spec.mjs", "--workers=1"],
     {
       stdio: "inherit",
       shell: true,
-      env: process.env,
+      env,
     },
   );
 

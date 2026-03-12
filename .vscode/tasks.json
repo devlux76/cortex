@@ -1,0 +1,37 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "harness:serve",
+      "type": "shell",
+      "command": "node scripts/runtime-harness-server.mjs",
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "cortex-harness",
+        "pattern": {
+          "regexp": "^$"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*",
+          "endsPattern": "\\[runtime-harness\\] serving .*"
+        }
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "focus": false,
+        "clear": false
+      }
+    },
+    {
+      "label": "harness:stop",
+      "type": "shell",
+      "command": "pkill -f 'node scripts/runtime-harness-server.mjs' || true",
+      "presentation": {
+        "reveal": "never",
+        "panel": "shared"
+      }
+    }
+  ]
+}

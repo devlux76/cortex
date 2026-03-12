@@ -1,0 +1,54 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Electron: Debug Main (Harness)",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/electron",
+      "windows": {
+        "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/electron.cmd"
+      },
+      "runtimeArgs": [
+        "--remote-debugging-port=9222"
+      ],
+      "args": [
+        "${workspaceFolder}/scripts/electron-harness-main.mjs"
+      ],
+      "env": {
+        "HARNESS_URL": "http://127.0.0.1:4173",
+        "CORTEX_ELECTRON_HEADLESS": "0",
+        "CORTEX_ELECTRON_SHOW": "1",
+        "CORTEX_DISABLE_VULKAN": "0",
+        "CORTEX_ENABLE_UNSAFE_WEBGPU": "0",
+        "CORTEX_IGNORE_GPU_BLOCKLIST": "0"
+      },
+      "outputCapture": "std",
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "preLaunchTask": "harness:serve",
+      "postDebugTask": "harness:stop"
+    },
+    {
+      "name": "Electron: Attach Renderer",
+      "type": "pwa-chrome",
+      "request": "attach",
+      "port": 9222,
+      "webRoot": "${workspaceFolder}",
+      "timeout": 30000
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Electron: Main + Renderer",
+      "configurations": [
+        "Electron: Debug Main (Harness)",
+        "Electron: Attach Renderer"
+      ]
+    }
+  ]
+}

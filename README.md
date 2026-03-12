@@ -34,6 +34,14 @@ Session-close update checklist (required):
 3. Record blockers with file path, failure symptom, and next action.
 4. Confirm README priorities still match the real top blocker.
 
+VS Code debugging setup (Electron docs aligned):
+1. Launch config file: `.vscode/launch.json`
+2. Task file: `.vscode/tasks.json`
+3. Main-process debug entry: `Electron: Debug Main (Harness)`
+4. Renderer attach entry: `Electron: Attach Renderer`
+5. Combined session: `Electron: Main + Renderer`
+6. Shell fallback launcher: `./scripts/launch-electron-harness.sh`
+
 Docs note:
 1. Numeric examples in design docs are illustrative unless explicitly sourced from model metadata.
 2. Legacy sketch docs were retired; canonical architecture lives in `CORTEX-DESIGN-PLAN-TODO.md` and execution sequencing lives in `PROJECT-EXECUTION-PLAN.md`.
