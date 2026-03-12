@@ -59,7 +59,7 @@ Completed in this pass:
    - `tests/runtime/electron-harness.spec.mjs`
 16. Added Playwright runtime lane configuration and scripts:
    - `playwright.config.mjs`
-   - `package.json` scripts (`dev:harness`, `test:browser`, `test:electron`, `test:runtime`, `test:all`)
+   - `package.json` scripts (`dev:harness`, `test:browser`, `test:electron`, `test:electron:playwright`, `test:electron:desktop`, `test:runtime`, `test:all`)
 17. Added explicit Electron lane runner with actionable setup messaging and optional local soft-skip:
    - `scripts/run-electron-runtime-tests.mjs`
    - `CORTEX_ALLOW_ELECTRON_SKIP=1` local skip flag
@@ -70,11 +70,20 @@ Completed in this pass:
    - `npm run test:unit`
    - `npm run test:browser`
    - `CORTEX_ALLOW_ELECTRON_SKIP=1 npm run test:electron`
+19. Added VS Code Electron debugging workflow aligned with Electron docs:
+   - `.vscode/launch.json`
+   - `.vscode/tasks.json`
+   - README references for `Electron: Debug Main (Harness)`, `Electron: Attach Renderer`, and `Electron: Main + Renderer`
+20. Additional validation in this workspace context:
+   - `npm run lint`
+   - `node scripts/runtime-harness-server.mjs` + Electron launch with `--remote-debugging-port=9222` (desktop-style flags)
+   - same launch with headless/software flags
+   - both Electron launches exited with `SIGSEGV` (`139`) in this non-desktop tooling context
 
 Open items carried to next pass:
 1. Wire resolved `ModelProfile` into first concrete ingest/query orchestrator path.
 2. Add real embedding providers (ONNX/Transformers/WebNN/WebGPU/WebGL/WASM) as candidates for the resolver.
-3. Provision Electron binary availability in CI image and enforce `runtime-electron` as hard gate.
+3. Stabilize Electron runtime lane policy for CI/non-desktop contexts (provisioning + graphics/runtime assumptions) and enforce `runtime-electron` with an explicit context contract.
 4. Implement first Hippocampus/Cortex vertical slice on top of runtime harness lanes.
 
 ### Documentation Synchronization Protocol (Required)
@@ -149,11 +158,11 @@ Decision from this pass:
 
 ## Current Pass Highest Priority (P0)
 
-Move from harness scaffolding to production validation by enabling Electron gate provisioning, wiring real providers, and implementing first ingest/query orchestration slices.
+Move from harness scaffolding to production validation by locking Electron runtime-context policy, wiring real providers, and implementing first ingest/query orchestration slices.
 
 Instruction:
 1. Keep canonical docs synchronized (`README.md`, `CORTEX-DESIGN-PLAN-TODO.md`, `PROJECT-EXECUTION-PLAN.md`) before and after implementation slices.
-2. Provision Electron in CI/runtime images and remove local soft-skip in gated contexts.
+2. Define Electron runtime prerequisites (binary + graphics/runtime context) in CI/runtime images and remove local soft-skip in gated contexts.
 3. Register the first real embedding providers in `ProviderResolver` and test selection inside runtime lanes.
 4. Implement first `Hippocampus` ingest orchestration entry point with profile-resolved settings.
 5. Implement first `Cortex` retrieval orchestration entry point with deterministic coherence ordering baseline.
@@ -226,8 +235,10 @@ Available now:
 11. `npm run dev:harness`
 12. `npm run test:browser`
 13. `npm run test:electron`
-14. `npm run test:runtime`
-15. `npm run test:all`
+14. `npm run test:electron:playwright`
+15. `npm run test:electron:desktop`
+16. `npm run test:runtime`
+17. `npm run test:all`
 
 Planned commands to add in later passes:
 1. `npm run test:unit -- tests/embeddings/OnnxEmbeddingRunner.test.ts`
@@ -236,9 +247,12 @@ Planned commands to add in later passes:
 
 ## Error Log
 
-1. File path: `scripts/run-electron-runtime-tests.mjs` / `package.json`
-2. Failure symptom: Electron executable is unavailable in this environment after `npm install`; direct `npm run test:electron` cannot launch Electron.
-3. Next action: provision Electron binary in CI image (or ensure `npm install -D electron` succeeds in runtime lane environment), then run `npm run test:electron` without `CORTEX_ALLOW_ELECTRON_SKIP=1`.
+1. Blocker A - File path: `scripts/electron-harness-main.mjs`, `.vscode/launch.json`, `scripts/run-electron-runtime-smoke.mjs`
+2. Blocker A - Failure symptom: Electron exits with `SIGSEGV` (`139`) in this tool-executed terminal context for both desktop-style and headless/software-style launches, despite Electron being installed and harness server reachability.
+3. Blocker A - Next action: validate `Electron: Main + Renderer` from an interactive desktop VS Code session and treat non-desktop crash contexts as environment-limited unless reproduced there.
+4. Blocker B - File path: `package.json` / CI runtime image provisioning
+5. Blocker B - Failure symptom: Electron lane reliability still varies across environments; install and runtime assumptions are not yet codified as a strict gate contract.
+6. Blocker B - Next action: define CI/runtime prerequisites explicitly (binary availability + graphics/runtime context policy), then enforce one canonical `runtime-electron` gate configuration.
 
 ## Known Hardcoded Hotspots To Clean First
 

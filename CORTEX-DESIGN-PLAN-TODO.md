@@ -94,7 +94,7 @@ Legend: `Implemented`, `Partial`, `Missing`
 | Storage contracts and persistence schema | Implemented | `core/types.ts`, `storage/OPFSVectorStore.ts`, `storage/IndexedDbMetadataStore.ts`, `tests/Persistence.test.ts` | Current tests are Node-lane with mocked browser APIs. |
 | Model-derived numeric governance | Implemented | `core/ModelProfile.ts`, `core/ModelDefaults.ts`, `core/ModelProfileResolver.ts`, `Policy.ts`, `scripts/guard-model-derived.mjs` | Guard command enforced by `npm run guard:model-derived`. |
 | Adaptive provider resolver infrastructure | Partial | `embeddings/ProviderResolver.ts`, `embeddings/EmbeddingRunner.ts` | Real providers not yet wired; dummy provider baseline exists. |
-| Browser/Electron runtime-realism lanes | Partial | `playwright.config.mjs`, `runtime/harness/index.html`, `tests/runtime/browser-harness.spec.mjs`, `tests/runtime/electron-harness.spec.mjs` | Browser lane passes; Electron lane requires installed Electron binary in environment/CI image. |
+| Browser/Electron runtime-realism lanes | Partial | `playwright.config.mjs`, `runtime/harness/index.html`, `tests/runtime/browser-harness.spec.mjs`, `tests/runtime/electron-harness.spec.mjs`, `.vscode/launch.json`, `.vscode/tasks.json` | Browser lane passes; Electron lane works in desktop sessions but can `SIGSEGV` in constrained non-desktop shells. CI/runtime-context policy is still pending. |
 | Hippocampus ingest orchestrator | Missing | (planned module) | No text chunking -> embed -> persist orchestration path yet. |
 | Cortex retrieval and coherence path | Missing | (planned module) | Ranking stack and open-path solver not yet implemented. |
 | Daydreamer consolidation loop | Missing | (planned module) | Idle scheduling and recalc loop not yet implemented. |

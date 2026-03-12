@@ -18,7 +18,7 @@ Current implementation snapshot:
 2. Model-profile-driven numeric ownership is implemented and guarded by `npm run guard:model-derived`.
 3. Adaptive embedding resolver infrastructure exists, but real providers are still being wired.
 4. Runtime harness and browser lane are implemented (`npm run dev:harness`, `npm run test:browser`).
-5. Electron lane is wired but environment-dependent (`npm run test:electron` requires Electron binary availability).
+5. Electron lane is wired but runtime-context-sensitive (`npm run test:electron` can still crash in constrained non-desktop shells even when Electron is installed; validate from desktop VS Code debug session).
 6. Hippocampus/Cortex/Daydreamer orchestration layers remain the primary vertical-slice gap.
 
 Current delivery priorities (P0):
@@ -41,6 +41,7 @@ VS Code debugging setup (Electron docs aligned):
 4. Renderer attach entry: `Electron: Attach Renderer`
 5. Combined session: `Electron: Main + Renderer`
 6. Shell fallback launcher: `./scripts/launch-electron-harness.sh`
+7. If Electron exits with `SIGSEGV` in a terminal-only environment, rerun from an interactive desktop VS Code session before treating it as an app-level failure.
 
 Docs note:
 1. Numeric examples in design docs are illustrative unless explicitly sourced from model metadata.
