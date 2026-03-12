@@ -37,7 +37,7 @@ export interface BookMetadata {
 export interface Book {
   bookId: Hash;               // SHA-256(pageIds joined or Merkle root)
   pageIds: Hash[];
-  medoidPageId: Hash;
+  medoidPageId: Hash;         // representative page selected by medoid statistic
   meta: BookMetadata;
 }
 
@@ -64,7 +64,7 @@ export interface Edge {
 }
 
 // ---------------------------------------------------------------------------
-// Metroid (medoid) nearest-neighbour graph
+// Metroid nearest-neighbour graph (project term; medoid-inspired)
 // ---------------------------------------------------------------------------
 
 export interface MetroidNeighbor {

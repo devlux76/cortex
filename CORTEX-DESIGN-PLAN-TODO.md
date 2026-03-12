@@ -52,6 +52,7 @@ Their durable content is preserved as canonical implementation/doc contracts:
 2. Metroid NN radius graph APIs (neighbors, induced subgraph, dirty recalc flags) are canonical in `core/types.ts` and `storage/IndexedDbMetadataStore.ts`, with persistence coverage in `tests/Persistence.test.ts`.
 3. Backend abstraction/detection/fallback is canonical in `VectorBackend.ts`, `BackendKind.ts`, and `CreateVectorBackend.ts`.
 4. Model-derived numeric ownership is canonical in `core/ModelDefaults.ts`, `core/ModelProfileResolver.ts`, and `Policy.ts`.
+5. Naming convention is settled: use `Metroid` for project-domain graph terms; keep `medoid` only when referring to the underlying clustering statistic.
 
 ## 1. Design
 
@@ -72,7 +73,7 @@ In scope for v1:
 1. On-device ingest, query, consolidation, and local persistence.
 2. Multi-backend vector compute abstraction (`webgpu`, `webgl`, `webnn`, `wasm`).
 3. Signed graph entities and hash verification.
-4. Sparse Metroid/medoid-neighbor graph for coherence routing.
+4. Sparse Metroid-neighbor graph for coherence routing.
 
 Out of scope for v1:
 1. Full production-grade distributed consensus.
@@ -296,7 +297,7 @@ Priority legend:
 3. ~~Resolve `VectorBackend` interface mismatch against all backend classes.~~ ✅ Done
 4. ~~Add `BackendKind` and `detectBackend` in real code module.~~ ✅ Done
 5. ~~Add missing imports/exports so backend factory compiles.~~ ✅ Done
-6. Decide and document naming convention: `Metroid` vs `Medoid`.
+6. ~~Decide and document naming convention: `Metroid` vs `Medoid`.~~ ✅ Done (`Metroid` canonical domain term; `medoid` math term)
 7. Add minimal CI workflow for build and tests.
 8. ~~Add lint/format rules for consistent style.~~ ✅ Done
 9. Add deterministic floating-point tolerance helpers for backend parity tests.
@@ -358,8 +359,8 @@ Mitigation: batched writes and deferred heavy recalculations in Daydreamer.
 3. Risk: complexity creep from simultaneous P2P and local core work.
 Mitigation: lock scope to local single-node quality before peer exchange.
 
-4. Risk: unclear term usage (`Metroid`/`Medoid`) leaks into API inconsistently.
-Mitigation: settle canonical term now and provide aliasing only at compatibility boundaries.
+4. Risk: terminology drift reintroduces mixed `Metroid`/`medoid` naming in API surfaces.
+Mitigation: keep `Metroid` as the canonical domain term; reserve `medoid` for algorithmic comments and internal statistical descriptions only.
 
 ## 6. Definition of done for v1
 1. Local-only node can ingest, persist, retrieve, and return coherent ordered context.
