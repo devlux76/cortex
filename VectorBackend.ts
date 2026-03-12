@@ -1,32 +1,49 @@
-// TS side
-export interface VectorBackend {
-  kind: BackendKind; // "wasm" | "webgl" | "webgpu" | "webnn"
+import type { BackendKind } from "./BackendKind";
 
-  // ---- float space (exact or high-precision cosine) ----
+export interface ScoreResult {
+  index: number;
+  score: number;
+}
+
+export interface DistanceResult {
+  index: number;
+  distance: number;
+}
+
+export interface VectorBackend {
+  kind: BackendKind;
+
+  // Exact or high-precision dot-product scoring over row-major matrices.
   dotMany(
-    query: Float32Array,      // length = dim
-    matrix: Float32Array,     // length = dim * count, row-major
+    query: Float32Array,
+    matrix: Float32Array,
     dim: number,
     count: number
-  ): Promise<Float32Array>;   // scores[length = count]
+  ): Promise<Float32Array>;
 
-  topKFromScores(
-    scores: Float32Array,
-    k: number
-  ): Promise<{ index: number; score: number }[]>;
+  // Projection helper used to reduce dimensionality for routing tiers.
+  project(
+    vector: Float32Array,
+    projectionMatrix: Float32Array,
+    dimIn: number,
+    dimOut: number
+  ): Promise<Float32Array>;
 
-  // ---- binary space (approximate, XOR / popcnt) ----
+  topKFromScores(scores: Float32Array, k: number): Promise<ScoreResult[]>;
+
+  // Random-hyperplane hash from projected vectors into packed binary codes.
   hashToBinary(
-    vector: Float32Array,     // original embedding (e.g. 768-d)
-    dim: number,              // same as vector.length
-    bits: number              // e.g. 64, 128
-  ): Promise<Uint32Array>;    // packed bits (words = ceil(bits/32))
+    vector: Float32Array,
+    projectionMatrix: Float32Array,
+    dimIn: number,
+    bits: number
+  ): Promise<Uint32Array>;
 
   hammingTopK(
-    queryCode: Uint32Array,   // packed bits
-    codes: Uint32Array,       // concatenated codes for N items
+    queryCode: Uint32Array,
+    codes: Uint32Array,
     wordsPerCode: number,
-    count: number,            // N
+    count: number,
     k: number
-  ): Promise<{ index: number; distance: number }[]>;
+  ): Promise<DistanceResult[]>;
 }

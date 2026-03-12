@@ -1,13 +1,35 @@
+import type {
+  DistanceResult,
+  ScoreResult,
+  VectorBackend
+} from "./VectorBackend";
+
+interface WasmVectorExports {
+  mem: WebAssembly.Memory;
+  dot_many(qPtr: number, mPtr: number, outPtr: number, dim: number, count: number): void;
+  project(vecPtr: number, pPtr: number, outPtr: number, dimIn: number, dimOut: number): void;
+  hash_binary(vecPtr: number, pPtr: number, codePtr: number, dimIn: number, bits: number): void;
+  hamming_scores(
+    queryCodePtr: number,
+    codesPtr: number,
+    outPtr: number,
+    wordsPerCode: number,
+    count: number
+  ): void;
+  topk_i32(scoresPtr: number, outPtr: number, count: number, k: number): void;
+  topk_f32(scoresPtr: number, outPtr: number, count: number, k: number): void;
+}
+
 export class WasmVectorBackend implements VectorBackend {
   readonly kind = "wasm" as const;
-  private exports!: Record<string, Function>;
+  private exports!: WasmVectorExports;
   private mem!: WebAssembly.Memory;
   private bump = 1024; // first 1KB reserved as guard
 
   static async create(wasmBytes: ArrayBuffer): Promise<WasmVectorBackend> {
     const b = new WasmVectorBackend();
     const { instance } = await WebAssembly.instantiate(wasmBytes);
-    b.exports = instance.exports as Record<string, Function>;
+    b.exports = instance.exports as unknown as WasmVectorExports;
     b.mem = instance.exports.mem as WebAssembly.Memory;
     return b;
   }
@@ -49,25 +71,27 @@ export class WasmVectorBackend implements VectorBackend {
   }
 
   async project(
-    vec: Float32Array, P: Float32Array,
+    vec: Float32Array,
+    projectionMatrix: Float32Array,
     dimIn: number, dimOut: number
   ): Promise<Float32Array> {
     this.reset();
     const v_ptr   = this.writeF32(vec);
-    const P_ptr   = this.writeF32(P);
+    const P_ptr   = this.writeF32(projectionMatrix);
     const out_ptr = this.alloc(dimOut * 4);
     this.exports.project(v_ptr, P_ptr, out_ptr, dimIn, dimOut);
     return new Float32Array(this.mem.buffer.slice(out_ptr, out_ptr + dimOut * 4));
   }
 
   async hashToBinary(
-    vec: Float32Array, P: Float32Array,
+    vec: Float32Array,
+    projectionMatrix: Float32Array,
     dimIn: number, bits: number
   ): Promise<Uint32Array> {
     this.reset();
     const wordsPerCode = Math.ceil(bits / 32);
     const v_ptr    = this.writeF32(vec);
-    const P_ptr    = this.writeF32(P);
+    const P_ptr    = this.writeF32(projectionMatrix);
     const code_ptr = this.alloc(wordsPerCode * 4);
     this.exports.hash_binary(v_ptr, P_ptr, code_ptr, dimIn, bits);
     return new Uint32Array(this.mem.buffer.slice(code_ptr, code_ptr + wordsPerCode * 4));
@@ -76,7 +100,7 @@ export class WasmVectorBackend implements VectorBackend {
   async hammingTopK(
     queryCode: Uint32Array, codes: Uint32Array,
     wordsPerCode: number, count: number, k: number
-  ): Promise<{ index: number; distance: number }[]> {
+  ): Promise<DistanceResult[]> {
     this.reset();
     const q_ptr       = this.writeU32(queryCode);
     const codes_ptr   = this.writeU32(codes);
@@ -98,7 +122,7 @@ export class WasmVectorBackend implements VectorBackend {
 
   async topKFromScores(
     scores: Float32Array, k: number
-  ): Promise<{ index: number; score: number }[]> {
+  ): Promise<ScoreResult[]> {
     this.reset();
     // copy: topk_f32 mutates in-place
     const copy_ptr = this.writeF32(new Float32Array(scores));

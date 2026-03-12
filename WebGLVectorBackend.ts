@@ -1,3 +1,10 @@
+import { topKByDistance, topKByScore } from "./TopK";
+import type {
+  DistanceResult,
+  ScoreResult,
+  VectorBackend
+} from "./VectorBackend";
+
 const VERT_SRC = /* glsl */`#version 300 es
 out vec2 v_uv;
 void main() {
@@ -204,12 +211,13 @@ export class WebGlVectorBackend implements VectorBackend {
   }
 
   async hashToBinary(
-    vec: Float32Array, P: Float32Array,
+    vec: Float32Array,
+    projectionMatrix: Float32Array,
     dimIn: number, bits: number
   ): Promise<Uint32Array> {
     const dimPacked = Math.ceil(dimIn / 4);
     const vTex = this.packF32Texture(vec, 1);
-    const hTex = this.packF32Texture(P, bits);
+    const hTex = this.packF32Texture(projectionMatrix, bits);
 
     const pixels = this.drawToFramebuffer(this.hashProg, bits, (prog) => {
       this.bindTex(prog, "u_vec",         vTex, 0);
@@ -239,7 +247,7 @@ export class WebGlVectorBackend implements VectorBackend {
   async hammingTopK(
     queryCode: Uint32Array, codes: Uint32Array,
     wordsPerCode: number, count: number, k: number
-  ): Promise<{ index: number; distance: number }[]> {
+  ): Promise<DistanceResult[]> {
     const distances = new Uint32Array(count);
     for (let i = 0; i < count; i++) {
       let dist = 0;
@@ -253,12 +261,12 @@ export class WebGlVectorBackend implements VectorBackend {
       }
       distances[i] = dist;
     }
-    return topKCpu(distances, k, false);
+    return topKByDistance(distances, k);
   }
 
   async topKFromScores(
     scores: Float32Array, k: number
-  ): Promise<{ index: number; score: number }[]> {
-    return topKCpu(scores, k, true);
+  ): Promise<ScoreResult[]> {
+    return topKByScore(scores, k);
   }
 }

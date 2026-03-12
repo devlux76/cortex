@@ -254,17 +254,17 @@ Priority legend:
 10. Add smoke test that instantiates each backend or cleanly falls back.
 
 ### P1 (v1 core)
-1. Implement `OPFSVectorStore.appendVector` and `readVector`.
-2. Implement `IndexedDbMetadataStore` entity CRUD methods.
-3. Implement metadata helper indexes (`page->book`, `book->volume`, `volume->shelf`).
-4. Implement `putMetroidNeighbors` and `getMetroidNeighbors`.
-5. Implement `getInducedMetroidSubgraph` with bounded BFS.
+1. ~~Implement `OPFSVectorStore.appendVector` and `readVector`.~~ ✅ Done (Phase 1, 2026-03-11)
+2. ~~Implement `IndexedDbMetadataStore` entity CRUD methods.~~ ✅ Done (Phase 1, 2026-03-11)
+3. ~~Implement metadata helper indexes (`page->book`, `book->volume`, `volume->shelf`).~~ ✅ Done (Phase 1, 2026-03-11)
+4. ~~Implement `putMetroidNeighbors` and `getMetroidNeighbors`.~~ ✅ Done (Phase 1, 2026-03-11)
+5. ~~Implement `getInducedMetroidSubgraph` with bounded BFS.~~ ✅ Done (Phase 1, 2026-03-11)
 6. Implement page chunking utility and deterministic page ID generation.
 7. Implement page signature creation and verification helpers.
 8. Implement Hippocampus ingest orchestration.
 9. Implement fast Metroid insert path for newly ingested pages.
 10. Implement reverse neighbor update path with bounded degree.
-11. Implement dirty-volume recalc flagging in metadata.
+11. ~~Implement dirty-volume recalc flagging in metadata.~~ ✅ Done (Phase 1, 2026-03-11)
 12. Implement Shelf/Volume/Book/Page ranking in Cortex query.
 13. Implement query seed selection threshold logic.
 14. Implement `findOpenTSPPath` with dummy-node open-path strategy.
@@ -275,7 +275,7 @@ Priority legend:
 19. Implement full neighborhood recalc for dirty volumes.
 20. Implement split/merge hooks for unstable clusters.
 21. Add end-to-end test: ingest -> query -> coherent ordered response.
-22. Add restart persistence test for vectors + metadata.
+22. ~~Add restart persistence test for vectors + metadata.~~ ✅ Done (Phase 1, 2026-03-11)
 23. Add regression tests for neighbor symmetry and bounded degree.
 24. Add benchmark harness and first baseline capture.
 

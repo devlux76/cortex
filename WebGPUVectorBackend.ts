@@ -1,3 +1,10 @@
+import { topKByDistance, topKByScore } from "./TopK";
+import type {
+  DistanceResult,
+  ScoreResult,
+  VectorBackend
+} from "./VectorBackend";
+
 const DOT_MANY_WGSL = /* wgsl */`
 struct Params { dim: u32, count: u32, words_per_code: u32, k: u32 }
 @group(0) @binding(0) var<storage, read>       query  : array<f32>;
@@ -77,16 +84,23 @@ export class WebGpuVectorBackend implements VectorBackend {
     });
   }
 
+  private toArrayBuffer(data: ArrayBufferView): ArrayBuffer {
+    const bytes = new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+    const copy = new Uint8Array(data.byteLength);
+    copy.set(bytes);
+    return copy.buffer;
+  }
+
   // Upload a Float32Array into a GPU storage buffer (read-only)
   private f32Buffer(data: Float32Array, usage = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST): GPUBuffer {
     const buf = this.device.createBuffer({ size: data.byteLength, usage });
-    this.device.queue.writeBuffer(buf, 0, data);
+    this.device.queue.writeBuffer(buf, 0, this.toArrayBuffer(data));
     return buf;
   }
 
   private u32Buffer(data: Uint32Array, usage = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST): GPUBuffer {
     const buf = this.device.createBuffer({ size: data.byteLength, usage });
-    this.device.queue.writeBuffer(buf, 0, data);
+    this.device.queue.writeBuffer(buf, 0, this.toArrayBuffer(data));
     return buf;
   }
 
@@ -109,7 +123,7 @@ export class WebGpuVectorBackend implements VectorBackend {
       size: Math.max(16, data.byteLength),  // WebGPU min uniform size = 16 bytes
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
-    this.device.queue.writeBuffer(buf, 0, data);
+    this.device.queue.writeBuffer(buf, 0, this.toArrayBuffer(data));
     return buf;
   }
 
@@ -174,12 +188,13 @@ export class WebGpuVectorBackend implements VectorBackend {
 
   // ── hash_binary
   async hashToBinary(
-    vec: Float32Array, P: Float32Array,
+    vec: Float32Array,
+    projectionMatrix: Float32Array,
     dimIn: number, bits: number
   ): Promise<Uint32Array> {
     const wordsPerCode = Math.ceil(bits / 32);
     const vBuf = this.f32Buffer(vec);
-    const pBuf = this.f32Buffer(P);
+    const pBuf = this.f32Buffer(projectionMatrix);
     const { gpu: oBuf, read: rBuf } = this.outBuffer(wordsPerCode * 4);
     // zero-init the output buffer before atomicOr writes
     this.device.queue.writeBuffer(oBuf, 0, new Uint32Array(wordsPerCode));
@@ -210,7 +225,7 @@ export class WebGpuVectorBackend implements VectorBackend {
   async hammingTopK(
     queryCode: Uint32Array, codes: Uint32Array,
     wordsPerCode: number, count: number, k: number
-  ): Promise<{ index: number; distance: number }[]> {
+  ): Promise<DistanceResult[]> {
     const qBuf = this.u32Buffer(queryCode);
     const cBuf = this.u32Buffer(codes);
     const { gpu: oBuf, read: rBuf } = this.outBuffer(count * 4);
@@ -235,31 +250,12 @@ export class WebGpuVectorBackend implements VectorBackend {
     this.device.queue.submit([cmd.finish()]);
 
     const distances = await this.readbackU32(oBuf, rBuf, count);
-    return topKCpu(distances, k, false); // ascending for Hamming
+    return topKByDistance(distances, k);
   }
 
   async topKFromScores(
     scores: Float32Array, k: number
-  ): Promise<{ index: number; score: number }[]> {
-    return topKCpu(scores, k, true); // descending for cosine
+  ): Promise<ScoreResult[]> {
+    return topKByScore(scores, k);
   }
-}
-
-// ── Shared CPU top-k (trivially fast for k<<N, used by all backends for final pass)
-function topKCpu(
-  arr: Float32Array | Uint32Array,
-  k: number,
-  descending: boolean
-): { index: number; score?: number; distance?: number }[] {
-  const indices = Array.from({ length: arr.length }, (_, i) => i);
-  indices.sort((a, b) =>
-    descending
-      ? (arr[b] as number) - (arr[a] as number)
-      : (arr[a] as number) - (arr[b] as number)
-  );
-  return indices.slice(0, k).map(i => ({
-    index: i,
-    score: descending ? (arr[i] as number) : undefined,
-    distance: descending ? undefined : (arr[i] as number),
-  }));
 }

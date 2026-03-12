@@ -1,5 +1,10 @@
-// WebNN types are in @webnn/types or via the browser's MLContext
-declare const ml: { createContext(): Promise<MLContext> };
+import { topKByScore } from "./TopK";
+import type {
+  DistanceResult,
+  ScoreResult,
+  VectorBackend
+} from "./VectorBackend";
+import { WasmVectorBackend } from "./WasmVectorBackend";
 
 export class WebNnVectorBackend implements VectorBackend {
   readonly kind = "webnn" as const;
@@ -11,6 +16,10 @@ export class WebNnVectorBackend implements VectorBackend {
   private wasmFallback!: WasmVectorBackend;
 
   static async create(wasmBytes: ArrayBuffer): Promise<WebNnVectorBackend> {
+    if (!navigator.ml) {
+      throw new Error("WebNN is not available in this runtime");
+    }
+
     const b = new WebNnVectorBackend();
     b.ctx     = await navigator.ml.createContext({ deviceType: "gpu" });
     b.builder = new MLGraphBuilder(b.ctx);
@@ -21,10 +30,9 @@ export class WebNnVectorBackend implements VectorBackend {
   // Build and cache an MLGraph for a given matmul shape.
   // graph computes: output[count] = matrix[count, dim] · query[dim]
   // (treating dot_many as a single matmul: output = M @ q)
-  private async getOrBuildGraph(
-    dim: number, count: number
-  ): Promise<{ graph: MLGraph; qInput: MLOperand; mInput: MLOperand }> {
+  private async getOrBuildGraph(dim: number, count: number): Promise<MLGraph> {
     const key = `${dim},${count}`;
+
     if (!this.graphCache.has(key)) {
       const qDesc: MLOperandDescriptor = { dataType: "float32", dimensions: [dim] };
       const mDesc: MLOperandDescriptor = { dataType: "float32", dimensions: [count, dim] };
@@ -42,14 +50,15 @@ export class WebNnVectorBackend implements VectorBackend {
       const graph = await this.builder.build({ scores: flat });
       this.graphCache.set(key, graph);
     }
-    return { graph: this.graphCache.get(key)!, qInput: null!, mInput: null! };
+
+    return this.graphCache.get(key)!;
   }
 
   async dotMany(
     query: Float32Array, matrix: Float32Array,
     dim: number, count: number
   ): Promise<Float32Array> {
-    const { graph } = await this.getOrBuildGraph(dim, count);
+    const graph = await this.getOrBuildGraph(dim, count);
     const outputs = { scores: new Float32Array(count) };
     await this.ctx.compute(graph, { query, matrix }, outputs);
     return outputs.scores;
@@ -57,30 +66,32 @@ export class WebNnVectorBackend implements VectorBackend {
 
   // project: same matmul, just dimIn→dimOut; WebNN handles any shape
   async project(
-    vec: Float32Array, P: Float32Array,
+    vec: Float32Array,
+    projectionMatrix: Float32Array,
     dimIn: number, dimOut: number
   ): Promise<Float32Array> {
-    return this.dotMany(vec, P, dimIn, dimOut);
+    return this.dotMany(vec, projectionMatrix, dimIn, dimOut);
   }
 
   // WebNN has no bitwise instructions — delegate to WASM
   async hashToBinary(
-    vec: Float32Array, P: Float32Array,
+    vec: Float32Array,
+    projectionMatrix: Float32Array,
     dimIn: number, bits: number
   ): Promise<Uint32Array> {
-    return this.wasmFallback.hashToBinary(vec, P, dimIn, bits);
+    return this.wasmFallback.hashToBinary(vec, projectionMatrix, dimIn, bits);
   }
 
   async hammingTopK(
     queryCode: Uint32Array, codes: Uint32Array,
     wordsPerCode: number, count: number, k: number
-  ): Promise<{ index: number; distance: number }[]> {
+  ): Promise<DistanceResult[]> {
     return this.wasmFallback.hammingTopK(queryCode, codes, wordsPerCode, count, k);
   }
 
   async topKFromScores(
     scores: Float32Array, k: number
-  ): Promise<{ index: number; score: number }[]> {
-    return topKCpu(scores, k, true);
+  ): Promise<ScoreResult[]> {
+    return topKByScore(scores, k);
   }
 }

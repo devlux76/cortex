@@ -1,3 +1,10 @@
+import { detectBackend } from "./BackendKind";
+import type { VectorBackend } from "./VectorBackend";
+import { WasmVectorBackend } from "./WasmVectorBackend";
+import { WebGlVectorBackend } from "./WebGLVectorBackend";
+import { WebGpuVectorBackend } from "./WebGPUVectorBackend";
+import { WebNnVectorBackend } from "./WebNNVectorBackend";
+
 export async function createVectorBackend(
   wasmBytes: ArrayBuffer
 ): Promise<VectorBackend> {
