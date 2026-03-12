@@ -4,8 +4,8 @@ Date: 2026-03-11
 
 This plan is synthesized from:
 - `README.md`
-- `Cortex-sketch.md`
-- `Cortex-sketch-errata.md`
+- `PROJECT-EXECUTION-PLAN.md`
+- Canonical contracts in `core/types.ts`, `storage/IndexedDbMetadataStore.ts`, `Policy.ts`, and model profile modules under `core/`
 - Existing proof-of-concept backend files in this repo
 
 ## 0. Execution Synchronization (2026-03-11)
@@ -43,6 +43,15 @@ Next focus:
 	- Transformers.js provider (`webnn/webgpu/wasm`)
 	- Explicit ORT WebGL provider (`webgl`)
 3. Add browser/electron runtime test lanes to match merge-gate policy.
+
+### 0.2 Legacy Sketch Consolidation (2026-03-11)
+
+The earlier `Cortex-sketch` and `Cortex-sketch-errata` notes are retired.
+Their durable content is preserved as canonical implementation/doc contracts:
+1. Data-model and storage interfaces are canonical in `core/types.ts`.
+2. Metroid NN radius graph APIs (neighbors, induced subgraph, dirty recalc flags) are canonical in `core/types.ts` and `storage/IndexedDbMetadataStore.ts`, with persistence coverage in `tests/Persistence.test.ts`.
+3. Backend abstraction/detection/fallback is canonical in `VectorBackend.ts`, `BackendKind.ts`, and `CreateVectorBackend.ts`.
+4. Model-derived numeric ownership is canonical in `core/ModelDefaults.ts`, `core/ModelProfileResolver.ts`, and `Policy.ts`.
 
 ## 1. Design
 
@@ -283,7 +292,7 @@ Priority legend:
 
 ### P0 (do first)
 1. ~~Create TypeScript project scaffolding (`package.json`, `tsconfig`, test runner).~~ ✅ Done
-2. ~~Define canonical shared types for all entities from sketch and errata.~~ ✅ Done
+2. ~~Define canonical shared types for all entities from legacy design notes.~~ ✅ Done
 3. ~~Resolve `VectorBackend` interface mismatch against all backend classes.~~ ✅ Done
 4. ~~Add `BackendKind` and `detectBackend` in real code module.~~ ✅ Done
 5. ~~Add missing imports/exports so backend factory compiles.~~ ✅ Done

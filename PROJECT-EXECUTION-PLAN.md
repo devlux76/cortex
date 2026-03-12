@@ -142,7 +142,7 @@ Planned commands to add in later passes:
 
 1. ~~`core/types.ts` comments with sample token/dimension values.~~ ✅ Updated to source-owned wording.
 2. ~~`Policy.ts` sample projection dimensions.~~ ✅ Replaced with derived policy implementation.
-3. ~~`Cortex-sketch.md` and `Cortex-sketch-errata.md` illustrative constants (`2048`, `768`, `128`, `0.68`, `40`, etc.).~~ ✅ Clarified as illustrative.
+3. ~~Legacy design-note illustrative constants (`2048`, `768`, `128`, `0.68`, `40`, etc.).~~ ✅ Canonicalized to model-derived policy/runtime constants and retired from source docs.
 4. Any ingest/query defaults currently assumed without model metadata backing. (Pending runtime module implementation)
 
 ## Scope Notes

@@ -18,6 +18,7 @@ Next session highest priority (P0):
 
 Docs note:
 1. Numeric examples in design docs are illustrative unless explicitly sourced from model metadata.
+2. Legacy sketch docs were retired; canonical architecture lives in `CORTEX-DESIGN-PLAN-TODO.md` and execution sequencing lives in `PROJECT-EXECUTION-PLAN.md`.
 
 ## What is CORTEX?
 
