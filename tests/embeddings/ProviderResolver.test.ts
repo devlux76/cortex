@@ -5,8 +5,10 @@ import {
   DEFAULT_PROVIDER_BENCHMARK_POLICY,
   DEFAULT_PROVIDER_ORDER,
   type EmbeddingProviderCandidate,
+  createTransformersJsProviderCandidates,
   resolveEmbeddingBackend,
 } from "../../embeddings/ProviderResolver";
+import { TransformersJsEmbeddingBackend } from "../../embeddings/TransformersJsEmbeddingBackend";
 
 class FakeBackend implements EmbeddingBackend {
   readonly kind: string;
@@ -140,5 +142,65 @@ describe("resolveEmbeddingBackend", () => {
 
     expect(result.selectedKind).toBe("webgpu");
     expect(benchmarkBackend).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("createTransformersJsProviderCandidates", () => {
+  it("returns three candidates for webnn, webgpu, and wasm", () => {
+    const candidates = createTransformersJsProviderCandidates();
+    const kinds = candidates.map((c) => c.kind);
+    expect(kinds).toEqual(["webnn", "webgpu", "wasm"]);
+  });
+
+  it("each candidate creates a TransformersJsEmbeddingBackend with the matching device", async () => {
+    const candidates = createTransformersJsProviderCandidates({ dimension: 64 });
+    for (const candidate of candidates) {
+      const backend = await candidate.createBackend();
+      expect(backend).toBeInstanceOf(TransformersJsEmbeddingBackend);
+      expect((backend as TransformersJsEmbeddingBackend).device).toBe(
+        candidate.kind,
+      );
+      expect((backend as TransformersJsEmbeddingBackend).dimension).toBe(64);
+    }
+  });
+
+  it("wasm candidate is always supported", async () => {
+    const candidates = createTransformersJsProviderCandidates();
+    const wasmCandidate = candidates.find((c) => c.kind === "wasm");
+    expect(wasmCandidate).toBeDefined();
+    expect(await wasmCandidate!.isSupported()).toBe(true);
+  });
+
+  it("webgpu candidate support reflects navigator.gpu availability", async () => {
+    const candidates = createTransformersJsProviderCandidates();
+    const webgpuCandidate = candidates.find((c) => c.kind === "webgpu");
+    expect(webgpuCandidate).toBeDefined();
+
+    // In a Node/vitest environment there is no navigator.gpu, so should be false.
+    expect(await webgpuCandidate!.isSupported()).toBe(false);
+  });
+
+  it("webnn candidate support reflects navigator.ml availability", async () => {
+    const candidates = createTransformersJsProviderCandidates();
+    const webnnCandidate = candidates.find((c) => c.kind === "webnn");
+    expect(webnnCandidate).toBeDefined();
+
+    // In a Node/vitest environment there is no navigator.ml, so should be false.
+    expect(await webnnCandidate!.isSupported()).toBe(false);
+  });
+
+  it("forwards shared options to each backend", async () => {
+    const options = {
+      modelId: "custom/model",
+      documentPrefix: "doc: ",
+      queryPrefix: "q: ",
+    };
+    const candidates = createTransformersJsProviderCandidates(options);
+    for (const candidate of candidates) {
+      const backend = (await candidate.createBackend()) as TransformersJsEmbeddingBackend;
+      expect(backend.modelId).toBe("custom/model");
+      expect(backend.documentPrefix).toBe("doc: ");
+      expect(backend.queryPrefix).toBe("q: ");
+    }
   });
 });

@@ -3,6 +3,11 @@ import {
   type DeterministicDummyEmbeddingBackendOptions,
 } from "./DeterministicDummyEmbeddingBackend";
 import type { EmbeddingBackend } from "./EmbeddingBackend";
+import {
+  TransformersJsEmbeddingBackend,
+  type TransformersJsDevice,
+  type TransformersJsEmbeddingBackendOptions,
+} from "./TransformersJsEmbeddingBackend";
 
 export type EmbeddingProviderKind =
   | "webnn"
@@ -241,4 +246,69 @@ export function createDummyProviderCandidate(
     isSupported: () => globalThis.crypto?.subtle !== undefined,
     createBackend: () => new DeterministicDummyEmbeddingBackend(options),
   };
+}
+
+/**
+ * Checks whether a given Transformers.js ONNX device is available in the
+ * current runtime environment.
+ *
+ * - `"wasm"` is always considered supported (lowest common denominator).
+ * - `"webgpu"` requires `navigator.gpu` to be present.
+ * - `"webnn"` requires `navigator.ml` to be present.
+ */
+function isTransformersJsDeviceSupported(
+  device: TransformersJsDevice,
+): boolean {
+  switch (device) {
+    case "webnn":
+      return (
+        typeof globalThis.navigator !== "undefined" &&
+        "ml" in globalThis.navigator
+      );
+    case "webgpu":
+      return (
+        typeof globalThis.navigator !== "undefined" &&
+        "gpu" in globalThis.navigator
+      );
+    case "wasm":
+      return true;
+  }
+}
+
+/**
+ * Returns an `EmbeddingProviderCandidate` array for each Transformers.js
+ * ONNX device (`"webnn"`, `"webgpu"`, `"wasm"`), ordered from fastest to most
+ * widely available.
+ *
+ * Each candidate:
+ * - Exposes a `kind` matching the underlying device (e.g. `"webgpu"`).
+ * - Runs its `isSupported()` check at resolution time (no eager pipeline load).
+ * - Creates a `TransformersJsEmbeddingBackend` with the shared `options` plus
+ *   the candidate-specific `device`.
+ *
+ * Pass these candidates to `resolveEmbeddingBackend` or
+ * `EmbeddingRunner.fromResolverOptions` to select the best available device
+ * at runtime.
+ *
+ * @example
+ * ```ts
+ * const runner = EmbeddingRunner.fromResolverOptions({
+ *   candidates: [
+ *     ...createTransformersJsProviderCandidates(),
+ *     createDummyProviderCandidate(),
+ *   ],
+ * });
+ * ```
+ */
+export function createTransformersJsProviderCandidates(
+  options: TransformersJsEmbeddingBackendOptions = {},
+): EmbeddingProviderCandidate[] {
+  const devices: TransformersJsDevice[] = ["webnn", "webgpu", "wasm"];
+
+  return devices.map((device) => ({
+    kind: device,
+    isSupported: () => isTransformersJsDeviceSupported(device),
+    createBackend: () =>
+      new TransformersJsEmbeddingBackend({ ...options, device }),
+  }));
 }

@@ -16,6 +16,7 @@ const IGNORED_DIRS = new Set([
 
 const ALLOWED_SOURCE_FILES = new Set([
   "core/ModelDefaults.ts",
+  "core/BuiltInModelProfiles.ts",
 ]);
 
 const MODEL_FIELD_PATTERN =

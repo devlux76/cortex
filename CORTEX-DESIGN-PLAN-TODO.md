@@ -18,7 +18,7 @@ Canonical document contract:
 Current delivery priorities (P0):
 1. Keep docs synchronized to real code state on every implementation pass.
 2. Stabilize Electron provisioning in CI so `runtime-electron` can run as a hard gate.
-3. Wire first real embedding providers into runtime selection path.
+3. ~~Wire first real embedding providers into runtime selection path.~~ **Done (2026-03-12)**
 4. Implement Hippocampus ingest and Cortex retrieval vertical slices with strict TDD.
 5. Preserve model-derived defaults and avoid hardcoded model-dependent numerics.
 
@@ -92,13 +92,43 @@ Legend: `Implemented`, `Partial`, `Missing`
 | --- | --- | --- | --- |
 | Vector backend abstraction (`webgpu`, `webgl`, `webnn`, `wasm`) | Implemented | `VectorBackend.ts`, `CreateVectorBackend.ts`, `WebGPUVectorBackend.ts`, `WebGLVectorBackend.ts`, `WebNNVectorBackend.ts`, `WasmVectorBackend.ts` | Runtime lanes still needed for real-environment confidence. |
 | Storage contracts and persistence schema | Implemented | `core/types.ts`, `storage/OPFSVectorStore.ts`, `storage/IndexedDbMetadataStore.ts`, `tests/Persistence.test.ts` | Current tests are Node-lane with mocked browser APIs. |
-| Model-derived numeric governance | Implemented | `core/ModelProfile.ts`, `core/ModelDefaults.ts`, `core/ModelProfileResolver.ts`, `Policy.ts`, `scripts/guard-model-derived.mjs` | Guard command enforced by `npm run guard:model-derived`. |
-| Adaptive provider resolver infrastructure | Partial | `embeddings/ProviderResolver.ts`, `embeddings/EmbeddingRunner.ts` | Real providers not yet wired; dummy provider baseline exists. |
+| Model-derived numeric governance | Implemented | `core/ModelProfile.ts`, `core/ModelDefaults.ts`, `core/ModelProfileResolver.ts`, `core/BuiltInModelProfiles.ts`, `Policy.ts`, `scripts/guard-model-derived.mjs` | Guard command enforced by `npm run guard:model-derived`. `BuiltInModelProfiles.ts` is explicitly allow-listed. |
+| Adaptive provider resolver infrastructure | Implemented | `embeddings/ProviderResolver.ts`, `embeddings/EmbeddingRunner.ts`, `embeddings/TransformersJsEmbeddingBackend.ts` | Real Transformers.js provider wired for `webnn`/`webgpu`/`wasm`. Dummy SHA-256 provider remains for fallback/testing. WebGL ORT adapter not yet implemented. |
 | Browser/Electron runtime-realism lanes | Partial | `playwright.config.mjs`, `runtime/harness/index.html`, `tests/runtime/browser-harness.spec.mjs`, `tests/runtime/electron-harness.spec.mjs`, `.vscode/launch.json`, `.vscode/tasks.json`, `docker/electron-debug/Dockerfile`, `docker-compose.electron-debug.yml` | Browser lane passes; Electron host-shell runs can `SIGSEGV` in constrained contexts. Dockerized attach flow is validated for sandbox-isolated debugging, while CI/runtime-context policy is still pending. |
 | Hippocampus ingest orchestrator | Missing | (planned module) | No text chunking -> embed -> persist orchestration path yet. |
 | Cortex retrieval and coherence path | Missing | (planned module) | Ranking stack and open-path solver not yet implemented. |
 | Daydreamer consolidation loop | Missing | (planned module) | Idle scheduling and recalc loop not yet implemented. |
 | Crypto signing and verification helpers | Missing | (planned module `core/crypto`) | Entity fields exist in `core/types.ts`, helper module pending. |
+
+### 0.7 Status Update (2026-03-12) — Real Embedding Providers Wired
+
+Completed in this pass:
+1. Added `@huggingface/transformers` dependency (v3.8.1) — ONNX Runtime-backed, real browser inference.
+2. Implemented `embeddings/TransformersJsEmbeddingBackend.ts`:
+   - Implements `EmbeddingBackend`; supports `webnn`, `webgpu`, and `wasm` devices.
+   - Default model: `onnx-community/embeddinggemma-300m-ONNX` (Q4-quantized EmbeddingGemma-300M).
+   - Lazy pipeline loading — zero cost until first `embed()` or `embedQueries()` call.
+   - Configurable `modelId`, `dimension`, `documentPrefix`, `queryPrefix` for model-agnostic use.
+   - `embed()` uses document prefix; `embedQueries()` uses query prefix (as required by EmbeddingGemma model card).
+   - Matryoshka sub-dimension slicing: output is truncated to `dimension` when smaller than model output.
+3. Added `createTransformersJsProviderCandidates()` factory to `embeddings/ProviderResolver.ts`:
+   - Returns candidates for `webnn`, `webgpu`, and `wasm` in priority order.
+   - Each candidate has a capability check (`navigator.gpu`, `navigator.ml`) before instantiating the pipeline.
+   - Shared options (model, dimension, prefixes) are forwarded to all device candidates.
+4. Added `core/BuiltInModelProfiles.ts`:
+   - Canonical registry entry for `onnx-community/embeddinggemma-300m-ONNX` with model-derived numeric values.
+   - `BUILT_IN_MODEL_REGISTRY` can be passed directly to `ModelProfileResolver` constructor.
+5. Updated `scripts/guard-model-derived.mjs` to allow `core/BuiltInModelProfiles.ts` as a numeric source-of-truth.
+6. TDD coverage added:
+   - `tests/embeddings/TransformersJsEmbeddingBackend.test.ts` (10 tests)
+   - `tests/embeddings/ProviderResolver.test.ts` extended with 6 `createTransformersJsProviderCandidates` tests
+   - `tests/model/BuiltInModelProfiles.test.ts` (5 tests)
+7. All validation gates pass: `npm run build`, `npm run lint`, `npm run test:unit`, `npm run guard:model-derived`.
+
+Next focus:
+1. Implement first `hippocampus` ingest orchestration entry point using resolved `ModelProfile` + `TransformersJsEmbeddingBackend`.
+2. Implement first `cortex` retrieval orchestration entry point.
+3. Implement `embeddings/OrtWebglEmbeddingBackend.ts` for explicit `webgl` fallback (lower priority).
 
 ### 0.6 Night Handoff (2026-03-12)
 
@@ -109,10 +139,10 @@ Where we are now:
 4. Docker lane currently runs software rendering and is not the final GPU-realism gate.
 
 Tomorrow's code-first sequence:
-1. Implement `embeddings/TransformersEmbeddingBackend.ts` for `webnn/webgpu/wasm`.
+1. ~~Implement `embeddings/TransformersEmbeddingBackend.ts` for `webnn/webgpu/wasm`.~~ **Done (2026-03-12)**
 2. Implement `embeddings/OrtWebglEmbeddingBackend.ts` for explicit `webgl` fallback.
-3. Expand resolver wiring in `embeddings/ProviderResolver.ts` so real providers participate in capability + benchmark selection.
-4. Add strict Red -> Green tests for new provider registration and selection behavior under capability constraints.
+3. ~~Expand resolver wiring in `embeddings/ProviderResolver.ts` so real providers participate in capability + benchmark selection.~~ **Done (2026-03-12)**
+4. ~~Add strict Red -> Green tests for new provider registration and selection behavior under capability constraints.~~ **Done (2026-03-12)**
 5. Implement first `hippocampus` ingest orchestration entry point using resolved `ModelProfile` values.
 6. Implement first `cortex` retrieval orchestration entry point with deterministic baseline ordering.
 
