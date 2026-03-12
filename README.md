@@ -4,7 +4,7 @@
 
 A neurobiologically inspired, fully on-device epistemic memory engine for autonomous agents.
 
-> "The library of dreams is not a collection of words but of things that words have touched — and how those things feel from the inside."
+> "Our library is not a collection of words but of things that words have touched."
 
 ## What is CORTEX?
 
