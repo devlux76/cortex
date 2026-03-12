@@ -6,68 +6,6 @@ A neurobiologically inspired, fully on-device epistemic memory engine for autono
 
 > "The library of dreams is not a collection of words but of things that words have touched — and how those things feel from the inside."
 
-## Execution Update (2026-03-11)
-
-Canonical documentation contract:
-1. Product vision and non-negotiables: `README.md`
-2. Architecture contracts and capability backlog: `CORTEX-DESIGN-PLAN-TODO.md`
-3. Execution sequencing, command contract, and test gates: `PROJECT-EXECUTION-PLAN.md`
-
-Current implementation snapshot:
-1. Foundation, storage schema, and vector backend abstractions are implemented.
-2. Model-profile-driven numeric ownership is implemented and guarded by `npm run guard:model-derived`.
-3. Adaptive embedding resolver infrastructure exists, but real providers are still being wired.
-4. Runtime harness and browser lane are implemented (`npm run dev:harness`, `npm run test:browser`).
-5. Electron lane is runtime-context-sensitive on host shells; the containerized debug lane is now validated as the preferred sandbox-isolated debugging path (`Electron: Docker Main + Renderer`).
-6. Hippocampus/Cortex/Daydreamer orchestration layers remain the primary vertical-slice gap.
-
-Current delivery priorities (P0):
-1. Keep docs synchronized to real code state on every implementation pass.
-2. Stabilize Electron provisioning in CI so `runtime-electron` can run as a hard gate.
-3. Wire first real embedding providers into runtime selection path.
-4. Implement Hippocampus ingest and Cortex retrieval vertical slices with strict TDD.
-5. Preserve model-derived defaults and avoid hardcoded model-dependent numerics.
-
-Session-close update checklist (required):
-1. Update `PROJECT-EXECUTION-PLAN.md` pass status with completed work and exact commands run.
-2. Update `CORTEX-DESIGN-PLAN-TODO.md` status matrix when implementation state changes.
-3. Record blockers with file path, failure symptom, and next action.
-4. Confirm README priorities still match the real top blocker.
-
-VS Code debugging setup (Electron docs aligned):
-1. Launch config file: `.vscode/launch.json`
-2. Task file: `.vscode/tasks.json`
-3. Main-process debug entry: `Electron: Debug Main (Harness)`
-4. Renderer attach entry: `Electron: Attach Renderer`
-5. Combined session: `Electron: Main + Renderer`
-6. Docker combined attach session: `Electron: Docker Main + Renderer`
-7. Docker startup task (auto from launch): `docker:electron:up`
-8. Docker stop task (auto from launch): `docker:electron:down`
-9. Shell fallback launcher: `./scripts/launch-electron-harness.sh`
-10. If Electron exits with `SIGSEGV` in host shell contexts, use the Docker attach flow before treating it as an app-level failure.
-
-Docker debug quick start:
-1. In VS Code Run and Debug, launch `Electron: Docker Main + Renderer` (this auto-runs `docker:electron:up`).
-2. If you need manual control, start the lane with `npm run docker:electron:up` and stop it with `npm run docker:electron:down`.
-
-Expected container log noise (non-fatal):
-1. `dbus/bus.cc` connection warnings are expected in slim container environments without a system DBus daemon.
-2. `WebGL2 blocklisted` is expected with software rendering in Xvfb; this does not imply Electron main-process crash.
-
-Night handoff note (2026-03-12):
-1. Runtime debugging status: `Electron: Docker Main + Renderer` is the validated sandbox-isolated debug path.
-2. Host-shell context status: local host-shell Electron runs can still fail with `SIGSEGV`; treat Docker attach as source of truth for debugger stability.
-3. Runtime realism status: Docker lane is software-rendered and is not the final GPU-realism gate.
-4. Tomorrow kickoff step 1: add real provider adapters in embeddings runtime (`Transformers` path for `webnn/webgpu/wasm`, explicit ORT path for `webgl`).
-5. Tomorrow kickoff step 2: add failing-first tests for provider registration and selection behavior, then implement to green.
-6. Tomorrow kickoff step 3: build first `Hippocampus` ingest slice with resolved model profile values.
-7. Tomorrow kickoff step 4: build first `Cortex` retrieval slice with deterministic baseline ordering.
-8. First commands for tomorrow: `npm run test:unit`, `npm run test:browser`, then `npm run docker:electron:up` with VS Code debug `Electron: Docker Main + Renderer`.
-
-Docs note:
-1. Numeric examples in design docs are illustrative unless explicitly sourced from model metadata.
-2. Legacy sketch docs were retired; canonical architecture lives in `CORTEX-DESIGN-PLAN-TODO.md` and execution sequencing lives in `PROJECT-EXECUTION-PLAN.md`.
-
 ## What is CORTEX?
 
 Modern agents are great at *retrieving* facts.  
@@ -89,7 +27,7 @@ When new observations arrive, Hippocampus immediately:
 - Performs lightning-fast WebGPU multi-prototype lookups
 - Builds hierarchical prototypes (Pages → Books → Volumes → Shelves)
 - Creates probabilistic Hebbian edges
-- Stores raw vectors in an append-only OPFS file (`vortex_vectors.bin`)
+- Stores raw vectors in an append-only OPFS file (e.g. `vortex_vectors.bin`)
 
 This is the rapid, multi-path "write" system that turns raw experience into structured memory scaffolding.
 
@@ -120,3 +58,21 @@ This is the "dreaming" phase that prevents catastrophic forgetting and forces ab
 - **Hierarchical & Sparse** — Progressive dimensionality reduction + medoid clustering keeps memory efficient at any scale.
 - **Hebbian & Dynamic** — Connections strengthen and weaken naturally.
 - **Zero-Copy & Persistent** — OPFS + IndexedDB with cryptographic signing.
+
+## Quick Start
+
+```sh
+npm install
+npm run build       # type-check
+npm run test:unit   # unit tests
+npm run dev:harness # start the browser runtime harness at http://127.0.0.1:4173
+```
+
+## Documentation
+
+| Document | Purpose |
+|---|---|
+| [`docs/api.md`](docs/api.md) | API reference for developers integrating with CORTEX |
+| [`docs/development.md`](docs/development.md) | Build, test, debug, and Docker workflow |
+| [`CORTEX-DESIGN-PLAN-TODO.md`](CORTEX-DESIGN-PLAN-TODO.md) | Architecture contracts and capability backlog |
+| [`PROJECT-EXECUTION-PLAN.md`](PROJECT-EXECUTION-PLAN.md) | Execution sequencing and test gates |
