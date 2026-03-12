@@ -10,30 +10,30 @@ This document contains a prioritized, actionable list of specific tasks required
 
 These items **must** be completed to have a usable system. Without them, users cannot ingest or query memories.
 
-### P0-A: Crypto Helpers (BLOCKS: all signed entity creation)
+### P0-A: Crypto Helpers (BLOCKS: all signed entity creation) ✅ COMPLETE
 
 **Why:** Pages require `contentHash`, `vectorHash`, and `signature`. Cannot create valid pages without crypto.
 
-- [ ] **P0-A1:** Implement `core/crypto/hash.ts`
+- [x] **P0-A1:** Implement `core/crypto/hash.ts`
   - SHA-256 for text content
   - SHA-256 for binary vector data
   - Test with known vectors
 
-- [ ] **P0-A2:** Implement `core/crypto/sign.ts`
+- [x] **P0-A2:** Implement `core/crypto/sign.ts`
   - Ed25519 key pair generation
   - Sign canonical page representation
   - Test with example pages
 
-- [ ] **P0-A3:** Implement `core/crypto/verify.ts`
+- [x] **P0-A3:** Implement `core/crypto/verify.ts`
   - Verify signature against public key
   - Test reject invalid signatures
 
-- [ ] **P0-A4:** Add crypto test coverage
+- [x] **P0-A4:** Add crypto test coverage
   - `tests/crypto/hash.test.ts`
   - `tests/crypto/sign.test.ts`
   - `tests/crypto/verify.test.ts`
 
-**Exit Criteria:** Can hash content, sign pages, verify signatures.
+**Exit Criteria:** Can hash content, sign pages, verify signatures. ✅ Met — 26 tests passing.
 
 ---
 
@@ -479,7 +479,7 @@ These items improve quality, performance, and developer experience. Not blockers
 
 | Phase | Items | Status | Blocking |
 |-------|-------|--------|----------|
-| v0.1 (Minimal Viable) | 17 tasks (P0-A through P0-E) | ❌ Not started | User cannot use system |
+| v0.1 (Minimal Viable) | 17 tasks (P0-A through P0-E) | 🟡 In Progress (P0-A complete) | User cannot use system |
 | v0.5 (Hierarchical + Coherent) | 13 tasks (P1-A through P1-F) | ❌ Not started | Blocked by v0.1 |
 | v1.0 (Background Consolidation) | 11 tasks (P2-A through P2-E) | ❌ Not started | Blocked by v0.5 |
 | Polish & Ship | 14 tasks (P3-A through P3-F) | ❌ Not started | Not blocking v1.0 |
@@ -492,13 +492,11 @@ These items improve quality, performance, and developer experience. Not blockers
 
 If you're reading this and want to know "what do I work on right now?", here's the answer:
 
-1. **P0-A1:** Implement `core/crypto/hash.ts` (SHA-256)
-2. **P0-A2:** Implement `core/crypto/sign.ts` (Ed25519)
-3. **P0-A3:** Implement `core/crypto/verify.ts`
-4. **P0-B1:** Implement `hippocampus/Chunker.ts`
-5. **P0-C1:** Implement `hippocampus/PageBuilder.ts`
-
-Complete these 5 tasks and you'll unblock the entire ingest path. Then move to P0-D (query) to complete v0.1.
+1. **P0-B1:** Implement `hippocampus/Chunker.ts`
+2. **P0-C1:** Implement `hippocampus/PageBuilder.ts`
+3. **P0-C2:** Implement `hippocampus/Ingest.ts`
+4. **P0-D1:** Implement `cortex/Query.ts`
+5. **P0-E1:** Implement `tests/integration/IngestQuery.test.ts`
 
 ---
 
