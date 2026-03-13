@@ -4,8 +4,8 @@ import type {
   Hash,
   HotpathEntry,
   MetadataStore,
-  MetroidNeighbor,
-  MetroidSubgraph,
+  SemanticNeighbor,
+  SemanticNeighborSubgraph,
   Page,
   PageActivity,
   Shelf,
@@ -16,7 +16,7 @@ import type {
 // Schema constants
 // ---------------------------------------------------------------------------
 
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 /** Object-store names used across the schema. */
 const STORE = {
@@ -25,7 +25,7 @@ const STORE = {
   volumes: "volumes",
   shelves: "shelves",
   edges: "edges_hebbian",
-  metroidNeighbors: "metroid_neighbors",
+  metroidNeighbors: "neighbor_graph",
   flags: "flags",
   pageToBook: "page_to_book",
   bookToVolume: "book_to_volume",
@@ -74,6 +74,10 @@ function applyUpgrade(db: IDBDatabase): void {
 
   if (!db.objectStoreNames.contains(STORE.metroidNeighbors)) {
     db.createObjectStore(STORE.metroidNeighbors, { keyPath: "pageId" });
+  }
+  // v3: renamed metroid_neighbors → neighbor_graph; drop old store if present
+  if (db.objectStoreNames.contains("metroid_neighbors")) {
+    db.deleteObjectStore("metroid_neighbors");
   }
   if (!db.objectStoreNames.contains(STORE.flags)) {
     db.createObjectStore(STORE.flags, { keyPath: "volumeId" });
@@ -328,18 +332,18 @@ export class IndexedDbMetadataStore implements MetadataStore {
   }
 
   // -------------------------------------------------------------------------
-  // Metroid NN radius index
+  // Semantic neighbour radius index
   // -------------------------------------------------------------------------
 
-  putMetroidNeighbors(pageId: Hash, neighbors: MetroidNeighbor[]): Promise<void> {
+  putSemanticNeighbors(pageId: Hash, neighbors: SemanticNeighbor[]): Promise<void> {
     return this._put(STORE.metroidNeighbors, { pageId, neighbors });
   }
 
-  async getMetroidNeighbors(
+  async getSemanticNeighbors(
     pageId: Hash,
     maxDegree?: number,
-  ): Promise<MetroidNeighbor[]> {
-    const row = await this._get<{ pageId: Hash; neighbors: MetroidNeighbor[] }>(
+  ): Promise<SemanticNeighbor[]> {
+    const row = await this._get<{ pageId: Hash; neighbors: SemanticNeighbor[] }>(
       STORE.metroidNeighbors,
       pageId,
     );
@@ -348,10 +352,10 @@ export class IndexedDbMetadataStore implements MetadataStore {
     return maxDegree !== undefined ? list.slice(0, maxDegree) : list;
   }
 
-  async getInducedMetroidSubgraph(
+  async getInducedNeighborSubgraph(
     seedPageIds: Hash[],
     maxHops: number,
-  ): Promise<MetroidSubgraph> {
+  ): Promise<SemanticNeighborSubgraph> {
     const visited = new Set<Hash>(seedPageIds);
     const nodeSet = new Set<Hash>(seedPageIds);
     const edgeMap = new Map<string, { from: Hash; to: Hash; distance: number }>();
@@ -362,7 +366,7 @@ export class IndexedDbMetadataStore implements MetadataStore {
       const nextFrontier: Hash[] = [];
 
       for (const pageId of frontier) {
-        const neighbors = await this.getMetroidNeighbors(pageId);
+        const neighbors = await this.getSemanticNeighbors(pageId);
         for (const n of neighbors) {
           const key = `${pageId}\x00${n.neighborPageId}`;
           if (!edgeMap.has(key)) {
@@ -393,7 +397,7 @@ export class IndexedDbMetadataStore implements MetadataStore {
   // Dirty-recalc flags
   // -------------------------------------------------------------------------
 
-  async needsMetroidRecalc(volumeId: Hash): Promise<boolean> {
+  async needsNeighborRecalc(volumeId: Hash): Promise<boolean> {
     const row = await this._get<{ volumeId: Hash; needsRecalc: boolean }>(
       STORE.flags,
       volumeId,
@@ -401,11 +405,11 @@ export class IndexedDbMetadataStore implements MetadataStore {
     return row?.needsRecalc === true;
   }
 
-  flagVolumeForMetroidRecalc(volumeId: Hash): Promise<void> {
+  flagVolumeForNeighborRecalc(volumeId: Hash): Promise<void> {
     return this._put(STORE.flags, { volumeId, needsRecalc: true });
   }
 
-  clearMetroidRecalcFlag(volumeId: Hash): Promise<void> {
+  clearNeighborRecalcFlag(volumeId: Hash): Promise<void> {
     return this._put(STORE.flags, { volumeId, needsRecalc: false });
   }
 

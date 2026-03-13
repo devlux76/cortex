@@ -1,4 +1,4 @@
-import type { Book, MetadataStore, VectorStore } from "../core/types";
+import type { Book, MetadataStore, Shelf, Volume, VectorStore } from "../core/types";
 import type { ModelProfile } from "../core/ModelProfile";
 import { hashText } from "../core/crypto/hash";
 import type { KeyPair } from "../core/crypto/sign";
@@ -6,6 +6,8 @@ import { EmbeddingRunner } from "../embeddings/EmbeddingRunner";
 import { chunkText } from "./Chunker";
 import { buildPage } from "./PageBuilder";
 import { runPromotionSweep } from "../core/SalienceEngine";
+import { buildHierarchy } from "./HierarchyBuilder";
+import { insertSemanticNeighbors } from "./FastNeighborInsert";
 
 export interface IngestOptions {
   modelProfile: ModelProfile;
@@ -19,6 +21,8 @@ export interface IngestOptions {
 export interface IngestResult {
   pages: Array<Awaited<ReturnType<typeof buildPage>>>;
   book?: Book;
+  volumes?: Volume[];
+  shelves?: Shelf[];
 }
 
 export async function ingestText(
@@ -84,18 +88,27 @@ export async function ingestText(
     });
   }
 
-  // Build a simple book containing all pages.
-  const bookId = await hashText(pageIds.join("|"));
-  const book: Book = {
-    bookId,
-    pageIds,
-    medoidPageId: pageIds[0],
-    meta: {},
-  };
-  await metadataStore.putBook(book);
+  // Build hierarchy (books, volumes, shelves) from the ingested pages.
+  const { books, volumes, shelves } = await buildHierarchy(pageIds, {
+    modelProfile,
+    vectorStore,
+    metadataStore,
+  });
+
+  // Use the first book from the hierarchy as the primary book for backward compatibility.
+  const book = books[0];
+
+  // Insert semantic neighbor edges for the new pages against all stored pages.
+  const allPages = await metadataStore.getAllPages();
+  const allPageIds = allPages.map((p) => p.pageId);
+  await insertSemanticNeighbors(pageIds, allPageIds, {
+    modelProfile,
+    vectorStore,
+    metadataStore,
+  });
 
   // Run hotpath promotion for the newly ingested pages.
   await runPromotionSweep(pageIds, metadataStore);
 
-  return { pages, book };
+  return { pages, book, volumes, shelves };
 }

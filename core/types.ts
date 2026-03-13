@@ -64,16 +64,18 @@ export interface Edge {
 }
 
 // ---------------------------------------------------------------------------
-// Metroid nearest-neighbour graph (project term; medoid-inspired)
+// Semantic neighbour graph
 // ---------------------------------------------------------------------------
 
-export interface MetroidNeighbor {
+/** A single directed proximity edge in the sparse semantic neighbor graph. */
+export interface SemanticNeighbor {
   neighborPageId: Hash;
   cosineSimilarity: number;   // threshold is defined by runtime policy
   distance: number;           // 1 - cosineSimilarity (ready for TSP)
 }
 
-export interface MetroidSubgraph {
+/** Induced subgraph returned by BFS expansion of the semantic neighbor graph. */
+export interface SemanticNeighborSubgraph {
   nodes: Hash[];
   edges: { from: Hash; to: Hash; distance: number }[];
 }
@@ -175,20 +177,20 @@ export interface MetadataStore {
   getVolumesByBook(bookId: Hash): Promise<Volume[]>;
   getShelvesByVolume(volumeId: Hash): Promise<Shelf[]>;
 
-  // --- Metroid NN radius index ---
-  putMetroidNeighbors(pageId: Hash, neighbors: MetroidNeighbor[]): Promise<void>;
-  getMetroidNeighbors(pageId: Hash, maxDegree?: number): Promise<MetroidNeighbor[]>;
+  // --- Semantic neighbour radius index ---
+  putSemanticNeighbors(pageId: Hash, neighbors: SemanticNeighbor[]): Promise<void>;
+  getSemanticNeighbors(pageId: Hash, maxDegree?: number): Promise<SemanticNeighbor[]>;
 
-  /** BFS expansion of the Metroid subgraph up to `maxHops` levels deep. */
-  getInducedMetroidSubgraph(
+  /** BFS expansion of the semantic neighbor subgraph up to `maxHops` levels deep. */
+  getInducedNeighborSubgraph(
     seedPageIds: Hash[],
     maxHops: number,
-  ): Promise<MetroidSubgraph>;
+  ): Promise<SemanticNeighborSubgraph>;
 
   // --- Dirty-volume recalc flags ---
-  needsMetroidRecalc(volumeId: Hash): Promise<boolean>;
-  flagVolumeForMetroidRecalc(volumeId: Hash): Promise<void>;
-  clearMetroidRecalcFlag(volumeId: Hash): Promise<void>;
+  needsNeighborRecalc(volumeId: Hash): Promise<boolean>;
+  flagVolumeForNeighborRecalc(volumeId: Hash): Promise<void>;
+  clearNeighborRecalcFlag(volumeId: Hash): Promise<void>;
 
   // --- Hotpath index ---
   putHotpathEntry(entry: HotpathEntry): Promise<void>;
