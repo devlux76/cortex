@@ -56,7 +56,7 @@ function freshDbName(): string {
   return `cortex-query-test-${Date.now()}-${++dbCounter}`;
 }
 
-describe("cortex query (minimal)", () => {
+describe("cortex query (dialectical orchestrator)", () => {
   beforeEach(() => {
     (globalThis as any).indexedDB = new IDBFactory();
     (globalThis as any).IDBKeyRange = FakeIDBKeyRange;
@@ -98,6 +98,11 @@ describe("cortex query (minimal)", () => {
     expect(result.pages).toHaveLength(0);
     expect(result.scores).toHaveLength(0);
     expect(result.metadata.returned).toBe(0);
+    // New fields must always be present
+    expect(Array.isArray(result.coherencePath)).toBe(true);
+    expect(result.metroid).toBeDefined();
+    // Empty corpus → no candidates → knowledge gap
+    expect(result.metroid?.knowledgeGap).toBe(true);
   });
 
   it("returns the most relevant page and updates activity", async () => {
@@ -158,6 +163,14 @@ describe("cortex query (minimal)", () => {
     const activity = await metadataStore.getPageActivity(returned.pageId);
     expect(activity?.queryHitCount).toBe(1);
     expect(activity?.lastQueryAt).toBeDefined();
+
+    // New fields must always be present
+    expect(Array.isArray(result.coherencePath)).toBe(true);
+    expect(result.metroid).toBeDefined();
+    // Non-Matryoshka profile → knowledge gap is expected
+    expect(result.metroid?.knowledgeGap).toBe(true);
+    // knowledgeGap object is returned when metroid has a gap
+    expect(result.knowledgeGap).not.toBeNull();
   });
 
   it("returns results in descending score order (relevance)", async () => {
@@ -214,6 +227,10 @@ describe("cortex query (minimal)", () => {
     for (let i = 1; i < result.scores.length; i++) {
       expect(result.scores[i]).toBeLessThanOrEqual(result.scores[i - 1]);
     }
+
+    // New fields must always be present
+    expect(Array.isArray(result.coherencePath)).toBe(true);
+    expect(result.metroid).toBeDefined();
   });
 
   it("respects the topK parameter", async () => {
@@ -264,5 +281,9 @@ describe("cortex query (minimal)", () => {
     expect(result.pages.length).toBe(2);
     expect(result.scores.length).toBe(2);
     expect(result.metadata.returned).toBe(2);
+
+    // New fields must always be present
+    expect(Array.isArray(result.coherencePath)).toBe(true);
+    expect(result.metroid).toBeDefined();
   });
 });
