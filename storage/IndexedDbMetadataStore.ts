@@ -2,10 +2,12 @@ import type {
   Book,
   Edge,
   Hash,
+  HotpathEntry,
   MetadataStore,
   MetroidNeighbor,
   MetroidSubgraph,
   Page,
+  PageActivity,
   Shelf,
   Volume,
 } from "../core/types";
@@ -14,7 +16,7 @@ import type {
 // Schema constants
 // ---------------------------------------------------------------------------
 
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 /** Object-store names used across the schema. */
 const STORE = {
@@ -28,6 +30,8 @@ const STORE = {
   pageToBook: "page_to_book",
   bookToVolume: "book_to_volume",
   volumeToShelf: "volume_to_shelf",
+  hotpathIndex: "hotpath_index",
+  pageActivity: "page_activity",
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -46,29 +50,42 @@ function promisifyTransaction(tx: IDBTransaction): Promise<void> {
 // Schema upgrade
 // ---------------------------------------------------------------------------
 
-function applyUpgrade(db: IDBDatabase): void {
-  // Primary entity stores
-  db.createObjectStore(STORE.pages, { keyPath: "pageId" });
-  db.createObjectStore(STORE.books, { keyPath: "bookId" });
-  db.createObjectStore(STORE.volumes, { keyPath: "volumeId" });
-  db.createObjectStore(STORE.shelves, { keyPath: "shelfId" });
+function applyUpgrade(db: IDBDatabase, oldVersion: number): void {
+  if (oldVersion < 1) {
+    // Primary entity stores
+    db.createObjectStore(STORE.pages, { keyPath: "pageId" });
+    db.createObjectStore(STORE.books, { keyPath: "bookId" });
+    db.createObjectStore(STORE.volumes, { keyPath: "volumeId" });
+    db.createObjectStore(STORE.shelves, { keyPath: "shelfId" });
 
-  // Hebbian edges: compound primary key + index on fromPageId
-  const edgeStore = db.createObjectStore(STORE.edges, {
-    keyPath: ["fromPageId", "toPageId"],
-  });
-  edgeStore.createIndex("by-from", "fromPageId");
+    // Hebbian edges: compound primary key + index on fromPageId
+    const edgeStore = db.createObjectStore(STORE.edges, {
+      keyPath: ["fromPageId", "toPageId"],
+    });
+    edgeStore.createIndex("by-from", "fromPageId");
 
-  // Metroid NN neighbors (pageId → MetroidNeighbor[])
-  db.createObjectStore(STORE.metroidNeighbors, { keyPath: "pageId" });
+    // Metroid NN neighbors (pageId → MetroidNeighbor[])
+    db.createObjectStore(STORE.metroidNeighbors, { keyPath: "pageId" });
 
-  // Dirty-recalc flags (volumeId → { volumeId, needsRecalc })
-  db.createObjectStore(STORE.flags, { keyPath: "volumeId" });
+    // Dirty-recalc flags (volumeId → { volumeId, needsRecalc })
+    db.createObjectStore(STORE.flags, { keyPath: "volumeId" });
 
-  // Reverse-index stores
-  db.createObjectStore(STORE.pageToBook, { keyPath: "pageId" });
-  db.createObjectStore(STORE.bookToVolume, { keyPath: "bookId" });
-  db.createObjectStore(STORE.volumeToShelf, { keyPath: "volumeId" });
+    // Reverse-index stores
+    db.createObjectStore(STORE.pageToBook, { keyPath: "pageId" });
+    db.createObjectStore(STORE.bookToVolume, { keyPath: "bookId" });
+    db.createObjectStore(STORE.volumeToShelf, { keyPath: "volumeId" });
+  }
+
+  if (oldVersion < 2) {
+    // Hotpath index keyed by entityId; secondary index on tier
+    const hotpathStore = db.createObjectStore(STORE.hotpathIndex, {
+      keyPath: "entityId",
+    });
+    hotpathStore.createIndex("by-tier", "tier");
+
+    // Page activity keyed by pageId
+    db.createObjectStore(STORE.pageActivity, { keyPath: "pageId" });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -97,7 +114,8 @@ export class IndexedDbMetadataStore implements MetadataStore {
       const req = indexedDB.open(dbName, DB_VERSION);
 
       req.onupgradeneeded = (event) => {
-        applyUpgrade((event.target as IDBOpenDBRequest).result);
+        const oldVersion = event.oldVersion;
+        applyUpgrade((event.target as IDBOpenDBRequest).result, oldVersion);
       };
 
       req.onsuccess = () => resolve(new IndexedDbMetadataStore(req.result));
@@ -365,6 +383,86 @@ export class IndexedDbMetadataStore implements MetadataStore {
 
   clearMetroidRecalcFlag(volumeId: Hash): Promise<void> {
     return this._put(STORE.flags, { volumeId, needsRecalc: false });
+  }
+
+  // -------------------------------------------------------------------------
+  // Hotpath index
+  // -------------------------------------------------------------------------
+
+  putHotpathEntry(entry: HotpathEntry): Promise<void> {
+    return this._put(STORE.hotpathIndex, entry);
+  }
+
+  async getHotpathEntries(tier?: HotpathEntry["tier"]): Promise<HotpathEntry[]> {
+    if (tier !== undefined) {
+      return new Promise((resolve, reject) => {
+        const tx = this.db.transaction(STORE.hotpathIndex, "readonly");
+        const idx = tx.objectStore(STORE.hotpathIndex).index("by-tier");
+        const req = idx.getAll(IDBKeyRange.only(tier));
+        req.onsuccess = () => resolve(req.result as HotpathEntry[]);
+        req.onerror = () => reject(req.error);
+      });
+    }
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(STORE.hotpathIndex, "readonly");
+      const req = tx.objectStore(STORE.hotpathIndex).getAll();
+      req.onsuccess = () => resolve(req.result as HotpathEntry[]);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  removeHotpathEntry(entityId: Hash): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(STORE.hotpathIndex, "readwrite");
+      tx.objectStore(STORE.hotpathIndex).delete(entityId);
+      promisifyTransaction(tx).then(resolve).catch(reject);
+    });
+  }
+
+  async evictWeakest(
+    tier: HotpathEntry["tier"],
+    communityId?: string,
+  ): Promise<void> {
+    const entries = await this.getHotpathEntries(tier);
+    const filtered = communityId !== undefined
+      ? entries.filter((e) => e.communityId === communityId)
+      : entries;
+
+    if (filtered.length === 0) return;
+
+    let weakest = filtered[0];
+    for (let i = 1; i < filtered.length; i++) {
+      const e = filtered[i];
+      if (
+        e.salience < weakest.salience ||
+        (e.salience === weakest.salience && e.entityId < weakest.entityId)
+      ) {
+        weakest = e;
+      }
+    }
+
+    await this.removeHotpathEntry(weakest.entityId);
+  }
+
+  async getResidentCount(): Promise<number> {
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(STORE.hotpathIndex, "readonly");
+      const req = tx.objectStore(STORE.hotpathIndex).count();
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // Page activity
+  // -------------------------------------------------------------------------
+
+  putPageActivity(activity: PageActivity): Promise<void> {
+    return this._put(STORE.pageActivity, activity);
+  }
+
+  async getPageActivity(pageId: Hash): Promise<PageActivity | undefined> {
+    return this._get<PageActivity>(STORE.pageActivity, pageId);
   }
 
   // -------------------------------------------------------------------------
