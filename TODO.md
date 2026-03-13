@@ -357,10 +357,11 @@ These items add hierarchical routing and coherent path ordering. They transform 
 - [ ] **P1-M1:** Implement `cortex/MetroidBuilder.ts`
   - Accept a query embedding and a list of resident medoids (shelf/volume/book representatives)
   - Select m1: the medoid with highest cosine similarity to the query
-  - Freeze the protected lower Matryoshka dimensions (dimension count derived from ModelProfile; see `embeddingDimension` and `matryoshkaProtectedDim`)
-  - In the unfrozen upper dimensions, search for the nearest medoid with **opposing** semantic direction (minimum cosine similarity above a negative threshold, or maximum angular distance)
+  - Read `matryoshkaProtectedDim` from `ModelProfile` (the field added to `core/ModelProfile.ts` as the per-model protected floor — e.g. 128 for embeddinggemma-300m, 64 for nomic-embed-text-v1.5). If `undefined` on the current model, return `{ m1, m2: null, c: null, knowledgeGap: true }` immediately.
+  - Freeze all dimensions with index < `matryoshkaProtectedDim`
+  - In the unfrozen upper dimensions (index >= `matryoshkaProtectedDim`), search for the nearest medoid with **opposing** semantic direction (minimum cosine similarity above a negative threshold, or maximum angular distance)
   - This medoid becomes m2 (antithesis)
-  - Compute centroid: `c = (m1_vec + m2_vec) / 2`
+  - Compute centroid: protected dims (< matryoshkaProtectedDim) copied from m1 vector; unfrozen dims averaged element-wise: `c[i] = (m1[i] + m2[i]) / 2`
   - Return `Metroid { m1, m2, c }`; if no valid m2 found, return `{ m1, m2: null, c: null, knowledgeGap: true }`
 
 - [ ] **P1-M2:** Implement Matryoshka dimensional unwinding in `cortex/MetroidBuilder.ts`
@@ -393,7 +394,9 @@ These items add hierarchical routing and coherent path ordering. They transform 
   - This DTO is returned to the caller as part of `QueryResult`
 
 - [ ] **P1-N2:** Implement curiosity probe construction in `cortex/KnowledgeGapDetector.ts`
-  - Build `CuriosityProbe { m1, partialMetroid, queryContext, knowledgeBoundary }`
+  - Build `CuriosityProbe { m1, partialMetroid, queryContext, knowledgeBoundary, mimeType, modelUrn }`
+    - `mimeType`: MIME type of embedded content (e.g. `text/plain`). Enables receiving peers to validate content-type compatibility before comparing graph sections.
+    - `modelUrn`: URN of the embedding model (e.g. `urn:model:onnx-community/embeddinggemma-300m-ONNX:v1`) sourced from the active `ModelProfile.modelId`. Peers **must** reject probes whose `modelUrn` does not match a model they support — accepting fragments from a different embedding model would produce incommensurable similarity scores at Matryoshka layer boundaries.
   - Store probe locally for broadcast via P2P layer (see P2-G)
   - Do not broadcast immediately — queue for the P2P sharing layer
 
@@ -404,7 +407,8 @@ These items add hierarchical routing and coherent path ordering. They transform 
 - [ ] **P1-N4:** Add knowledge gap test coverage
   - `tests/cortex/KnowledgeGapDetector.test.ts`
   - Test that a KnowledgeGap DTO is produced when MetroidBuilder returns `knowledgeGap: true`
-  - Test that a CuriosityProbe is constructed with correct fields
+  - Test that a CuriosityProbe is constructed with correct fields including `mimeType` and `modelUrn`
+  - Test that `modelUrn` is derived from `ModelProfile.modelId` (not hardcoded)
   - Test that QueryResult includes the KnowledgeGap when present
   - Test that queries against a rich corpus do NOT produce false-positive knowledge gaps
 

@@ -12,6 +12,11 @@ import type {
 export interface ModelProfileRegistryEntry {
   embeddingDimension: number;
   contextWindowTokens: number;
+  /**
+   * The most coarse-grained Matryoshka sub-dimension for this model.
+   * Required for MetroidBuilder dimensional unwinding. See `ModelProfile.matryoshkaProtectedDim`.
+   */
+  matryoshkaProtectedDim?: number;
 }
 
 export interface ModelProfileResolverOptions {
@@ -46,6 +51,9 @@ export class ModelProfileResolver {
     this.registry.set(normalizeModelId(modelId), {
       embeddingDimension: entry.embeddingDimension,
       contextWindowTokens: entry.contextWindowTokens,
+      ...(entry.matryoshkaProtectedDim !== undefined
+        ? { matryoshkaProtectedDim: entry.matryoshkaProtectedDim }
+        : {}),
     });
   }
 
@@ -78,6 +86,7 @@ export class ModelProfileResolver {
         embeddingDimension,
         contextWindowTokens,
         source,
+        matryoshkaProtectedDim: registryEntry?.matryoshkaProtectedDim,
       },
       this.derivationPolicy,
     );

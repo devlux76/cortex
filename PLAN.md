@@ -77,15 +77,15 @@ This document tracks the implementation status of each major module in CORTEX. I
 
 | Module | Status | Files | Notes |
 |--------|--------|-------|-------|
-| Text Chunking | ❌ Missing | `hippocampus/Chunker.ts` (planned) | Token-aware page boundary detection respecting ModelProfile limits |
-| Page ID Generation | ❌ Missing | `hippocampus/PageIdGenerator.ts` (planned) | Deterministic hash-based ID creation |
-| Ingest Orchestrator | ❌ Missing | `hippocampus/Ingest.ts` (planned) | Main entry point: chunk → embed → persist → initialise PageActivity → build hierarchy → fast neighbor insert → hotpath admission |
+| Text Chunking | ✅ Complete | `hippocampus/Chunker.ts` | Token-aware sentence-boundary splitting respecting `ModelProfile.maxChunkTokens`; covered by `tests/hippocampus/Chunker.test.ts` |
+| Page Builder | ✅ Complete | `hippocampus/PageBuilder.ts` | Builds signed `Page` entities with `contentHash`, `vectorHash`, `prevPageId`/`nextPageId` linkage; covered by `tests/hippocampus/PageBuilder.test.ts` |
+| Ingest Orchestrator | 🟡 Partial | `hippocampus/Ingest.ts` | `ingestText()` implemented: chunk → embed → persist pages + PageActivity → create Book → run hotpath promotion sweep. **Missing:** hierarchy building (Volume/Shelf), semantic neighbor insertion. |
 | Hierarchy Builder | ❌ Missing | `hippocampus/HierarchyBuilder.ts` (planned) | Construct/update Books, Volumes, Shelves; attempt tier-quota hotpath admission for each level's medoid/prototype; Williams-derived fanout bounds; trigger split via ClusterStability when bounds exceeded |
-| Fast Semantic Neighbor Insert | ❌ Missing | `hippocampus/FastNeighborInsert.ts` (planned) | Incremental semantic neighbor graph update; max degree derived from HotpathPolicy (not hardcoded K); evict lowest-weight neighbor on degree overflow; check new page for hotpath admission. **Note:** Not to be confused with Metroid construction, which is a CORTEX retrieval concern. |
+| Fast Semantic Neighbor Insert | ❌ Missing | `hippocampus/FastNeighborInsert.ts` (planned) | Incremental semantic neighbor graph update; max degree derived from HotpathPolicy (not hardcoded K); evict lowest-cosine-similarity neighbor on degree overflow; check new page for hotpath admission. **Note:** Not to be confused with Metroid construction, which is a CORTEX retrieval concern. |
 
-**Hippocampus Status:** 0/5 complete (0%)
+**Hippocampus Status:** 2.5/5 complete (50%)
 
-**Critical Blocker:** Without this, users cannot ingest text into the memory system.
+**Critical Blocker:** Hierarchy builder and semantic neighbor insertion missing; ingest produces no graph structure beyond a single Book.
 
 ---
 
@@ -100,12 +100,12 @@ This document tracks the implementation status of each major module in CORTEX. I
 | Seed Selection | ❌ Missing | `cortex/SeedSelection.ts` (planned) | Threshold-based top-k page selection from ranking output |
 | Subgraph Expansion | 🟡 Partial | `storage/IndexedDbMetadataStore.ts` (`getInducedMetroidSubgraph` — to be renamed `getInducedNeighborSubgraph`) | BFS expansion implemented in storage layer; needs dynamic Williams bounds; needs orchestration wrapper |
 | Open TSP Solver | ❌ Missing | `cortex/OpenTSPSolver.ts` (planned) | Dummy-node open-path heuristic for coherent ordering |
-| Query Orchestrator | ❌ Missing | `cortex/Query.ts` (planned) | Main entry point: embed → select m1 → build Metroid → dialectical scoring → subgraph expansion → TSP path → query cost meter → early-stop; return result |
-| Result DTO | ❌ Missing | `cortex/QueryResult.ts` (planned) | Structured query result with provenance metadata (coherence path, subgraph size, hop count, edge weights, knowledge gap flag) |
+| Query Orchestrator | 🟡 Partial | `cortex/Query.ts` | `query()` implemented: hotpath-first scoring → warm/cold spill → PageActivity update → promotion sweep. **Missing:** MetroidBuilder, dialectical zone scoring, subgraph expansion, TSP coherence, query cost meter. |
+| Result DTO | 🟡 Partial | `cortex/QueryResult.ts` | Minimal DTO: `pages`, `scores`, `metadata`. **Missing:** `coherencePath`, `metroid`, `knowledgeGap`, `provenance` fields. |
 
-**Cortex Status:** 0.5/9 complete (6%)
+**Cortex Status:** 1.5/9 complete (17%)
 
-**Critical Blocker:** Without this, users cannot retrieve memories from the system. The MetroidBuilder, dialectical search pipeline, and knowledge gap detector are entirely absent.
+**Critical Blocker:** MetroidBuilder, dialectical search pipeline, and knowledge gap detector entirely absent. Existing `Query.ts` implements flat top-K retrieval only.
 
 ---
 
@@ -194,15 +194,15 @@ This document tracks the implementation status of each major module in CORTEX. I
 | Storage | 100% | — |
 | Vector Compute | 100% | — |
 | Embedding | 83% | WebGL provider (low priority) |
-| Hippocampus | 0% | **CRITICAL** — No ingest path |
-| Cortex | 6% | **CRITICAL** — No retrieval path; MetroidBuilder, dialectical search, knowledge gap detection all missing |
+| Hippocampus | 50% | Chunker + PageBuilder + minimal Ingest done; hierarchy builder and semantic neighbor insertion missing |
+| Cortex | 17% | Minimal Query + QueryResult done; MetroidBuilder, dialectical search, knowledge gap detection all missing |
 | Daydreamer | 0% | Not v1 blocker |
 | Policy | 100% | — |
 | Runtime | 100% | — |
 | Testing | 67% | Integration tests, scaling benchmarks |
 | Build/CI | 83% | — |
 
-**System-Wide Completion:** ~70% (core infrastructure and policy foundation complete; ingest/query/benchmarks remain.)
+**System-Wide Completion:** ~75% (core infrastructure, policy foundation, chunking, page building, and minimal ingest/query implemented; hierarchy builder, MetroidBuilder, and graph coherence remain.)
 
 ---
 
@@ -211,17 +211,21 @@ This document tracks the implementation status of each major module in CORTEX. I
 - ✅ Store/retrieve vectors and metadata
 - ✅ Vector similarity operations on all backends
 - ✅ Generate real embeddings via Transformers.js
-- ✅ Resolve model profiles and derive routing policies
+- ✅ Resolve model profiles and derive routing policies (including `matryoshkaProtectedDim` for Matryoshka models)
 - ✅ Run browser/Electron runtime harness
 - ✅ Pass 115 unit tests
 - ✅ Hash text/binary content (SHA-256) and sign/verify Ed25519 signatures
+- ✅ Chunk text and build signed `Page` entities
+- ✅ Ingest text (minimal): chunk → embed → persist pages + PageActivity → create Book → hotpath promotion
 
 ## What Doesn't Work Today
 
-- ❌ **Cannot ingest text** — No chunking or hierarchy builder
-- ❌ **Cannot query memories** — No ranking pipeline or TSP solver
+- ❌ **No hierarchy beyond single Book** — Volume/Shelf hierarchy builder not yet implemented
+- ❌ **No semantic neighbor graph** — `FastNeighborInsert` not yet implemented; subgraph expansion has no edges
+- ❌ **No dialectical retrieval** — `MetroidBuilder`, `KnowledgeGapDetector`, and dialectical pipeline not yet implemented; current `Query.ts` is flat top-K retrieval only
+- ❌ **No coherent path ordering** — No TSP solver; results are ranked list, not narrative chain
 - ❌ **Cannot consolidate** — No Daydreamer loop
-- ❌ **Cannot share discovery updates safely** — No privacy-filtered interest-subgraph exchange path
+- ❌ **Cannot share discovery updates safely** — No P2P curiosity broadcasting or privacy-filtered exchange
 
 ---
 
@@ -236,33 +240,25 @@ This document tracks the implementation status of each major module in CORTEX. I
    - Ed25519 signing/verification
    - 26 tests passing
 
-2. **Williams Bound Policy Foundation**
-   - `core/HotpathPolicy.ts` — `computeCapacity`, `computeSalience`, `deriveTierQuotas`, `deriveCommunityQuotas`; all constants as frozen default policy object
-   - `core/SalienceEngine.ts` — `computeNodeSalience`, `batchComputeSalience`, `shouldPromote`, `selectEvictionTarget`; bootstrap and steady-state lifecycle
-   - Extend `core/types.ts` — `PageActivity`, `HotpathEntry`, `TierQuotas`, `MetadataStore` hotpath method signatures
-   - Extend `storage/IndexedDbMetadataStore.ts` — `hotpath_index` and `page_activity` object stores; implement new `MetadataStore` hotpath methods
-   - Tests: `tests/HotpathPolicy.test.ts`, `tests/SalienceEngine.test.ts`, extend `tests/Persistence.test.ts`
+2. **Williams Bound Policy Foundation** ✅ **Complete**
+   - `core/HotpathPolicy.ts`, `core/SalienceEngine.ts`, `core/types.ts` extensions, `storage/IndexedDbMetadataStore.ts` hotpath stores
 
-3. **Text Chunking** (`hippocampus/Chunker.ts`)
-   - Token-aware splitting respecting ModelProfile limits
-   - Preserve sentence boundaries where possible
-   - Test with various text lengths
+3. **Text Chunking** (`hippocampus/Chunker.ts`) ✅ **Complete**
+   - Token-aware sentence-boundary splitting; tests passing
 
-4. **Hippocampus Ingest** (`hippocampus/Ingest.ts`)
-   - Chunk → Embed → Persist orchestration
-   - Build Page entities with proper hashing/signing; initialise `PageActivity` record
-   - Single-Book hierarchy (defer Volume/Shelf)
-   - Basic semantic neighbor insertion with Williams-bounded degree
+4. **Page Builder** (`hippocampus/PageBuilder.ts`) ✅ **Complete**
+   - Signed Page entities with hash linkage; tests passing
 
-5. **Cortex Query** (`cortex/Query.ts`)
-   - Embed query
-   - Flat page ranking against resident hotpath (skip full hierarchy for now)
-   - Return top-K pages by similarity
-   - Skip TSP coherence path (just ranked list)
+5. **Hippocampus Ingest** (`hippocampus/Ingest.ts`) 🟡 **Partial**
+   - Minimal `ingestText()` implemented (chunk → embed → persist pages → single Book → hotpath admission)
+   - **Remaining:** semantic neighbor insertion (deferred to Phase 2)
 
-6. **Integration Test** (`tests/integration/IngestQuery.test.ts`)
-   - Ingest text → Retrieve by query → Validate results
-   - Persistence across sessions
+6. **Cortex Query** (`cortex/Query.ts`) 🟡 **Partial**
+   - Minimal `query()` implemented (hotpath-first flat scoring; warm/cold spill)
+   - **Remaining:** MetroidBuilder, dialectical pipeline (deferred to Phase 2)
+
+7. **Integration Test** (`tests/integration/IngestQuery.test.ts`) ✅ **Complete**
+   - Ingest text → Retrieve by query → Validate results; persistence across sessions
 
 **Exit Criteria:** User can ingest text and retrieve relevant pages by query; Williams Bound policy is in place.
 
@@ -392,21 +388,21 @@ This document tracks the implementation status of each major module in CORTEX. I
 
 ## Known Blockers & Risks
 
-### Blocker 1: No Ingest Orchestration
-**Impact:** Cannot use the system at all.
-**Mitigation:** Phase 1 priority; single-book hierarchy sufficient for v0.1.
+### Blocker 1: No Hierarchy Builder or Semantic Neighbor Graph
+**Impact:** Ingest produces only a single flat Book; no Volume/Shelf structure; subgraph expansion has no edges to traverse.
+**Mitigation:** Phase 2 priority; `HierarchyBuilder` and `FastNeighborInsert` must be implemented before dialectical retrieval is possible.
 
-### Blocker 2: No Query Orchestration
-**Impact:** Cannot retrieve memories.
-**Mitigation:** Phase 1 priority; flat ranking against resident hotpath acceptable for v0.1.
+### Blocker 2: No MetroidBuilder or Dialectical Pipeline
+**Impact:** Queries return flat top-K results only; no epistemic balance, no knowledge gap detection, no P2P curiosity.
+**Mitigation:** Phase 2 priority; depends on semantic neighbor graph (Blocker 1) and hierarchy builder.
 
-### Blocker 3: No HotpathPolicy or SalienceEngine
-**Impact:** Cannot enforce Williams Bound invariants; all subsequent phases depend on these.
-**Mitigation:** Phase 1 priority; implement before ingest/query orchestration.
+### Blocker 3: No Privacy-Safe Sharing or Curiosity Broadcasting Pipeline
+**Impact:** Core discovery-sharing value proposition is missing; knowledge gaps cannot be resolved via P2P.
+**Mitigation:** Phase 3 required track; implement eligibility classifier + curiosity broadcaster + signed subgraph exchange as v1 scope. CuriosityProbe must include `mimeType` and `modelUrn` to prevent incommensurable graph merges.
 
-### Blocker 4: No Privacy-Safe Sharing Pipeline
-**Impact:** Core discovery-sharing value proposition is missing.
-**Mitigation:** Phase 3 required track; implement eligibility classifier + signed subgraph exchange as v1 scope.
+### Blocker 4: Naming Drift (P0-X)
+**Impact:** The term "Metroid" is currently used for the proximity graph in all code. MetroidBuilder cannot be introduced without a rename collision.
+**Mitigation:** P0-X tasks (rename `MetroidNeighbor` → `SemanticNeighbor`, etc.) must be completed before MetroidBuilder is implemented.
 
 ### Risk 1: TSP Complexity
 Open TSP is NP-hard; heuristic may be slow on large subgraphs.

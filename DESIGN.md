@@ -115,7 +115,10 @@ The Metroid is constructed at query time by the `MetroidBuilder`. It is **not** 
 1. **Select m1** — Identify the topic medoid most relevant to the query embedding.
 2. **Freeze protected dimensions** — Lock the lower Matryoshka embedding dimensions that encode invariant semantic context (domain, language register, topic class). These dimensions are never searched for antithesis.
 3. **Search for m2** — Within the remaining (unfrozen) upper dimensions, search for the nearest medoid that represents semantic opposition to m1.
-4. **Compute centroid** — `c = (m1_vec + m2_vec) / 2` (element-wise average over the unfrozen dimensions).
+4. **Compute centroid** — Compute `c` as follows:
+   - Protected dimensions (index < `matryoshkaProtectedDim`): copy directly from m1. These dimensions are invariant; averaging them would dilute the domain anchor that makes the antithesis search meaningful.
+   - Unfrozen dimensions (index >= `matryoshkaProtectedDim`): compute the element-wise average of m1 and m2 — `c[i] = (m1[i] + m2[i]) / 2`.
+   - The result is a full-dimensional vector that can be used directly as a scoring anchor.
 5. **Prefer centroid as search origin** — Use `c` as the primary starting point for subgraph expansion. This prevents semantic drift toward either pole.
 6. **Unwind Matryoshka layers** — Progressively free deeper embedding dimensions and repeat from step 3. Each unwinding broadens the antithesis search.
 7. **Stop at the protected dimension** — The protected lower dimensions are never unwound. This preserves semantic invariants throughout all levels of search.
@@ -181,14 +184,33 @@ This means CORTEX does not possess sufficient knowledge to provide an epistemica
 When a knowledge gap is detected, CORTEX broadcasts the incomplete Metroid as a curiosity probe to connected peers:
 
 ```
-CuriosityProbe = { m1, partialMetroid, queryContext, knowledgeBoundary }
+CuriosityProbe = {
+  m1,
+  partialMetroid,
+  queryContext,
+  knowledgeBoundary,
+  mimeType,
+  modelUrn
+}
 ```
 
-Where `knowledgeBoundary` encodes the dimensional layer where antithesis discovery failed. Peers receiving this probe:
+Where:
+- **m1** — the thesis medoid (the topic for which antithesis was not found)
+- **partialMetroid** — the incomplete Metroid at the boundary of local knowledge
+- **queryContext** — the original query embedding, used for scoring by the responding peer
+- **knowledgeBoundary** — the Matryoshka dimensional layer at which antithesis search failed
+- **mimeType** — the MIME type of the embedded content (e.g. `text/plain`, `image/jpeg`). Required so receiving peers can validate commensurability of their graph sections.
+- **modelUrn** — a URN identifying the specific embedding model and version used to produce the vectors (e.g. `urn:model:onnx-community/embeddinggemma-300m-ONNX:v1`). Peers **must** reject probes whose `modelUrn` does not match a model they can compare against. Accepting graph fragments embedded by a different model would produce incommensurable similarity scores at the dimensional boundaries where the models' Matryoshka layers overlap.
 
-1. Search their own memory graphs for medoids that could serve as `m2`.
-2. If found, respond with the relevant graph fragment (subject to eligibility filtering; see Smart Sharing Guardrails).
-3. The originating node integrates the received fragment and may retry MetroidBuilder.
+> **Why `mimeType` and `modelUrn` are required:**  
+> Embedding models project content into incompatible latent spaces. A fragment embedded with `nomic-embed-text-v1.5` (matryoshkaProtectedDim=64) cannot be meaningfully compared against a fragment embedded with `embeddinggemma-300m` (matryoshkaProtectedDim=128). Without explicit model and content-type identity on the probe, a peer could return graph sections that appear similar by cosine score but are semantically incommensurable — introducing hallucination-equivalent errors at the knowledge boundary.
+
+Peers receiving this probe:
+
+1. Verify `mimeType` and `modelUrn` match a supported local model.
+2. Search their own memory graphs for medoids that could serve as `m2` using the same embedding space.
+3. If found, respond with the relevant graph fragment (subject to eligibility filtering; see Smart Sharing Guardrails).
+4. The originating node integrates the received fragment and may retry MetroidBuilder.
 
 This mechanism enables **distributed learning without hallucination**: the system discovers knowledge through structured peer exchange rather than generating plausible-sounding but ungrounded content.
 
@@ -661,9 +683,9 @@ Smart sharing is a core capability, not a post-v1 extra. The v1 exchange path mu
 
 **Medoid** (mathematical term): The existing memory node selected as the statistical representative of a cluster. Selected by minimising the sum of distances to all other nodes in the cluster. Used throughout algorithmic descriptions and internal implementation comments.
 
-**Centroid** (mathematical term): The arithmetic mean of a set of vectors — a computed geometric point that may not correspond to any stored page. Used in MetroidBuilder to compute the balanced search origin `c`.
+**Centroid** (mathematical term): In MetroidBuilder, the centroid `c` is a full-dimensional vector where protected dimensions are copied from m1 (domain invariant) and unfrozen dimensions are the element-wise average of m1 and m2. Used as the balanced search origin in dialectical scoring.
 
-**Metroid** (CORTEX architectural term): A structured dialectical search probe constructed at query time: `{ m1, m2, c }`, where m1 is the thesis medoid, m2 is the antithesis medoid, and c is the centroid between them. **A Metroid is never stored as a persistent graph structure.** It is an ephemeral instrument used by the CORTEX retrieval subsystem.
+**Metroid** (CORTEX architectural term): A structured dialectical search probe constructed at query time: `{ m1, m2, c }`, where m1 is the thesis medoid, m2 is the antithesis medoid, and c is the centroid (protected dims from m1; unfrozen dims averaged). **A Metroid is never stored as a persistent graph structure.** It is an ephemeral instrument used by the CORTEX retrieval subsystem.
 
 **MetroidBuilder**: The CORTEX module responsible for constructing a Metroid for a given query via Matryoshka dimensional unwinding. Planned module: `cortex/MetroidBuilder.ts`.
 
@@ -687,15 +709,22 @@ Smart sharing is a core capability, not a post-v1 extra. The v1 exchange path mu
 
 ## Model-Derived Numerics
 
-**Critical Rule:** All numeric values derived from ML model architecture (embedding dimensions, context lengths, thresholds) must **never** be hardcoded as magic numbers.
+**Critical Rule:** All numeric values derived from ML model architecture (embedding dimensions, context lengths, thresholds, and Matryoshka sub-dimension boundaries) must **never** be hardcoded as magic numbers.
 
 **Source of Truth:**
-- `core/ModelProfile.ts` — Interface definition
-- `core/ModelDefaults.ts` — Default fallback values
-- `core/BuiltInModelProfiles.ts` — Concrete model registrations
+- `core/ModelProfile.ts` — Interface definition (includes `matryoshkaProtectedDim`)
+- `core/ModelDefaults.ts` — Default derivation from seed values
+- `core/BuiltInModelProfiles.ts` — Concrete model registrations (includes per-model `matryoshkaProtectedDim`)
 - `core/ModelProfileResolver.ts` — Runtime resolution
 
-**Enforcement:** `npm run guard:model-derived` scans for violations before CI merge.
+**Model-specific `matryoshkaProtectedDim` values (must be sourced from `BuiltInModelProfiles.ts`):**
+
+| Model | `matryoshkaProtectedDim` | Notes |
+|-------|--------------------------|-------|
+| `onnx-community/embeddinggemma-300m-ONNX` | 128 | Smallest supported Matryoshka sub-dimension |
+| `nomic-ai/nomic-embed-text-v1.5` | 64 | To be added when nomic provider is wired |
+
+**Enforcement:** `npm run guard:model-derived` scans for violations before CI merge. The guard now checks for `matryoshkaProtectedDim` in addition to the standard embedding dimension and context length fields.
 
 ## Policy-Derived Constants
 

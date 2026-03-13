@@ -64,7 +64,7 @@ This is the rapid, multi-path "write" system that turns raw experience into stru
 ### 🧩 Cortex — Intelligent Routing & Coherence
 When you ask a question, Cortex does **not** return a bag of similar vectors.
 
-Instead it:
+**Planned target behavior (v0.5+):**
 - Constructs a **Metroid** `{ m1, m2, c }` for the query — a structured dialectical search probe pairing the thesis medoid (m1) with an antithesis medoid (m2) and a balanced centroid (c)
 - Performs Matryoshka dimensional unwinding to discover semantically opposing knowledge
 - Performs parallel WebGPU "scoops" across the entire active universe (sub-millisecond)
@@ -72,9 +72,13 @@ Instead it:
 - Traces closed-loop paths through Hebbian connections
 - Returns only self-consistent, coherent context chains
 - Detects **knowledge gaps** when no antithesis medoid exists within dimensional constraints
-- Broadcasts P2P curiosity probes to discover missing knowledge from peers
+- Broadcasts P2P curiosity probes (with `mimeType` + `modelUrn` for commensurability) to discover missing knowledge from peers
 
-The result feels like genuine recollection rather than search — and surfaces what you *don't* know as clearly as what you do.
+**Current behavior (v0.1):**
+- Flat top-K similarity scoring against the hotpath resident index with warm/cold spill
+- No MetroidBuilder, no dialectical pipeline, no knowledge gap detection yet
+
+The result of the full v0.5 system will feel like genuine recollection rather than search — and will surface what you *don't* know as clearly as what you do.
 
 ### 🌙 Daydreamer — The Default Mode Network
 When the agent is idle, a throttled Web Worker takes over:

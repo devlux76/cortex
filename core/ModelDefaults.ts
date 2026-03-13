@@ -77,6 +77,15 @@ export function buildModelProfileFromSeed(
   assertPositiveInteger("embeddingDimension", seed.embeddingDimension);
   assertPositiveInteger("contextWindowTokens", seed.contextWindowTokens);
 
+  if (seed.matryoshkaProtectedDim !== undefined) {
+    assertPositiveInteger("matryoshkaProtectedDim", seed.matryoshkaProtectedDim);
+    if (seed.matryoshkaProtectedDim > seed.embeddingDimension) {
+      throw new Error(
+        "matryoshkaProtectedDim cannot exceed embeddingDimension",
+      );
+    }
+  }
+
   return {
     modelId,
     embeddingDimension: seed.embeddingDimension,
@@ -84,5 +93,8 @@ export function buildModelProfileFromSeed(
     truncationTokens: deriveTruncationTokens(seed.contextWindowTokens, policy),
     maxChunkTokens: deriveChunkTokenLimit(seed.contextWindowTokens, policy),
     source: seed.source,
+    ...(seed.matryoshkaProtectedDim !== undefined
+      ? { matryoshkaProtectedDim: seed.matryoshkaProtectedDim }
+      : {}),
   };
 }

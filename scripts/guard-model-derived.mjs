@@ -20,7 +20,7 @@ const ALLOWED_SOURCE_FILES = new Set([
 ]);
 
 const MODEL_FIELD_PATTERN =
-  /\b(embeddingDim(?:ension)?|contextWindowTokens|maxInputTokens|maxChunkTokens|truncationTokens|maxTokens)\b/i;
+  /\b(embeddingDim(?:ension)?|contextWindowTokens|maxInputTokens|maxChunkTokens|truncationTokens|maxTokens|matryoshkaProtectedDim)\b/i;
 const ASSIGNMENT_PATTERN = /[:=]/;
 const NUMERIC_LITERAL_PATTERN = /(^|[^\w.])-?\d+(?:\.\d+)?([^\w.]|$)/;
 

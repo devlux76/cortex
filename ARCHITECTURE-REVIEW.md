@@ -244,7 +244,7 @@ This report catalogs every divergence found and maps each to a correction task i
 
 ## Components with Zero Drift
 
-The following components correctly implement their intended architecture and require no changes related to this review:
+The following components are correctly implemented (or partially implemented in the correct direction) and require no changes related to this naming review:
 
 - `core/HotpathPolicy.ts` — Williams Bound policy implementation; correct
 - `core/SalienceEngine.ts` — Promotion/eviction lifecycle; correct
@@ -252,9 +252,14 @@ The following components correctly implement their intended architecture and req
 - `storage/OPFSVectorStore.ts` — Append-only vector file; correct
 - `storage/MemoryVectorStore.ts` — In-memory testing backend; correct
 - `embeddings/` — All embedding providers; correct
-- `hippocampus/Chunker.ts` — Text chunking; correct
-- `hippocampus/PageBuilder.ts` — Page entity construction; correct
+- `hippocampus/Chunker.ts` — Text chunking; **implemented and correct**
+- `hippocampus/PageBuilder.ts` — Page entity construction; **implemented and correct**
+- `hippocampus/Ingest.ts` — Minimal ingest path; **partially implemented** (chunk→embed→persist→Book→hotpath); correct direction, hierarchy and neighbor insertion deferred
+- `cortex/Query.ts` — Minimal query path; **partially implemented** (hotpath-first flat scoring); correct direction, MetroidBuilder deferred
+- `cortex/QueryResult.ts` — Minimal result DTO; **partially implemented**; correct direction, provenance fields deferred
 - All `VectorBackend` implementations — correct
+
+> **Note:** PLAN.md v1.2 has been updated to reflect the actual implementation status of all Hippocampus and Cortex modules. The initial v1.1 plan incorrectly marked `Chunker.ts`, `PageBuilder.ts`, `Ingest.ts`, `Query.ts`, and `QueryResult.ts` as missing; this has been corrected.
 
 ---
 
