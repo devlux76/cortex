@@ -20,14 +20,14 @@ This document tracks the implementation status of each major module in CORTEX. I
 
 | Module | Status | Files | Notes |
 |--------|--------|-------|-------|
-| Core Types | 🟡 Partial | `core/types.ts` | All entity interfaces defined; needs `PageActivity`, `HotpathEntry`, `TierQuotas`, and `MetadataStore` hotpath method signatures |
+| Core Types | ✅ Complete | `core/types.ts` | All entity interfaces defined; includes `PageActivity`, `HotpathEntry`, `TierQuotas`, and `MetadataStore` hotpath method signatures |
 | Model Profiles | ✅ Complete | `core/ModelProfile.ts`, `core/ModelDefaults.ts`, `core/ModelProfileResolver.ts`, `core/BuiltInModelProfiles.ts` | Source-of-truth for model-derived numerics; guard script enforces compliance |
 | Numeric Constants | ✅ Complete | `core/NumericConstants.ts` | Runtime constants (byte sizes, workgroup limits) centralized |
 | Crypto Helpers | ✅ Complete | `core/crypto/hash.ts`, `core/crypto/sign.ts`, `core/crypto/verify.ts` | SHA-256 hashing; Ed25519 sign/verify; 26 tests passing |
-| Hotpath Policy | ❌ Missing | `core/HotpathPolicy.ts` (planned) | Central Williams Bound policy: `computeCapacity`, `computeSalience`, `deriveTierQuotas`, `deriveCommunityQuotas`; all policy constants (c, α, β, γ, tier quotas) as frozen default policy object |
-| Salience Engine | ❌ Missing | `core/SalienceEngine.ts` (planned) | Per-node salience computation, promotion/eviction lifecycle helpers, community-aware admission logic |
+| Hotpath Policy | ✅ Complete | `core/HotpathPolicy.ts` | Williams Bound policy implementation; covered by `tests/HotpathPolicy.test.ts` |
+| Salience Engine | ✅ Complete | `core/SalienceEngine.ts` | Per-node salience computation, promotion/eviction lifecycle helpers, community-aware admission logic; covered by `tests/SalienceEngine.test.ts` |
 
-**Foundation Status:** 4/6 complete (67%)
+**Foundation Status:** 6/6 complete (100%)
 
 ---
 
@@ -37,9 +37,9 @@ This document tracks the implementation status of each major module in CORTEX. I
 |--------|--------|-------|-------|
 | Vector Store (OPFS) | ✅ Complete | `storage/OPFSVectorStore.ts` | Append-only binary vector file; byte-offset addressing; test coverage via `tests/Persistence.test.ts` |
 | Vector Store (Memory) | ✅ Complete | `storage/MemoryVectorStore.ts` | In-memory implementation for testing |
-| Metadata Store (IndexedDB) | 🟡 Partial | `storage/IndexedDbMetadataStore.ts` | Full CRUD for all entities; reverse indexes; Metroid neighbor operations; dirty-volume flags; needs `hotpath_index` and `page_activity` object stores; hotpath CRUD methods; test coverage via `tests/Persistence.test.ts` |
+| Metadata Store (IndexedDB) | ✅ Complete | `storage/IndexedDbMetadataStore.ts` | Full CRUD for all entities; reverse indexes; Metroid neighbor operations; dirty-volume flags; includes `hotpath_index` and `page_activity` object stores; hotpath CRUD methods are implemented and covered by `tests/Persistence.test.ts` |
 
-**Storage Status:** 2.5/3 complete (83%)
+**Storage Status:** 3/3 complete (100%)
 
 ---
 
@@ -128,9 +128,9 @@ This document tracks the implementation status of each major module in CORTEX. I
 | Module | Status | Files | Notes |
 |--------|--------|-------|-------|
 | Routing Policy | ✅ Complete | `Policy.ts` | Derives routing dimensions from ModelProfile; integration tested |
-| Hotpath Policy | ❌ Missing | `core/HotpathPolicy.ts` (planned) | Williams Bound capacity formula, salience weights, tier quotas, community quotas; separate from model-derived numerics |
+| Hotpath Policy | ✅ Complete | `core/HotpathPolicy.ts` | Williams Bound policy implementation, salience weights, tier quotas, community quotas; separate from model-derived numerics |
 
-**Policy Status:** 1/2 complete (50%)
+**Policy Status:** 2/2 complete (100%)
 
 ---
 
@@ -152,18 +152,18 @@ This document tracks the implementation status of each major module in CORTEX. I
 | Module | Status | Files | Notes |
 |--------|--------|-------|-------|
 | Unit Tests | ✅ Complete | `tests/*.test.ts`, `tests/**/*.test.ts` | 115 tests across 13 files; all passing |
-| Persistence Tests | ✅ Complete | `tests/Persistence.test.ts` | Full storage layer coverage (OPFS, IndexedDB, Metroid neighbors); needs extension for hotpath stores |
+| Persistence Tests | ✅ Complete | `tests/Persistence.test.ts` | Full storage layer coverage (OPFS, IndexedDB, Metroid neighbors, hotpath indexes) |
 | Model Tests | ✅ Complete | `tests/model/*.test.ts` | Profile resolution, defaults, routing policy |
 | Embedding Tests | ✅ Complete | `tests/embeddings/*.test.ts` | Provider resolver, runner, real/dummy backends |
 | Backend Smoke Tests | ✅ Complete | `tests/BackendSmoke.test.ts` | All vector backends instantiate cleanly |
 | Runtime Tests | ✅ Complete | `tests/runtime/*.spec.mjs` | Browser harness validated; Electron context-sensitive |
 | Integration Tests | ❌ Missing | `tests/integration/*.test.ts` (planned) | End-to-end: ingest → persist → query → coherent result |
-| Hotpath Policy Tests | ❌ Missing | `tests/HotpathPolicy.test.ts` (planned) | H(t) sublinearity and monotonicity; tier quota sums; community quota minimums; salience determinism |
-| Salience Engine Tests | ❌ Missing | `tests/SalienceEngine.test.ts` (planned) | Bootstrap fills to H(t); steady-state eviction; community/tier quota enforcement; determinism |
+| Hotpath Policy Tests | ✅ Complete | `tests/HotpathPolicy.test.ts` | H(t) sublinearity and monotonicity; tier quota sums; community quota minimums; salience determinism |
+| Salience Engine Tests | ✅ Complete | `tests/SalienceEngine.test.ts` | Bootstrap fills to H(t); steady-state eviction; community/tier quota enforcement; determinism |
 | Scaling Benchmarks | ❌ Missing | `tests/benchmarks/HotpathScaling.bench.ts` (planned) | Synthetic graphs at 1K/10K/100K/1M; assert resident count ≤ H(t); query cost sublinear |
 | Benchmarks | 🟡 Partial | `tests/benchmarks/DummyEmbedderHotpath.bench.ts` | Baseline dummy embedder benchmark; real-provider and hotpath scaling benchmarks needed |
 
-**Testing Status:** 6/12 complete (50%)
+**Testing Status:** 8/12 complete (67%)
 
 ---
 
@@ -187,19 +187,19 @@ This document tracks the implementation status of each major module in CORTEX. I
 
 | Layer | Completion | Critical Gap |
 |-------|-----------|--------------|
-| Foundation | 67% | HotpathPolicy, SalienceEngine, type extensions |
-| Storage | 83% | Hotpath IndexedDB stores |
+| Foundation | 100% | — |
+| Storage | 100% | — |
 | Vector Compute | 100% | — |
 | Embedding | 83% | WebGL provider (low priority) |
 | Hippocampus | 0% | **CRITICAL** — No ingest path |
 | Cortex | 8% | **CRITICAL** — No retrieval path |
 | Daydreamer | 0% | Not v1 blocker |
-| Policy | 50% | HotpathPolicy |
+| Policy | 100% | — |
 | Runtime | 100% | — |
-| Testing | 50% | Integration tests, hotpath tests, scaling benchmarks |
+| Testing | 67% | Integration tests, scaling benchmarks |
 | Build/CI | 83% | — |
 
-**System-Wide Completion:** ~55% (infrastructure complete; Williams Bound policy foundation and orchestration layers missing)
+**System-Wide Completion:** ~70% (core infrastructure and policy foundation complete; ingest/query/benchmarks remain.)
 
 ---
 

@@ -37,11 +37,11 @@ These items **must** be completed to have a usable system. Without them, users c
 
 ---
 
-### P0-F: Williams Bound Policy Foundation (BLOCKS: all hotpath-aware modules)
+### P0-F: Williams Bound Policy Foundation (BLOCKS: all hotpath-aware modules) ✅ COMPLETE
 
 **Why:** The HotpathPolicy and SalienceEngine are the central source of truth for the Williams Bound architecture. Every subsequent module (ingest, query, hierarchy, Daydreamer) depends on them. Implementing these first ensures the bound is enforced from day one rather than retrofitted.
 
-- [ ] **P0-F1:** Implement `core/HotpathPolicy.ts`
+- [x] **P0-F1:** Implement `core/HotpathPolicy.ts`
   - `computeCapacity(graphMass: number): number` — H(t) = ⌈c · √(t · log₂(1+t))⌉
   - `computeSalience(hebbianIn: number, recency: number, queryHits: number, weights?: SalienceWeights): number` — σ = α·H_in + β·R + γ·Q
   - `deriveTierQuotas(capacity: number, quotaRatios?: TierQuotaRatios): TierQuotas` — allocate H(t) across shelf/volume/book/page tiers
@@ -49,7 +49,7 @@ These items **must** be completed to have a usable system. Without them, users c
   - Export a frozen `DEFAULT_HOTPATH_POLICY` object containing all constants: `c = 0.5`, `α = 0.5`, `β = 0.3`, `γ = 0.2`, `q_s = 0.10`, `q_v = 0.20`, `q_b = 0.20`, `q_p = 0.50`
   - Keep strictly separate from `core/ModelDefaults.ts` (policy-derived ≠ model-derived)
 
-- [ ] **P0-F2:** Add HotpathPolicy test coverage (`tests/HotpathPolicy.test.ts`)
+- [x] **P0-F2:** Add HotpathPolicy test coverage (`tests/HotpathPolicy.test.ts`)
   - H(t) grows sublinearly: verify `H(10_000) / 10_000 < H(1_000) / 1_000`
   - H(t) is monotonically non-decreasing over a representative range: verify `H(t+1) >= H(t)` for each `t` in `[0, 1, 2, 10, 100, 1_000, 10_000, 100_000]`
   - H(t) is a finite integer ≥ 1 for edge inputs: `t = 0`, `t = 1`, `t = Number.MAX_SAFE_INTEGER`; result must never be `NaN`, `Infinity`, or `< 1`
@@ -59,7 +59,7 @@ These items **must** be completed to have a usable system. Without them, users c
   - Salience is deterministic for same inputs
   - Salience clamps output to a finite number: never `NaN` or `Infinity` for extreme weight or hit-count values
 
-- [ ] **P0-F3:** Extend `core/types.ts`
+- [x] **P0-F3:** Extend `core/types.ts`
   - Add `PageActivity` interface: `{ pageId: Hash; queryHitCount: number; lastQueryAt: string; communityId?: string }`
   - Add `HotpathEntry` interface: `{ entityId: Hash; tier: 'shelf' | 'volume' | 'book' | 'page'; salience: number; communityId?: string }`
   - Add `TierQuotas` type: `{ shelf: number; volume: number; book: number; page: number }`
@@ -71,7 +71,7 @@ These items **must** be completed to have a usable system. Without them, users c
     - `putPageActivity(activity: PageActivity): Promise<void>`
     - `getPageActivity(pageId: Hash): Promise<PageActivity | undefined>`
 
-- [ ] **P0-F4:** Extend `storage/IndexedDbMetadataStore.ts`
+- [x] **P0-F4:** Extend `storage/IndexedDbMetadataStore.ts`
   - Add `hotpath_index` object store keyed by `entityId`; secondary index by `tier`
   - Add `page_activity` object store keyed by `pageId`
   - Implement all six new `MetadataStore` hotpath methods
@@ -80,25 +80,25 @@ These items **must** be completed to have a usable system. Without them, users c
     - put/get for `PageActivity`
     - `getResidentCount` returns correct value after multiple puts
 
-**Exit Criteria:** `HotpathPolicy` module passes all tests; `types.ts` has hotpath interfaces; IndexedDB hotpath stores are implemented and tested.
+**Exit Criteria:** `HotpathPolicy` module passes all tests; `types.ts` has hotpath interfaces; IndexedDB hotpath stores are implemented and tested. ✅ Met — tests passing.
 
 ---
 
-### P0-G: Salience Engine (BLOCKS: hotpath promotion in ingest and Daydreamer)
+### P0-G: Salience Engine (BLOCKS: hotpath promotion in ingest and Daydreamer) ✅ COMPLETE
 
 **Why:** The SalienceEngine is the decision-making layer for hotpath admission. It is needed by ingest (new page admission), query (hit-count update), and Daydreamer (post-LTP/LTD sweeps). Implementing it before ingest ensures promotion logic is correct from the first page written.
 
-- [ ] **P0-G1:** Implement `core/SalienceEngine.ts`
+- [x] **P0-G1:** Implement `core/SalienceEngine.ts`
   - `computeNodeSalience(pageId: Hash, metadataStore: MetadataStore): Promise<number>` — fetch PageActivity and incident Hebbian edges; apply σ formula via HotpathPolicy
   - `batchComputeSalience(pageIds: Hash[], metadataStore: MetadataStore): Promise<Map<Hash, number>>` — efficient batch version
   - `shouldPromote(candidateSalience: number, weakestResidentSalience: number, capacityRemaining: number): boolean` — admission gating
   - `selectEvictionTarget(tier: HotpathEntry['tier'], communityId: string | undefined, metadataStore: MetadataStore): Promise<Hash | undefined>` — find weakest resident in tier/community bucket
 
-- [ ] **P0-G2:** Implement promotion/eviction lifecycle helpers in `core/SalienceEngine.ts`
+- [x] **P0-G2:** Implement promotion/eviction lifecycle helpers in `core/SalienceEngine.ts`
   - `bootstrapHotpath(metadataStore: MetadataStore, policy: HotpathPolicy): Promise<void>` — fill hotpath greedily by salience while resident count < H(t)
   - `runPromotionSweep(candidateIds: Hash[], metadataStore: MetadataStore, policy: HotpathPolicy): Promise<void>` — steady-state: promote if salience > weakest in same tier/community bucket; evict weakest on promotion
 
-- [ ] **P0-G3:** Add SalienceEngine test coverage (`tests/SalienceEngine.test.ts`)
+- [x] **P0-G3:** Add SalienceEngine test coverage (`tests/SalienceEngine.test.ts`)
   - Bootstrap fills hotpath to exactly H(t) given enough candidates
   - Steady-state promotes only when candidate beats the weakest resident
   - Steady-state evicts exactly the weakest resident (not a random entry)
@@ -106,7 +106,7 @@ These items **must** be completed to have a usable system. Without them, users c
   - Tier quotas prevent one hierarchy level from dominating
   - Eviction is deterministic under the same state
 
-**Exit Criteria:** `SalienceEngine` module passes all tests; promotion/eviction lifecycle is correct and deterministic.
+**Exit Criteria:** `SalienceEngine` module passes all tests; promotion/eviction lifecycle is correct and deterministic. ✅ Met — tests passing.
 
 ---
 
