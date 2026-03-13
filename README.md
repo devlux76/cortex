@@ -114,8 +114,16 @@ bun run dev:harness # start the browser runtime harness at http://127.0.0.1:4173
 | Document | Purpose |
 |---|---|
 | [`DESIGN.md`](DESIGN.md) | Architecture specification and core design principles |
-| [`PLAN.md`](PLAN.md) | Module-by-module implementation status and development phases |
-| [`TODO.md`](TODO.md) | Prioritized actionable tasks to ship v1.0 |
 | [`ARCHITECTURE-REVIEW.md`](ARCHITECTURE-REVIEW.md) | Repository-wide architectural drift report and correction tasks |
 | [`docs/api.md`](docs/api.md) | API reference for developers integrating with CORTEX |
 | [`docs/development.md`](docs/development.md) | Build, test, debug, and Docker workflow |
+
+### Project Management
+
+Task tracking, prioritization, and sprint planning use **GitHub-native features**:
+
+- **[Issues](../../issues)** — Every task, bug, and feature request. Use the structured templates.
+- **[Projects](../../projects)** — Kanban boards for lifecycle tracking.
+- **Milestones** — Group issues by release phase (`v0.1`, `v0.5`, `v1.0`).
+- **Labels** — Auto-applied on PRs based on changed files. Priority (`P0`–`P3`) and layer labels for classification.
+- **`gh` CLI** — Agents create, update, and close issues directly via `gh issue create`, `gh issue close`, etc.

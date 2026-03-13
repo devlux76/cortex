@@ -407,7 +407,7 @@ This keeps subgraph expansion cost sublinear in graph mass at scale while remain
 
 ### Policy Source of Truth
 
-All hotpath constants — `c`, `α`, `β`, `γ`, `q_s`, `q_v`, `q_b`, `q_p` — live in `core/HotpathPolicy.ts` as a frozen default policy object. These are **policy-derived constants** (not model-derived) and are kept strictly separate from `core/ModelDefaults.ts`. A companion guard (or an extension to `guard:model-derived`) is planned (see TODO.md P3-E3) to prevent these constants from being hardcoded elsewhere; until that guard is in place, discipline is enforced by convention.
+All hotpath constants — `c`, `α`, `β`, `γ`, `q_s`, `q_v`, `q_b`, `q_p` — live in `core/HotpathPolicy.ts` as a frozen default policy object. These are **policy-derived constants** (not model-derived) and are kept strictly separate from `core/ModelDefaults.ts`. A companion guard (or an extension to `guard:model-derived`) is planned to prevent these constants from being hardcoded elsewhere; until that guard is in place, discipline is enforced by convention.
 
 ---
 

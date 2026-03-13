@@ -15,10 +15,20 @@ The engine models three biological brain regions:
 |---|---|
 | `README.md` | Product vision and quick start |
 | `DESIGN.md` | Complete architecture specification and design principles |
-| `PLAN.md` | Module-by-module implementation status and development phases |
-| `TODO.md` | Prioritized actionable tasks to ship v1.0 |
 
-Keep all documents synchronized with the real code state after every implementation pass.
+Keep `DESIGN.md` synchronized with the real code state after every implementation pass.
+
+## Project Management
+
+All task tracking, prioritization, and status is managed through **GitHub-native features** — not markdown files:
+
+- **GitHub Issues** — Every task, bug, and feature request is a GitHub Issue (use the issue templates in `.github/ISSUE_TEMPLATE/`).
+- **GitHub Projects** — Use project boards for Kanban-style lifecycle tracking (To Do → In Progress → Done).
+- **Milestones** — Group issues by release phase (`v0.1`, `v0.5`, `v1.0`).
+- **Labels** — Auto-applied on PRs by `.github/workflows/auto-label.yml` using path-based rules in `.github/labeler.yml`. Priority labels (`P0`–`P3`) and layer labels (`layer: foundation`, `layer: cortex`, etc.) are used for classification.
+- **Issue linking** — Reference dependencies with `#issue_number`. Use `Closes #N` in PR descriptions to auto-close issues on merge.
+
+Agents with `gh` CLI access can create, update, and close issues directly. Do not create markdown files for task tracking.
 
 ## Directory Structure
 
@@ -119,8 +129,10 @@ Run `npm run guard:model-derived` after any numeric change to verify compliance.
 
 - All CI checks must pass: `lint`, `build` (typecheck), `test:unit`.
 - `npm run guard:model-derived` must pass for any change that touches numeric constants.
-- Keep `README.md`, `CORTEX-DESIGN-PLAN-TODO.md`, and `PROJECT-EXECUTION-PLAN.md` synchronized with any implementation state changes.
-- Record blockers with file path, failure symptom, and next action.
+- PRs are auto-labeled by layer based on changed files (`.github/labeler.yml`).
+- Use the PR template (`.github/PULL_REQUEST_TEMPLATE.md`) — it is pre-populated on every PR.
+- Reference the issue being addressed with `Closes #N` in the PR description.
+- Keep `DESIGN.md` synchronized with any architectural changes.
 
 ## What NOT to Do
 

@@ -1,0 +1,67 @@
+name: Close Legacy Issues
+
+# One-shot workflow: closes all pre-existing issues that were created by the
+# removed sync-github-project.mjs script. Run manually, then delete this file.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  close-all:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Close all open issues as won't-fix
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            // Ensure the "wontfix" label exists
+            try {
+              await github.rest.issues.getLabel({ owner, repo, name: "wontfix" });
+            } catch {
+              await github.rest.issues.createLabel({
+                owner, repo,
+                name: "wontfix",
+                color: "ffffff",
+                description: "Closed during migration to GitHub-native project management"
+              });
+            }
+
+            // Paginate through all open issues
+            let page = 1;
+            let closed = 0;
+            while (true) {
+              const { data: issues } = await github.rest.issues.listForRepo({
+                owner, repo,
+                state: "open",
+                per_page: 100,
+                page,
+              });
+              if (issues.length === 0) break;
+
+              for (const issue of issues) {
+                // Skip pull requests (they appear in the issues API)
+                if (issue.pull_request) continue;
+
+                await github.rest.issues.addLabels({
+                  owner, repo,
+                  issue_number: issue.number,
+                  labels: ["wontfix"],
+                });
+                await github.rest.issues.update({
+                  owner, repo,
+                  issue_number: issue.number,
+                  state: "closed",
+                  state_reason: "not_planned",
+                });
+                console.log(`Closed #${issue.number}: ${issue.title}`);
+                closed++;
+              }
+              page++;
+            }
+            console.log(`\nDone — closed ${closed} issues.`);

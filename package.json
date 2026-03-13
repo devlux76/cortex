@@ -23,8 +23,7 @@
     "docker:electron:build": "docker compose -f docker-compose.electron-debug.yml build electron-debug",
     "docker:electron:up": "docker compose -f docker-compose.electron-debug.yml up --build --force-recreate electron-debug",
     "docker:electron:down": "docker compose -f docker-compose.electron-debug.yml down --remove-orphans",
-    "docker:electron:logs": "docker compose -f docker-compose.electron-debug.yml logs -f electron-debug",
-    "sync:github-project": "bun scripts/sync-github-project.mjs"
+    "docker:electron:logs": "docker compose -f docker-compose.electron-debug.yml logs -f electron-debug"
   },
   "devDependencies": {
     "@eslint/js": "latest",

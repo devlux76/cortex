@@ -1,0 +1,60 @@
+# Maps file-path globs to labels applied automatically on PRs.
+# Used by the auto-label.yml workflow (actions/labeler).
+
+"layer: foundation":
+  - changed-files:
+      - any-glob-to-any-file: "core/**"
+
+"layer: storage":
+  - changed-files:
+      - any-glob-to-any-file: "storage/**"
+
+"layer: compute":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "VectorBackend.ts"
+          - "WebGPUVectorBackend.ts"
+          - "WebGLVectorBackend.ts"
+          - "WebNNVectorBackend.ts"
+          - "WasmVectorBackend.ts"
+          - "CreateVectorBackend.ts"
+          - "BackendKind.ts"
+          - "TopK.ts"
+          - "Vectors.glsl"
+          - "Vectors.wgsl"
+          - "Vectors.wat"
+
+"layer: embeddings":
+  - changed-files:
+      - any-glob-to-any-file: "embeddings/**"
+
+"layer: hippocampus":
+  - changed-files:
+      - any-glob-to-any-file: "hippocampus/**"
+
+"layer: cortex":
+  - changed-files:
+      - any-glob-to-any-file: "cortex/**"
+
+"layer: daydreamer":
+  - changed-files:
+      - any-glob-to-any-file: "daydreamer/**"
+
+"layer: testing":
+  - changed-files:
+      - any-glob-to-any-file: "tests/**"
+
+"layer: ci":
+  - changed-files:
+      - any-glob-to-any-file:
+          - ".github/workflows/**"
+          - ".github/labeler.yml"
+
+"layer: documentation":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "*.md"
+          - "docs/**"
+          - ".github/copilot-instructions.md"
+          - ".github/ISSUE_TEMPLATE/**"
+          - ".github/PULL_REQUEST_TEMPLATE.md"

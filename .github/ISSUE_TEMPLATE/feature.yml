@@ -1,0 +1,60 @@
+name: "✨ Feature Request"
+description: Propose a new feature or enhancement for CORTEX
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the feature you'd like to see in CORTEX.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: A concise description of the proposed feature.
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: Why is this feature needed? What problem does it solve?
+    validations:
+      required: true
+
+  - type: textarea
+    id: design
+    attributes:
+      label: Proposed Design
+      description: How should this feature work? Reference DESIGN.md sections if applicable.
+
+  - type: dropdown
+    id: layer
+    attributes:
+      label: Target Layer
+      description: Which CORTEX layer would this feature primarily affect?
+      multiple: true
+      options:
+        - Foundation (core/)
+        - Storage (storage/)
+        - Vector Compute (root backends)
+        - Embeddings (embeddings/)
+        - Hippocampus (hippocampus/)
+        - Cortex (cortex/)
+        - Daydreamer
+        - Runtime Harness (runtime/)
+        - CI / Build
+        - Documentation
+    validations:
+      required: true
+
+  - type: textarea
+    id: exit-criteria
+    attributes:
+      label: Exit Criteria
+      description: What must be true for this feature to be considered complete?
+      placeholder: |
+        - [ ] Unit tests pass
+        - [ ] Integration test covers end-to-end flow
+        - [ ] DESIGN.md updated if architecture changed
