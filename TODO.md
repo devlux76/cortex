@@ -114,12 +114,12 @@ These items **must** be completed to have a usable system. Without them, users c
 
 **Why:** Must split text into page-sized chunks respecting ModelProfile token limits.
 
-- [ ] **P0-B1:** Implement `hippocampus/Chunker.ts`
+- [x] **P0-B1:** Implement `hippocampus/Chunker.ts`
   - Token-aware splitting (use ModelProfile `maxContextLength`)
   - Respect sentence boundaries where possible
   - Handle edge cases (empty input, single-token input, huge paragraphs)
 
-- [ ] **P0-B2:** Add chunker test coverage
+- [x] **P0-B2:** Add chunker test coverage
   - `tests/hippocampus/Chunker.test.ts`
   - Test various text lengths (short, medium, long, huge)
   - Test boundary conditions

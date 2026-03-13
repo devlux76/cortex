@@ -13,6 +13,22 @@ describe("chunkTextWithMaxTokens", () => {
     expect(chunkTextWithMaxTokens(text, 10)).toEqual([text]);
   });
 
+  it("handles single-token input", () => {
+    const text = "Word";
+    expect(chunkTextWithMaxTokens(text, 5)).toEqual([text]);
+  });
+
+  it("scales to very large inputs without blowing the stack", () => {
+    const numTokens = 10_000;
+    const tokens = Array.from({ length: numTokens }, (_, i) => `w${i}`);
+    const text = tokens.join(" ");
+    const chunks = chunkTextWithMaxTokens(text, 256);
+
+    expect(chunks.every((chunk) => chunk.split(/\s+/).length <= 256)).toBe(true);
+    expect(chunks.join(" ")).toBe(text);
+    expect(chunks.length).toBeGreaterThan(1);
+  });
+
   it("splits into multiple chunks when token count exceeds the limit", () => {
     const tokens = Array.from({ length: 25 }, (_, i) => `word${i}`);
     const text = tokens.join(" ");
