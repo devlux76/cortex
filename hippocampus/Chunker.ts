@@ -15,7 +15,7 @@ export function chunkTextWithMaxTokens(
   text: string,
   maxChunkTokens: number,
 ): string[] {
-  if (!Number.isInteger(maxChunkTokens) || maxChunkTokens <= 0) {
+  if (!Number.isInteger(maxChunkTokens) || maxChunkTokens <= 0) { // model-derived-ok
     throw new Error("maxChunkTokens must be a positive integer");
   }
 
@@ -51,7 +51,8 @@ export function chunkTextWithMaxTokens(
     // Sentence is larger than budget: split it across multiple chunks.
     if (sentenceTokens.length > maxChunkTokens) {
       pushCurrent();
-      for (let i = 0; i < sentenceTokens.length; i += maxChunkTokens) {
+      // model-derived-ok: uses maxChunkTokens as derived from ModelProfile
+      for (let i = 0; i < sentenceTokens.length; i += maxChunkTokens) { // model-derived-ok
         const slice = sentenceTokens.slice(i, i + maxChunkTokens);
         chunks.push(slice.join(" "));
       }

@@ -145,6 +145,20 @@ export class IndexedDbMetadataStore implements MetadataStore {
     return this._get<Page>(STORE.pages, pageId);
   }
 
+  /**
+   * Returns all pages in the store. Used for warm/cold fallbacks in query.
+   * TODO: Replace with a paginated or indexed scan before production use —
+   * loading every page into memory is expensive for large corpora.
+   */
+  async getAllPages(): Promise<Page[]> {
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(STORE.pages, "readonly");
+      const req = tx.objectStore(STORE.pages).getAll();
+      req.onsuccess = () => resolve(req.result as Page[]);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
   // -------------------------------------------------------------------------
   // Book CRUD + reverse index maintenance
   // -------------------------------------------------------------------------

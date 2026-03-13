@@ -163,7 +163,7 @@ These items **must** be completed to have a usable system. Without them, users c
 
 **Why:** Users need to retrieve relevant memories.
 
-- [ ] **P0-D1:** Implement `cortex/Query.ts` (minimal version)
+- [x] **P0-D1:** Implement `cortex/Query.ts` (minimal version)
   - Entry point: `query(queryText, modelProfile, vectorStore, metadataStore, topK)`
   - Embed query via `EmbeddingRunner`
   - Score resident hotpath entries first (HOT pages); fall back to full scan for WARM/COLD
@@ -172,10 +172,10 @@ These items **must** be completed to have a usable system. Without them, users c
   - Return `QueryResult` with page IDs and scores
   - **Defer:** Full hierarchical ranking, subgraph expansion, TSP coherence, query cost meter
 
-- [ ] **P0-D2:** Implement `cortex/QueryResult.ts`
+- [x] **P0-D2:** Implement `cortex/QueryResult.ts`
   - DTO with `pages: Page[]`, `scores: number[]`, `metadata: object`
 
-- [ ] **P0-D3:** Add query test coverage
+- [x] **P0-D3:** Add query test coverage
   - `tests/cortex/Query.test.ts`
   - Test happy path (query → top-K pages)
   - Test empty corpus (no results)

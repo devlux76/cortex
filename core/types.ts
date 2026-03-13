@@ -154,6 +154,8 @@ export interface MetadataStore {
   // --- Core CRUD ---
   putPage(page: Page): Promise<void>;
   getPage(pageId: Hash): Promise<Page | undefined>;
+  /** Returns all pages in the store. Used for warm/cold fallbacks in query. */
+  getAllPages(): Promise<Page[]>;
 
   putBook(book: Book): Promise<void>;
   getBook(bookId: Hash): Promise<Book | undefined>;
