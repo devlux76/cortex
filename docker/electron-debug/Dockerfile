@@ -1,6 +1,8 @@
 FROM node:24-bookworm-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
+ENV BUN_INSTALL=/root/.bun
+ENV PATH=${BUN_INSTALL}/bin:${PATH}
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
@@ -30,10 +32,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     xvfb \
   && rm -rf /var/lib/apt/lists/*
 
+RUN curl -fsSL https://bun.sh/install | bash
+
 WORKDIR /workspace
 
-COPY package.json package-lock.json ./
-RUN npm ci
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile
 
 COPY . .
 

@@ -64,10 +64,10 @@ This is the "dreaming" phase that prevents catastrophic forgetting and forces ab
 ## Quick Start
 
 ```sh
-npm install
-npm run build       # type-check
-npm run test:unit   # unit tests
-npm run dev:harness # start the browser runtime harness at http://127.0.0.1:4173
+bun install
+bun run build       # type-check
+bun run test:unit   # unit tests
+bun run dev:harness # start the browser runtime harness at http://127.0.0.1:4173
 ```
 
 ## Documentation

@@ -4,7 +4,7 @@
     {
       "label": "harness:serve",
       "type": "shell",
-      "command": "node scripts/runtime-harness-server.mjs",
+      "command": "bun scripts/runtime-harness-server.mjs",
       "isBackground": true,
       "problemMatcher": {
         "owner": "cortex-harness",
@@ -27,7 +27,7 @@
     {
       "label": "harness:stop",
       "type": "shell",
-      "command": "pkill -f 'node scripts/runtime-harness-server.mjs' || true",
+      "command": "pkill -f 'bun scripts/runtime-harness-server.mjs' || true",
       "presentation": {
         "reveal": "never",
         "panel": "shared"

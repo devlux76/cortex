@@ -15,7 +15,7 @@ export default defineConfig({
     trace: "on-first-retry",
   },
   webServer: {
-    command: "node scripts/runtime-harness-server.mjs",
+    command: "bun scripts/runtime-harness-server.mjs",
     url: HARNESS_URL,
     reuseExistingServer: true,
     timeout: 30_000,

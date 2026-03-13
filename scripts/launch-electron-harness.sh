@@ -18,7 +18,7 @@ elif command -v electron >/dev/null 2>&1; then
   ELECTRON_BIN="$(command -v electron)"
 else
   echo "Electron executable not found."
-  echo "Install with: npm install -D electron"
+  echo "Install with: bun add --dev electron"
   exit 1
 fi
 
@@ -32,7 +32,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 echo "[launcher] starting runtime harness server at ${HARNESS_URL}"
-node "${ROOT_DIR}/scripts/runtime-harness-server.mjs" >"${SERVER_LOG}" 2>&1 &
+bun "${ROOT_DIR}/scripts/runtime-harness-server.mjs" >"${SERVER_LOG}" 2>&1 &
 SERVER_PID=$!
 
 sleep 1

@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 
 import { spawn } from "node:child_process";
 import process from "node:process";
@@ -25,7 +25,7 @@ function runPlaywrightElectronTests() {
   };
 
   const child = spawn(
-    "npx",
+    "bunx",
     ["playwright", "test", "tests/runtime/electron-harness.spec.mjs", "--workers=1"],
     {
       stdio: "inherit",
@@ -45,7 +45,7 @@ async function main() {
   if (!installed) {
     const message = [
       "runtime-electron lane cannot run: Electron executable is not installed.",
-      "Install with: npm install -D electron",
+      "Install with: bun add --dev electron",
       "Or run with CORTEX_ALLOW_ELECTRON_SKIP=1 to soft-skip locally.",
     ].join("\n");
 

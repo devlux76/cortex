@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 
 import { app, BrowserWindow } from "electron";
 import process from "node:process";

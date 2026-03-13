@@ -5,49 +5,51 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json --noEmit",
-    "typecheck": "npm run build",
+    "typecheck": "bun run build",
     "lint": "eslint .",
     "test": "vitest run tests/*.test.ts tests/**/*.test.ts",
     "test:unit": "vitest run tests/*.test.ts tests/**/*.test.ts",
     "test:watch": "vitest tests/*.test.ts tests/**/*.test.ts",
-    "dev:harness": "node scripts/runtime-harness-server.mjs",
+    "dev:harness": "bun scripts/runtime-harness-server.mjs",
     "test:browser": "playwright test tests/runtime/browser-harness.spec.mjs",
-    "test:electron": "node scripts/run-electron-runtime-smoke.mjs",
-    "test:electron:playwright": "node scripts/run-electron-runtime-tests.mjs",
-    "test:electron:desktop": "CORTEX_ELECTRON_HEADLESS=0 CORTEX_ELECTRON_SHOW=1 node scripts/run-electron-runtime-smoke.mjs",
-    "test:runtime": "npm run test:browser && npm run test:electron",
-    "test:all": "npm run test:unit && npm run test:runtime",
-    "guard:model-derived": "node scripts/guard-model-derived.mjs",
+    "test:electron": "bun scripts/run-electron-runtime-smoke.mjs",
+    "test:electron:playwright": "bun scripts/run-electron-runtime-tests.mjs",
+    "test:electron:desktop": "CORTEX_ELECTRON_HEADLESS=0 CORTEX_ELECTRON_SHOW=1 bun scripts/run-electron-runtime-smoke.mjs",
+    "test:runtime": "bun run test:browser && bun run test:electron",
+    "test:all": "bun run test:unit && bun run test:runtime",
+    "guard:model-derived": "bun scripts/guard-model-derived.mjs",
     "benchmark:dummy": "vitest bench --watch=false tests/benchmarks/DummyEmbedderHotpath.bench.ts",
-    "benchmark": "npm run benchmark:dummy",
+    "benchmark": "bun run benchmark:dummy",
     "docker:electron:build": "docker compose -f docker-compose.electron-debug.yml build electron-debug",
     "docker:electron:up": "docker compose -f docker-compose.electron-debug.yml up --build --force-recreate electron-debug",
     "docker:electron:down": "docker compose -f docker-compose.electron-debug.yml down --remove-orphans",
     "docker:electron:logs": "docker compose -f docker-compose.electron-debug.yml logs -f electron-debug",
-    "sync:github-project": "node scripts/sync-github-project.mjs"
+    "sync:github-project": "bun scripts/sync-github-project.mjs"
   },
   "devDependencies": {
-    "@eslint/js": "^9.38.0",
-    "@playwright/test": "^1.55.1",
-    "@webgpu/types": "^0.1.64",
-    "electron": "^41.0.0",
-    "eslint": "^9.38.0",
-    "fake-indexeddb": "^6.2.5",
-    "typescript": "^5.9.3",
-    "typescript-eslint": "^8.46.2",
-    "vitest": "^3.2.4"
+    "@eslint/js": "latest",
+    "@playwright/test": "latest",
+    "@webgpu/types": "latest",
+    "electron": "latest",
+    "eslint": "latest",
+    "fake-indexeddb": "latest",
+    "typescript": "latest",
+    "typescript-eslint": "latest",
+    "vitest": "latest"
   },
   "optionalDependencies": {
-    "electron": "^37.2.0"
+    "electron": "latest"
   },
   "dependencies": {
-    "@huggingface/transformers": "^3.8.1"
+    "@huggingface/transformers": "latest"
   },
   "engines": {
-    "node": ">=24"
+    "bun": "latest"
   },
   "trustedDependencies": [
+    "electron",
     "onnxruntime-node",
-    "protobufjs"
+    "protobufjs",
+    "sharp"
   ]
 }

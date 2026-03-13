@@ -24,7 +24,7 @@ trap cleanup EXIT INT TERM
 
 echo "[docker-electron] starting harness server on ${HARNESS_HOST}:${HARNESS_PORT}"
 HARNESS_HOST="${HARNESS_HOST}" HARNESS_PORT="${HARNESS_PORT}" \
-  node "${ROOT_DIR}/scripts/runtime-harness-server.mjs" &
+  bun "${ROOT_DIR}/scripts/runtime-harness-server.mjs" &
 HARNESS_PID=$!
 
 ready=0

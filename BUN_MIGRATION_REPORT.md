@@ -10,7 +10,7 @@
 
 Migrating CORTEX from Node.js + npm to Bun is **low-risk, fully compatible, and meaningfully faster for CI**. Every CI step—install, lint, typecheck, and unit tests—ran correctly under Bun with zero code changes required. The largest single win is the package install step: `bun install` with a warm global cache resolves in **~13 ms** versus npm ci's constant **~7–8 s** regardless of cache. Across all CI steps the end-to-end savings in a cold run sit around 25%; on a warm-cache hit the install alone cuts from 8 s to 0.013 s—a roughly **600×** improvement.
 
-The migration surface is narrow: two CI workflow lines, two lines in `docs/development.md`, and one `trustedDependencies` field already added to `package.json`. No TypeScript source files need to change.
+The migration surface remains low-risk: CI/workflow setup now uses Bun latest, package scripts invoke Bun directly, and script launchers/shebangs use Bun entrypoints. No TypeScript feature modules required changes.
 
 ---
 
@@ -88,21 +88,21 @@ By default Bun sandboxes lifecycle scripts for security. Two transitive dependen
 ]
 ```
 
-#### 2. Script shebangs use `#!/usr/bin/env node`
+#### 2. Script shebangs now use `#!/usr/bin/env bun`
 
-All scripts in `scripts/` declare `#!/usr/bin/env node`. Since Bun exposes a `node` compatibility shim in its `PATH`, these run correctly today. Updating shebangs to `#!/usr/bin/env bun` is optional and can be done incrementally.
+Script entrypoints in `scripts/` were updated to Bun shebangs so direct execution no longer relies on the Node compatibility shim.
 
-#### 3. Scripts spawn `node` explicitly for subprocesses
+#### 3. Scripts spawn Bun explicitly for subprocesses
 
-`scripts/run-electron-runtime-smoke.mjs` spawns `node scripts/runtime-harness-server.mjs` as a child process. Under a Bun CI environment `node` is still available (Bun installs its own `node` wrapper), so this works without changes.
+`scripts/run-electron-runtime-smoke.mjs` now spawns `bun scripts/runtime-harness-server.mjs` for child-process consistency.
 
 #### 4. `dev:harness` and `sync:github-project` scripts
 
-These use `node scripts/...` in the `package.json` `scripts` block. They work with `bun run` today (Bun delegates to the `node` wrapper). Optionally they can be updated to `bun scripts/...` for consistency.
+These now use `bun scripts/...` in the `package.json` `scripts` block.
 
 #### 5. Electron optional dependency version duplication
 
-`package.json` lists `electron` in both `devDependencies` (^41.0.0) and `optionalDependencies` (^37.2.0). Bun resolves the higher range (^41). npm behaves the same. This pre-existing duplication is unrelated to the migration.
+`package.json` lists `electron` in both `devDependencies` and `optionalDependencies` (both set to `latest`). This duplication remains intentional for current install behavior.
 
 #### 6. `lockfileVersion: 1` in `bun.lock`
 
@@ -142,7 +142,7 @@ Replace Node.js setup + npm with the official Bun GitHub Action.
 - name: Setup Bun
   uses: oven-sh/setup-bun@v2
   with:
-    bun-version: "1.3.10"
+    bun-version: "latest"
 
 - name: Install dependencies
   run: bun install --frozen-lockfile
@@ -175,10 +175,8 @@ Prerequisites updated to list Bun 1.2+ as the supported package manager and show
 
 | Task | Effort | Notes |
 |---|---|---|
-| Replace `node scripts/...` with `bun scripts/...` in `package.json` scripts | Trivial | Works with both today |
-| Update `#!/usr/bin/env node` shebangs to `#!/usr/bin/env bun` | Low | Speeds up script cold start slightly |
 | Remove `package-lock.json` once team fully migrated | Trivial | One `git rm` |
-| Pin a specific Bun version in CI instead of `latest` | Done | Already set to `1.3.10`; bump deliberately when upgrading |
+| Keep Bun on `latest` in CI | Done | Current policy tracks newest Bun releases |
 
 ---
 
@@ -186,16 +184,16 @@ Prerequisites updated to list Bun 1.2+ as the supported package manager and show
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| Bun release breaks a CI step | Low | Medium | Pin Bun version in CI |
+| Bun release breaks a CI step | Low | Medium | Temporarily pin Bun to a known-good version in CI |
 | Postinstall sandbox blocks new dep | Low | Low | Add to `trustedDependencies` |
-| Electron spawn via `node` wrapper fails | Very Low | Medium | Use explicit `bun` binary path if needed |
+| Bun subprocess path mismatch | Very Low | Medium | Use absolute Bun binary path if needed |
 | Vitest incompatibility with future Bun version | Very Low | High | Vitest runs on the underlying Bun JavaScriptCore; keep Vitest version pinned |
 
 ---
 
 ## Conclusion
 
-The CORTEX toolchain is already Bun-compatible with only the config changes included in this PR. No TypeScript source, no tests, no shaders, and no runtime code needed modification. The migration delivers:
+The CORTEX toolchain is Bun-first and uses Bun latest across CI and scripts. No TypeScript source, no tests, and no shaders needed modification; only tooling/config/script invocation surfaces were updated. The migration delivers:
 
 - **~25 % faster** end-to-end cold CI runs
 - **~75–90 % faster** installs on cached runs (the step that previously dominated CI time)

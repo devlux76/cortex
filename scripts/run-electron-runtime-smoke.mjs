@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 
 import { spawn } from "node:child_process";
 import process from "node:process";
@@ -14,7 +14,7 @@ const SMOKE_TIMEOUT_MS = Number.parseInt(
 );
 
 function createHarnessServer() {
-  return spawn("node", [path.join(ROOT_DIR, "scripts/runtime-harness-server.mjs")], {
+  return spawn("bun", [path.join(ROOT_DIR, "scripts/runtime-harness-server.mjs")], {
     cwd: ROOT_DIR,
     stdio: ["ignore", "pipe", "pipe"],
     env: process.env,
@@ -88,7 +88,7 @@ async function main() {
     await import("electron");
   } catch {
     globalThis.console.error("runtime-electron smoke failed: Electron package is not installed.");
-    globalThis.console.error("Install with: npm install -D electron");
+    globalThis.console.error("Install with: bun add --dev electron");
     process.exit(1);
     return;
   }

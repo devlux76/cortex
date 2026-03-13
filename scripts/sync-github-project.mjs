@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 
 /**
  * sync-github-project.mjs
@@ -13,7 +13,7 @@
  * immediately closed.
  *
  * Usage:
- *   node scripts/sync-github-project.mjs [--dry-run]
+ *   bun scripts/sync-github-project.mjs [--dry-run]
  *
  *   --dry-run   Print every action that would be taken; make no API calls.
  *

@@ -20,9 +20,8 @@ This guide covers building, testing, debugging, and contributing to CORTEX.
 
 ## Prerequisites
 
-- [Bun](https://bun.sh/) 1.2 or later (**recommended** — used in CI)
-- [Node.js](https://nodejs.org/) 24 LTS (Krypton) — required minimum if you prefer npm over Bun
-- [Playwright](https://playwright.dev/) browsers (installed automatically via `bun install` / `npm install`)
+- [Bun](https://bun.sh/) latest (used in CI)
+- [Playwright](https://playwright.dev/) browsers (installed automatically via `bun install`)
 - [Electron](https://www.electronjs.org/) (installed as an optional dev dependency)
 - [Docker](https://www.docker.com/) — required only for the containerised Electron debug lane
 
@@ -31,11 +30,7 @@ This guide covers building, testing, debugging, and contributing to CORTEX.
 ## Installation
 
 ```sh
-# Recommended (Bun — faster installs, used in CI)
 bun install
-
-# Alternatively (npm)
-npm install
 ```
 
 ---
@@ -43,8 +38,8 @@ npm install
 ## Build & Type-check
 
 ```sh
-npm run build       # TypeScript type-check (no emit)
-npm run typecheck   # alias for npm run build
+bun run build       # TypeScript type-check (no emit)
+bun run typecheck   # alias for bun run build
 ```
 
 ---
@@ -52,7 +47,7 @@ npm run typecheck   # alias for npm run build
 ## Linting
 
 ```sh
-npm run lint
+bun run lint
 ```
 
 ---
@@ -62,8 +57,8 @@ npm run lint
 ### Unit Tests
 
 ```sh
-npm run test:unit   # run all unit tests once
-npm run test:watch  # run unit tests in watch mode
+bun run test:unit   # run all unit tests once
+bun run test:watch  # run unit tests in watch mode
 ```
 
 ### Browser Runtime Tests
@@ -71,29 +66,29 @@ npm run test:watch  # run unit tests in watch mode
 Starts the local harness server, then runs Playwright tests against it in Chromium.
 
 ```sh
-npm run dev:harness      # start the harness server on http://127.0.0.1:4173
-npm run test:browser     # run Playwright browser-harness tests
+bun run dev:harness      # start the harness server on http://127.0.0.1:4173
+bun run test:browser     # run Playwright browser-harness tests
 ```
 
 ### Electron Runtime Tests
 
 ```sh
-npm run test:electron          # smoke test (headless)
-npm run test:electron:desktop  # smoke test with visible window
-npm run test:electron:playwright  # full Playwright Electron test suite
+bun run test:electron          # smoke test (headless)
+bun run test:electron:desktop  # smoke test with visible window
+bun run test:electron:playwright  # full Playwright Electron test suite
 ```
 
 Set `CORTEX_ALLOW_ELECTRON_SKIP=1` to skip the Electron lane locally and exit with code 0 (rather than failing the build) if Electron is not installed or crashes during setup:
 
 ```sh
-CORTEX_ALLOW_ELECTRON_SKIP=1 npm run test:electron
+CORTEX_ALLOW_ELECTRON_SKIP=1 bun run test:electron
 ```
 
 ### All Tests
 
 ```sh
-npm run test:runtime   # browser + electron
-npm run test:all       # unit + runtime
+bun run test:runtime   # browser + electron
+bun run test:all       # unit + runtime
 ```
 
 ---
@@ -103,7 +98,7 @@ npm run test:all       # unit + runtime
 The harness is a thin browser page that detects runtime capabilities (WebGPU, WebNN, WebGL, WASM, OPFS, IndexedDB) and publishes a report as `globalThis.__cortexHarnessReport`.
 
 ```sh
-npm run dev:harness
+bun run dev:harness
 # → serving runtime/harness on http://127.0.0.1:4173
 ```
 
@@ -114,8 +109,8 @@ Open the URL in Chrome/Edge to see the capability report in the browser console.
 ## Benchmarks
 
 ```sh
-npm run benchmark         # runs the dummy embedder hotpath benchmark
-npm run benchmark:dummy   # same, explicit alias
+bun run benchmark         # runs the dummy embedder hotpath benchmark
+bun run benchmark:dummy   # same, explicit alias
 ```
 
 ---
@@ -141,13 +136,13 @@ The Docker lane provides a sandbox-isolated Electron environment with software r
 
 ```sh
 # Start the lane (auto-rebuilds the image)
-npm run docker:electron:up
+bun run docker:electron:up
 
 # Stream logs
-npm run docker:electron:logs
+bun run docker:electron:logs
 
 # Stop and clean up
-npm run docker:electron:down
+bun run docker:electron:down
 ```
 
 From VS Code, use the `Electron: Docker Main + Renderer` launch config. It automatically starts and stops the container via the `docker:electron:up` / `docker:electron:down` tasks.
@@ -164,7 +159,7 @@ From VS Code, use the `Electron: Docker Main + Renderer` launch config. It autom
 To prevent hardcoded model-dependent numeric literals (embedding dimensions, context window sizes, etc.) from leaking into non-approved source files, run:
 
 ```sh
-npm run guard:model-derived
+bun run guard:model-derived
 ```
 
 This command will fail the build if it detects numeric literals that are likely to be model-dependent (e.g. embedding dimensions such as `768`, `1536`, or context-window sizes such as `8192`) in files outside the approved source files (`core/ModelDefaults.ts`, `core/ModelProfile.ts`, `core/ModelProfileResolver.ts`). All other code must obtain these values from a resolved `ModelProfile`.
