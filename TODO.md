@@ -234,8 +234,6 @@ These items **must** be completed to have a usable system. Without them, users c
   - Rename class/function to `FullNeighborRecalc`/`runNeighborRecalc`
 
 - [x] **P0-X6:** Rename IndexedDB object store from `metroid_neighbors` → `neighbor_graph`
-  - Increment `DB_VERSION` in `storage/IndexedDbMetadataStore.ts`
-  - Add migration in `applyUpgrade` to copy data from old store to new store
 
 - [x] **P0-X7:** Update all documentation strings and JSDoc that use "Metroid neighbor" to use "semantic neighbor"
 
