@@ -1,0 +1,77 @@
+name: "🔧 Implementation Task"
+description: Define a specific implementation task
+labels: ["task"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Define a concrete implementation task. Reference DESIGN.md for architectural context.
+
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective
+      description: What needs to be built or changed?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - "P0: critical — blocks dependent work"
+        - "P1: high — targets next milestone"
+        - "P2: medium — important but not blocking"
+        - "P3: low — polish or nice-to-have"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: layer
+    attributes:
+      label: Target Layer
+      description: Which CORTEX layer does this task target?
+      multiple: true
+      options:
+        - Foundation (core/)
+        - Storage (storage/)
+        - Vector Compute (root backends)
+        - Embeddings (embeddings/)
+        - Hippocampus (hippocampus/)
+        - Cortex (cortex/)
+        - Daydreamer
+        - Runtime Harness (runtime/)
+        - CI / Build
+        - Documentation
+    validations:
+      required: true
+
+  - type: textarea
+    id: files
+    attributes:
+      label: Files to Create or Modify
+      description: List the files this task will touch.
+      placeholder: |
+        - `cortex/MetroidBuilder.ts` (create)
+        - `tests/cortex/MetroidBuilder.test.ts` (create)
+        - `DESIGN.md` (update if architecture changes)
+
+  - type: textarea
+    id: exit-criteria
+    attributes:
+      label: Exit Criteria
+      description: Checklist of conditions that must be met to close this task.
+      placeholder: |
+        - [ ] Implementation complete
+        - [ ] Unit tests passing
+        - [ ] Lint and typecheck clean
+        - [ ] guard:model-derived passes (if numerics changed)
+    validations:
+      required: true
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: List any issues or tasks that must be completed first. Use `#issue_number` references.

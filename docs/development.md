@@ -170,9 +170,9 @@ This command will fail the build if it detects numeric literals that are likely 
 
 At the end of every implementation pass, update documents in this order:
 
-1. **`PROJECT-EXECUTION-PLAN.md`** — append pass status delta and exact commands executed.
-2. **`CORTEX-DESIGN-PLAN-TODO.md`** — update the design-to-code status matrix.
-3. **`README.md`** — confirm the project description still reflects reality.
-4. **`docs/api.md`** — update if new public APIs are added or existing ones change.
+1. **`DESIGN.md`** — update if architecture changes.
+2. **`README.md`** — confirm the project description still reflects reality.
+3. **`docs/api.md`** — update if new public APIs are added or existing ones change.
+4. **GitHub Issues** — close completed tasks, create new ones as needed via `gh` CLI or the web UI.
 
 > Numeric examples in design docs are illustrative unless explicitly sourced from model metadata.
