@@ -208,17 +208,17 @@ These items **must** be completed to have a usable system. Without them, users c
 
 **Why:** The codebase uses the term "Metroid" to name the sparse proximity/neighbor graph (`MetroidNeighbor`, `MetroidSubgraph`, `metroid_neighbors`, `getInducedMetroidSubgraph`, `FastMetroidInsert`, `FullMetroidRecalc`). This is architecturally incorrect. In CORTEX, a **Metroid** is a structured dialectical search probe `{ m1, m2, c }` — a concept that does not yet exist in the codebase at all. The proximity graph has nothing to do with Metroids. This naming collision will cause permanent confusion and make the MetroidBuilder impossible to implement cleanly without a rename.
 
-- [ ] **P0-X1:** Rename `MetroidNeighbor` → `SemanticNeighbor` in `core/types.ts`
+- [x] **P0-X1:** Rename `MetroidNeighbor` → `SemanticNeighbor` in `core/types.ts`
   - Update all references in `storage/IndexedDbMetadataStore.ts`
   - Update all references in test files
   - Update JSDoc and inline comments
 
-- [ ] **P0-X2:** Rename `MetroidSubgraph` → `SemanticNeighborSubgraph` in `core/types.ts`
+- [x] **P0-X2:** Rename `MetroidSubgraph` → `SemanticNeighborSubgraph` in `core/types.ts`
   - Update all references in `storage/IndexedDbMetadataStore.ts`
   - Update all references in `cortex/Query.ts`
   - Update JSDoc and inline comments
 
-- [ ] **P0-X3:** Rename `MetadataStore` proximity graph methods:
+- [x] **P0-X3:** Rename `MetadataStore` proximity graph methods:
   - `putMetroidNeighbors` → `putSemanticNeighbors`
   - `getMetroidNeighbors` → `getSemanticNeighbors`
   - `getInducedMetroidSubgraph` → `getInducedNeighborSubgraph`
@@ -227,17 +227,17 @@ These items **must** be completed to have a usable system. Without them, users c
   - `clearMetroidRecalcFlag` → `clearNeighborRecalcFlag`
   - Update all callers in `storage/IndexedDbMetadataStore.ts`, `cortex/Query.ts`, and test files
 
-- [ ] **P0-X4:** Rename planned Hippocampus file `hippocampus/FastMetroidInsert.ts` → `hippocampus/FastNeighborInsert.ts`
+- [x] **P0-X4:** Rename planned Hippocampus file `hippocampus/FastMetroidInsert.ts` → `hippocampus/FastNeighborInsert.ts`
   - Rename class/function to `FastNeighborInsert`/`insertSemanticNeighbors`
 
-- [ ] **P0-X5:** Rename planned Daydreamer file `daydreamer/FullMetroidRecalc.ts` → `daydreamer/FullNeighborRecalc.ts`
+- [x] **P0-X5:** Rename planned Daydreamer file `daydreamer/FullMetroidRecalc.ts` → `daydreamer/FullNeighborRecalc.ts`
   - Rename class/function to `FullNeighborRecalc`/`runNeighborRecalc`
 
-- [ ] **P0-X6:** Rename IndexedDB object store from `metroid_neighbors` → `neighbor_graph`
+- [x] **P0-X6:** Rename IndexedDB object store from `metroid_neighbors` → `neighbor_graph`
   - Increment `DB_VERSION` in `storage/IndexedDbMetadataStore.ts`
   - Add migration in `applyUpgrade` to copy data from old store to new store
 
-- [ ] **P0-X7:** Update all documentation strings and JSDoc that use "Metroid neighbor" to use "semantic neighbor"
+- [x] **P0-X7:** Update all documentation strings and JSDoc that use "Metroid neighbor" to use "semantic neighbor"
 
 **Exit Criteria:** No source file uses "Metroid" to refer to the proximity graph. The term "Metroid" is reserved exclusively for the `{ m1, m2, c }` dialectical probe type implemented in `cortex/MetroidBuilder.ts`.
 
@@ -863,7 +863,7 @@ These items improve quality, performance, and developer experience. Not blockers
 If you're reading this and want to know "what do I work on right now?", here's the answer:
 
 **Immediate (unblock MetroidBuilder):**
-1. **P0-X1–X7:** Fix architectural naming drift (`MetroidNeighbor` → `SemanticNeighbor` and related renames)
+1. ~~**P0-X1–X7:** Fix architectural naming drift (`MetroidNeighbor` → `SemanticNeighbor` and related renames)~~ ✅ DONE
 
 **After P0-X (complete v0.1):**
 2. **P0-B1:** Implement `hippocampus/Chunker.ts`

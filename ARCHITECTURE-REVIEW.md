@@ -4,6 +4,8 @@
 **Scope:** Full repository audit against corrected DESIGN.md (v1.2)
 **Status:** Documentation-only pass; no code changes made in this review
 
+**Update (P0-X resolved):** All P0-X naming drift items (D1–D9) have been corrected. `SemanticNeighbor`, `SemanticNeighborSubgraph`, `putSemanticNeighbors`, `getSemanticNeighbors`, `getInducedNeighborSubgraph`, `needsNeighborRecalc`, `flagVolumeForNeighborRecalc`, and `clearNeighborRecalcFlag` are now in place throughout `core/types.ts`, `storage/IndexedDbMetadataStore.ts`, `cortex/Query.ts`, and all test files. The IDB object store is `neighbor_graph` (DB_VERSION=3). The divergence entries below are preserved as historical record.
+
 ---
 
 ## Executive Summary
