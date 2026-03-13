@@ -65,12 +65,16 @@ This is the rapid, multi-path "write" system that turns raw experience into stru
 When you ask a question, Cortex does **not** return a bag of similar vectors.
 
 Instead it:
+- Constructs a **Metroid** `{ m1, m2, c }` for the query — a structured dialectical search probe pairing the thesis medoid (m1) with an antithesis medoid (m2) and a balanced centroid (c)
+- Performs Matryoshka dimensional unwinding to discover semantically opposing knowledge
 - Performs parallel WebGPU "scoops" across the entire active universe (sub-millisecond)
 - Pulls relevant sub-graphs from IndexedDB
 - Traces closed-loop paths through Hebbian connections
 - Returns only self-consistent, coherent context chains
+- Detects **knowledge gaps** when no antithesis medoid exists within dimensional constraints
+- Broadcasts P2P curiosity probes to discover missing knowledge from peers
 
-The result feels like genuine recollection rather than search.
+The result feels like genuine recollection rather than search — and surfaces what you *don't* know as clearly as what you do.
 
 ### 🌙 Daydreamer — The Default Mode Network
 When the agent is idle, a throttled Web Worker takes over:
@@ -107,5 +111,6 @@ bun run dev:harness # start the browser runtime harness at http://127.0.0.1:4173
 | [`DESIGN.md`](DESIGN.md) | Architecture specification and core design principles |
 | [`PLAN.md`](PLAN.md) | Module-by-module implementation status and development phases |
 | [`TODO.md`](TODO.md) | Prioritized actionable tasks to ship v1.0 |
+| [`ARCHITECTURE-REVIEW.md`](ARCHITECTURE-REVIEW.md) | Repository-wide architectural drift report and correction tasks |
 | [`docs/api.md`](docs/api.md) | API reference for developers integrating with CORTEX |
 | [`docs/development.md`](docs/development.md) | Build, test, debug, and Docker workflow |

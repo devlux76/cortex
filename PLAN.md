@@ -1,6 +1,6 @@
 # CORTEX Implementation Plan
 
-**Version:** 1.1
+**Version:** 1.2
 **Last Updated:** 2026-03-13
 
 This document tracks the implementation status of each major module in CORTEX. It shows what's been built, what's in progress, and what remains.
@@ -37,7 +37,7 @@ This document tracks the implementation status of each major module in CORTEX. I
 |--------|--------|-------|-------|
 | Vector Store (OPFS) | ✅ Complete | `storage/OPFSVectorStore.ts` | Append-only binary vector file; byte-offset addressing; test coverage via `tests/Persistence.test.ts` |
 | Vector Store (Memory) | ✅ Complete | `storage/MemoryVectorStore.ts` | In-memory implementation for testing |
-| Metadata Store (IndexedDB) | ✅ Complete | `storage/IndexedDbMetadataStore.ts` | Full CRUD for all entities; reverse indexes; Metroid neighbor operations; dirty-volume flags; includes `hotpath_index` and `page_activity` object stores; hotpath CRUD methods are implemented and covered by `tests/Persistence.test.ts` |
+| Metadata Store (IndexedDB) | ✅ Complete | `storage/IndexedDbMetadataStore.ts` | Full CRUD for all entities; reverse indexes; semantic neighbor graph operations (currently misnamed as "Metroid neighbor" — see TODO P0-X); dirty-volume flags; includes `hotpath_index` and `page_activity` object stores; hotpath CRUD methods are implemented and covered by `tests/Persistence.test.ts` |
 
 **Storage Status:** 3/3 complete (100%)
 
@@ -81,7 +81,7 @@ This document tracks the implementation status of each major module in CORTEX. I
 | Page ID Generation | ❌ Missing | `hippocampus/PageIdGenerator.ts` (planned) | Deterministic hash-based ID creation |
 | Ingest Orchestrator | ❌ Missing | `hippocampus/Ingest.ts` (planned) | Main entry point: chunk → embed → persist → initialise PageActivity → build hierarchy → fast neighbor insert → hotpath admission |
 | Hierarchy Builder | ❌ Missing | `hippocampus/HierarchyBuilder.ts` (planned) | Construct/update Books, Volumes, Shelves; attempt tier-quota hotpath admission for each level's medoid/prototype; Williams-derived fanout bounds; trigger split via ClusterStability when bounds exceeded |
-| Fast Neighbor Insert | ❌ Missing | `hippocampus/FastMetroidInsert.ts` (planned) | Incremental Metroid neighbor update; max degree derived from HotpathPolicy (not hardcoded K); evict lowest-weight neighbor on degree overflow; check new page for hotpath admission |
+| Fast Semantic Neighbor Insert | ❌ Missing | `hippocampus/FastNeighborInsert.ts` (planned) | Incremental semantic neighbor graph update; max degree derived from HotpathPolicy (not hardcoded K); evict lowest-weight neighbor on degree overflow; check new page for hotpath admission. **Note:** Not to be confused with Metroid construction, which is a CORTEX retrieval concern. |
 
 **Hippocampus Status:** 0/5 complete (0%)
 
@@ -94,15 +94,18 @@ This document tracks the implementation status of each major module in CORTEX. I
 | Module | Status | Files | Notes |
 |--------|--------|-------|-------|
 | Ranking Pipeline | ❌ Missing | `cortex/Ranking.ts` (planned) | Resident-first scoring cascade: HOT shelves → HOT volumes → HOT books → HOT pages; spill to WARM/COLD only when coverage insufficient |
+| MetroidBuilder | ❌ Missing | `cortex/MetroidBuilder.ts` (planned) | Constructs Metroid `{ m1, m2, c }` via Matryoshka dimensional unwinding; antithesis discovery; centroid computation; knowledge gap detection |
+| Dialectical Search Pipeline | ❌ Missing | `cortex/DialecticalSearch.ts` (planned) | Orchestrates thesis/antithesis/synthesis zone exploration using a Metroid; prevents confirmation bias |
+| Knowledge Gap Detector | ❌ Missing | `cortex/KnowledgeGapDetector.ts` (planned) | Determines when MetroidBuilder cannot find m2; emits curiosity probe |
 | Seed Selection | ❌ Missing | `cortex/SeedSelection.ts` (planned) | Threshold-based top-k page selection from ranking output |
-| Subgraph Expansion | 🟡 Partial | `storage/IndexedDbMetadataStore.ts` (`getInducedMetroidSubgraph`) | BFS expansion implemented in storage layer; needs dynamic Williams bounds; needs orchestration wrapper |
+| Subgraph Expansion | 🟡 Partial | `storage/IndexedDbMetadataStore.ts` (`getInducedMetroidSubgraph` — to be renamed `getInducedNeighborSubgraph`) | BFS expansion implemented in storage layer; needs dynamic Williams bounds; needs orchestration wrapper |
 | Open TSP Solver | ❌ Missing | `cortex/OpenTSPSolver.ts` (planned) | Dummy-node open-path heuristic for coherent ordering |
-| Query Orchestrator | ❌ Missing | `cortex/Query.ts` (planned) | Main entry point: embed → resident-first ranking → subgraph expansion with dynamic bounds → TSP path → query cost meter → early-stop; return result |
-| Result DTO | ❌ Missing | `cortex/QueryResult.ts` (planned) | Structured query result with provenance metadata (coherence path, subgraph size, hop count, edge weights) |
+| Query Orchestrator | ❌ Missing | `cortex/Query.ts` (planned) | Main entry point: embed → select m1 → build Metroid → dialectical scoring → subgraph expansion → TSP path → query cost meter → early-stop; return result |
+| Result DTO | ❌ Missing | `cortex/QueryResult.ts` (planned) | Structured query result with provenance metadata (coherence path, subgraph size, hop count, edge weights, knowledge gap flag) |
 
-**Cortex Status:** 0.5/6 complete (8%)
+**Cortex Status:** 0.5/9 complete (6%)
 
-**Critical Blocker:** Without this, users cannot retrieve memories from the system.
+**Critical Blocker:** Without this, users cannot retrieve memories from the system. The MetroidBuilder, dialectical search pipeline, and knowledge gap detector are entirely absent.
 
 ---
 
@@ -113,7 +116,7 @@ This document tracks the implementation status of each major module in CORTEX. I
 | Idle Scheduler | ❌ Missing | `daydreamer/IdleScheduler.ts` (planned) | Cooperative background loop; interruptible; respects CPU budget |
 | Hebbian Updates | ❌ Missing | `daydreamer/HebbianUpdater.ts` (planned) | LTP (strengthen), LTD (decay), prune below threshold; recompute σ(v) for changed nodes; run promotion/eviction sweep |
 | Prototype Recomputation | ❌ Missing | `daydreamer/PrototypeRecomputer.ts` (planned) | Recalculate volume/shelf medoids and centroids; recompute salience for affected entries; run tier-quota promotion/eviction |
-| Full Metroid Recalc | ❌ Missing | `daydreamer/FullMetroidRecalc.ts` (planned) | Rebuild bounded neighbor lists for dirty volumes; batch size bounded by O(√(t log t)) per idle cycle; recompute salience after recalc |
+| Full Neighbor Graph Recalc | ❌ Missing | `daydreamer/FullNeighborRecalc.ts` (planned) | Rebuild bounded neighbor lists for dirty volumes; batch size bounded by O(√(t log t)) per idle cycle; recompute salience after recalc. **Note:** Currently planned as `FullMetroidRecalc` — this is a naming error; see TODO P0-X. |
 | Experience Replay | ❌ Missing | `daydreamer/ExperienceReplay.ts` (planned) | Simulate queries to reinforce connections |
 | Cluster Stability | ❌ Missing | `daydreamer/ClusterStability.ts` (planned) | Detect/trigger split/merge for unstable clusters; run lightweight label propagation for community detection; store community labels in PageActivity |
 
@@ -152,7 +155,7 @@ This document tracks the implementation status of each major module in CORTEX. I
 | Module | Status | Files | Notes |
 |--------|--------|-------|-------|
 | Unit Tests | ✅ Complete | `tests/*.test.ts`, `tests/**/*.test.ts` | 115 tests across 13 files; all passing |
-| Persistence Tests | ✅ Complete | `tests/Persistence.test.ts` | Full storage layer coverage (OPFS, IndexedDB, Metroid neighbors, hotpath indexes) |
+| Persistence Tests | ✅ Complete | `tests/Persistence.test.ts` | Full storage layer coverage (OPFS, IndexedDB, semantic neighbor graph — currently tested as "Metroid neighbors", hotpath indexes) |
 | Model Tests | ✅ Complete | `tests/model/*.test.ts` | Profile resolution, defaults, routing policy |
 | Embedding Tests | ✅ Complete | `tests/embeddings/*.test.ts` | Provider resolver, runner, real/dummy backends |
 | Backend Smoke Tests | ✅ Complete | `tests/BackendSmoke.test.ts` | All vector backends instantiate cleanly |
@@ -192,7 +195,7 @@ This document tracks the implementation status of each major module in CORTEX. I
 | Vector Compute | 100% | — |
 | Embedding | 83% | WebGL provider (low priority) |
 | Hippocampus | 0% | **CRITICAL** — No ingest path |
-| Cortex | 8% | **CRITICAL** — No retrieval path |
+| Cortex | 6% | **CRITICAL** — No retrieval path; MetroidBuilder, dialectical search, knowledge gap detection all missing |
 | Daydreamer | 0% | Not v1 blocker |
 | Policy | 100% | — |
 | Runtime | 100% | — |
@@ -249,7 +252,7 @@ This document tracks the implementation status of each major module in CORTEX. I
    - Chunk → Embed → Persist orchestration
    - Build Page entities with proper hashing/signing; initialise `PageActivity` record
    - Single-Book hierarchy (defer Volume/Shelf)
-   - Basic Metroid neighbor insertion with Williams-bounded degree
+   - Basic semantic neighbor insertion with Williams-bounded degree
 
 5. **Cortex Query** (`cortex/Query.ts`)
    - Embed query
@@ -265,9 +268,9 @@ This document tracks the implementation status of each major module in CORTEX. I
 
 ---
 
-### Phase 2: Add Hierarchy, Coherence & Resident-First Routing (Ship v0.5)
+### Phase 2: Add Hierarchy, Dialectical Search & Resident-First Routing (Ship v0.5)
 
-**Goal:** Hierarchical routing, coherent path ordering, and fully resident-first query path.
+**Goal:** Hierarchical routing, MetroidBuilder, dialectical search pipeline, coherent path ordering, and fully resident-first query path.
 
 1. **Hierarchy Builder** (`hippocampus/HierarchyBuilder.ts`)
    - Cluster pages into Books (medoid selection)
@@ -276,22 +279,35 @@ This document tracks the implementation status of each major module in CORTEX. I
    - Attempt tier-quota hotpath admission for each level's medoid/prototype via `SalienceEngine`
    - Williams-derived fanout bounds; trigger split via `ClusterStability` when exceeded
 
-2. **Ranking Pipeline** (`cortex/Ranking.ts`)
+2. **MetroidBuilder** (`cortex/MetroidBuilder.ts`)
+   - Select m1 (topic medoid) for a given query embedding
+   - Freeze protected Matryoshka dimensions
+   - Search for m2 (antithesis medoid) within unfrozen dimensions
+   - Compute centroid `c = (m1 + m2) / 2`
+   - Unwind Matryoshka layers progressively, repeating antithesis search
+   - Return `Metroid { m1, m2, c }` or signal knowledge gap
+
+3. **Knowledge Gap Detector** (`cortex/KnowledgeGapDetector.ts`)
+   - Evaluate MetroidBuilder result
+   - Emit `KnowledgeGap` DTO with dimensional boundary info
+   - Trigger P2P curiosity probe emission
+
+4. **Ranking Pipeline** (`cortex/Ranking.ts`)
    - Resident-first cascade: HOT shelves → HOT volumes → HOT books → HOT pages
    - Spill to WARM/COLD only when resident coverage insufficient
 
-3. **Open TSP Solver** (`cortex/OpenTSPSolver.ts`)
+5. **Open TSP Solver** (`cortex/OpenTSPSolver.ts`)
    - Dummy-node open-path heuristic
    - Test on synthetic graphs
 
-4. **Full Query Orchestrator** (`cortex/Query.ts` — upgrade)
-   - Resident-first hierarchical ranking
+6. **Full Query Orchestrator** (`cortex/Query.ts` — upgrade)
+   - Embed query → select m1 → build Metroid → dialectical scoring cascade
    - Dynamic subgraph expansion bounds from `HotpathPolicy`
    - Query cost meter; early-stop on budget exceeded
    - Coherent path via TSP
-   - Rich result DTO with provenance
+   - Rich result DTO with provenance and knowledge gap flag
 
-**Exit Criteria:** User gets coherent ordered context chains through the resident hotpath; query latency controlled by H(t).
+**Exit Criteria:** User gets epistemically balanced context chains via MetroidBuilder and dialectical search; knowledge gaps are detected; query latency controlled by H(t).
 
 ---
 
@@ -307,7 +323,7 @@ This document tracks the implementation status of each major module in CORTEX. I
    - LTP/LTD rules; edge pruning
    - Recompute σ(v) for changed nodes; run promotion/eviction sweep
 
-3. **Full Metroid Recalc** (`daydreamer/FullMetroidRecalc.ts`)
+3. **Full Neighbor Graph Recalc** (`daydreamer/FullNeighborRecalc.ts`)
    - Rebuild neighbor lists for dirty volumes
    - O(√(t log t)) batch size per idle cycle
 
@@ -316,7 +332,7 @@ This document tracks the implementation status of each major module in CORTEX. I
    - Tier-quota promotion/eviction after recomputation
 
 5. **Community Detection** (`daydreamer/ClusterStability.ts` — extend)
-   - Label propagation on Metroid neighbor graph
+   - Label propagation on semantic neighbor graph
    - Store community labels in `PageActivity.communityId`
    - Wire community IDs into `SalienceEngine` promotion/eviction
 
@@ -473,7 +489,7 @@ After every implementation pass:
 
 ## Notes
 
-- **Metroid vs medoid:** Use `Metroid` in all API surfaces and docs; `medoid` only in algorithmic comments.
+- **Metroid vs medoid vs semantic neighbor graph:** These are three distinct concepts. `Metroid` refers only to the dialectical search probe `{ m1, m2, c }` constructed by `MetroidBuilder` at query time. `medoid` refers to a cluster representative node. The sparse proximity/neighbor graph (used for BFS subgraph expansion) is the **semantic neighbor graph** — it is currently misnamed `MetroidNeighbor`/`MetroidSubgraph` in code (see TODO P0-X for the rename task).
 - **Model-derived numerics:** Never hardcode; always source from `core/` model profile modules.
 - **Policy-derived constants:** Never hardcode; always source from `core/HotpathPolicy.ts`.
 - **Test philosophy:** TDD (Red → Green → Refactor) for all new slices.

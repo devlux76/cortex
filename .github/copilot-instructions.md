@@ -6,7 +6,7 @@ CORTEX (**C**lustered **O**ntic **R**outing **T**hrough **E**ntangled e**X**chan
 
 The engine models three biological brain regions:
 - **Hippocampus** — Fast associative encoding (WebGPU multi-prototype lookups, Matryoshka embeddings, Hebbian edge creation, OPFS-backed vector storage)
-- **Cortex** — Intelligent routing & coherence (parallel WebGPU scoops, IndexedDB sub-graph retrieval, closed-loop Hebbian path tracing)
+- **Cortex** — Intelligent routing & coherence (Metroid construction `{ m1, m2, c }`, dialectical search, Matryoshka dimensional unwinding, knowledge gap detection, P2P curiosity broadcasting, parallel WebGPU scoops, IndexedDB sub-graph retrieval, closed-loop Hebbian path tracing)
 - **Daydreamer** — Background consolidation Web Worker (LTP/LTD, pruning, medoid recomputation, experience replay)
 
 ## Key Documentation Files
