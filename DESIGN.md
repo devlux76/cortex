@@ -287,7 +287,12 @@ interface PageActivity {
 ```
 
 #### HotpathEntry
-A record in the resident in-memory index. Tracks which entity is HOT and at what salience level.
+The shared record type for HOT membership. Used in two complementary roles:
+
+1. **Live RAM index** — the active resident set (size ≤ H(t)) that every query scans first.
+2. **IndexedDB persistence** — the `hotpath_index` store holds a periodic snapshot of the live index so that HOT membership and salience values survive a page reload or machine reboot. On startup, `HotpathEntry` rows are loaded from IndexedDB to reconstruct the RAM index without requiring a full corpus replay.
+
+The Daydreamer worker owns the write path to `hotpath_index`; it checkpoints the live index whenever it runs its maintenance cycle (LTP/LTD pass), making the persisted snapshot no more than one cycle stale.
 
 ```typescript
 interface HotpathEntry {
@@ -320,7 +325,7 @@ Structured entity storage with automatic reverse indexes.
 - `metroid_neighbors` (sparse NN graph)
 - `flags` (dirty-volume recalc markers)
 - `page_to_book`, `book_to_volume`, `volume_to_shelf` (reverse indexes)
-- `hotpath_index` (resident hotpath entries, keyed by `entityId`)
+- `hotpath_index` (periodic HOT-membership checkpoint, keyed by `entityId`; loaded on startup to reconstruct the RAM resident index; written by Daydreamer each maintenance cycle)
 - `page_activity` (per-page activity metadata for salience computation)
 
 ## Retrieval Design
@@ -483,7 +488,7 @@ All operations must complete on WASM fallback, albeit slower. The resident hotpa
 
 **medoid** (mathematical term): The underlying clustering statistic. Reserved for algorithmic comments and internal statistical descriptions only.
 
-**Hotpath**: The in-memory resident index of H(t) entries spanning all four hierarchy tiers. The hotpath is the first lookup target for every query; misses spill to WARM/COLD storage.
+**Hotpath**: The in-memory resident index of H(t) entries spanning all four hierarchy tiers. The hotpath is the first lookup target for every query; misses spill to WARM/COLD storage. HOT membership and salience are checkpointed to the `hotpath_index` IndexedDB store by Daydreamer each maintenance cycle, allowing the RAM index to be restored after a page reload or machine reboot without full corpus replay.
 
 **Williams Bound**: The theoretical result S = O(√(t log t)) from Williams 2025, applied here as a universal sublinear growth law for all space-time tradeoff subsystems in CORTEX.
 
