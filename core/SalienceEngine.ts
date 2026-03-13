@@ -308,9 +308,9 @@ export async function runPromotionSweep(
       }
     }
 
-    // Check if tier is full
-    if (tierEntries.length >= tierQuotas[tier] && capacityRemaining <= 0) {
-      // Tier is at quota — promote only if beats weakest in tier
+    // Check tier quota and overall capacity
+    if (tierEntries.length >= tierQuotas[tier]) {
+      // Tier is at or above quota — promote only if beats weakest in tier
       const weakestId = await selectEvictionTarget(tier, communityId, metadataStore);
       if (weakestId === undefined) continue;
 
@@ -328,8 +328,27 @@ export async function runPromotionSweep(
         salience: candidateSalience,
         communityId,
       });
+    } else if (capacityRemaining > 0) {
+      // Tier has room under quota and global capacity available — just admit
+      await metadataStore.putHotpathEntry({
+        entityId: candidateId,
+        tier,
+        salience: candidateSalience,
+        communityId,
+      });
     } else {
-      // Capacity available — just admit
+      // Tier has room under quota but no global capacity — admit only via replacement
+      const weakestId = await selectEvictionTarget(tier, communityId, metadataStore);
+      if (weakestId === undefined) continue;
+
+      const weakestEntry = tierEntries.find((e) => e.entityId === weakestId);
+      const weakestSalience = weakestEntry?.salience ?? 0;
+
+      if (!shouldPromote(candidateSalience, weakestSalience, capacityRemaining)) {
+        continue;
+      }
+
+      await metadataStore.removeHotpathEntry(weakestId);
       await metadataStore.putHotpathEntry({
         entityId: candidateId,
         tier,
