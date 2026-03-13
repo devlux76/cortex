@@ -52,7 +52,7 @@ const PATTERNS: Array<{ reason: BlockReason; pattern: RegExp }> = [
   {
     reason: "pii_identity",
     // Email addresses (identity signal — may be PII)
-    pattern: /\b[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.]+\.[a-zA-Z]{2,}\b/v,
+    pattern: /\b[-a-zA-Z0-9._%+]+@[a-zA-Z0-9.]+\.[a-zA-Z]{2,}\b/i,
   },
   {
     reason: "pii_health",
