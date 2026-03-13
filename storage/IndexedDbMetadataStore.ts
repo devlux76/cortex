@@ -50,7 +50,7 @@ function promisifyTransaction(tx: IDBTransaction): Promise<void> {
 // Schema upgrade
 // ---------------------------------------------------------------------------
 
-function applyUpgrade(db: IDBDatabase, upgradeTx: IDBTransaction): void {
+function applyUpgrade(db: IDBDatabase): void {
   // v1 stores
   if (!db.objectStoreNames.contains(STORE.pages)) {
     db.createObjectStore(STORE.pages, { keyPath: "pageId" });
@@ -95,28 +95,9 @@ function applyUpgrade(db: IDBDatabase, upgradeTx: IDBTransaction): void {
     db.createObjectStore(STORE.pageActivity, { keyPath: "pageId" });
   }
 
-  // v3 stores — rename metroid_neighbors → neighbor_graph
+  // v3 stores — neighbor_graph (replaces the old metroid_neighbors name)
   if (!db.objectStoreNames.contains(STORE.neighborGraph)) {
     db.createObjectStore(STORE.neighborGraph, { keyPath: "pageId" });
-  }
-  if (db.objectStoreNames.contains("metroid_neighbors")) {
-    // Copy all records from the old store to the new one via an IDB cursor.
-    // Each cursor.continue() call keeps the upgrade transaction alive; the
-    // transaction cannot commit until the cursor is exhausted (cursor === null).
-    // deleteObjectStore is invoked only once, in the final else-branch, after
-    // every record has been migrated.
-    const oldStore = upgradeTx.objectStore("metroid_neighbors");
-    const newStore = upgradeTx.objectStore(STORE.neighborGraph);
-    oldStore.openCursor().onsuccess = (event) => {
-      const cursor = (event.target as IDBRequest<IDBCursorWithValue | null>).result;
-      if (cursor) {
-        newStore.put(cursor.value);
-        cursor.continue();
-      } else {
-        // cursor is null — all records migrated; safe to drop the old store now.
-        db.deleteObjectStore("metroid_neighbors");
-      }
-    };
   }
 }
 
@@ -146,9 +127,7 @@ export class IndexedDbMetadataStore implements MetadataStore {
       const req = indexedDB.open(dbName, DB_VERSION);
 
       req.onupgradeneeded = (event) => {
-        const db = (event.target as IDBOpenDBRequest).result;
-        const tx = (event.target as IDBOpenDBRequest).transaction!;
-        applyUpgrade(db, tx);
+        applyUpgrade((event.target as IDBOpenDBRequest).result);
       };
 
       req.onsuccess = () => resolve(new IndexedDbMetadataStore(req.result));
