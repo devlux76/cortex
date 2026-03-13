@@ -156,6 +156,9 @@ export async function query(
   return {
     pages: combined.map((r) => r.page),
     scores: combined.map((r) => r.score),
+    coherencePath: [],
+    metroid: null,
+    knowledgeGap: null,
     metadata: {
       queryText,
       topK,
