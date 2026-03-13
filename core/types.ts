@@ -70,7 +70,7 @@ export interface Edge {
 export interface MetroidNeighbor {
   neighborPageId: Hash;
   cosineSimilarity: number;   // threshold is defined by runtime policy
-  distance: number;           // 1 – cosineSimilarity (ready for TSP)
+  distance: number;           // 1 - cosineSimilarity (ready for TSP)
 }
 
 export interface MetroidSubgraph {
@@ -82,25 +82,43 @@ export interface MetroidSubgraph {
 // Hotpath / Williams Bound types
 // ---------------------------------------------------------------------------
 
+/** Lightweight per-page activity metadata for salience computation. */
 export interface PageActivity {
   pageId: Hash;
-  queryHitCount: number;
-  lastQueryAt: string;
-  communityId?: string;
+  queryHitCount: number;      // incremented on each query hit
+  lastQueryAt: string;        // ISO timestamp of most recent query hit
+  communityId?: string;       // set by Daydreamer label propagation
 }
 
+/** Record for HOT membership — used in both RAM index and IndexedDB snapshot. */
 export interface HotpathEntry {
-  entityId: Hash;
+  entityId: Hash;             // pageId, bookId, volumeId, or shelfId
   tier: "shelf" | "volume" | "book" | "page";
-  salience: number;
-  communityId?: string;
+  salience: number;           // salience value at last computation
+  communityId?: string;       // community this entry counts against
 }
 
+/** Per-tier slot budgets derived from H(t). */
 export interface TierQuotas {
   shelf: number;
   volume: number;
   book: number;
   page: number;
+}
+
+/** Fractional quota ratios for each tier (must sum to 1.0). */
+export interface TierQuotaRatios {
+  shelf: number;
+  volume: number;
+  book: number;
+  page: number;
+}
+
+/** Tunable weights for the salience formula: sigma = alpha*H_in + beta*R + gamma*Q. */
+export interface SalienceWeights {
+  alpha: number; // weight for Hebbian connectivity
+  beta: number;  // weight for recency
+  gamma: number; // weight for query-hit frequency
 }
 
 // ---------------------------------------------------------------------------
@@ -173,8 +191,11 @@ export interface MetadataStore {
   // --- Hotpath index ---
   putHotpathEntry(entry: HotpathEntry): Promise<void>;
   getHotpathEntries(tier?: HotpathEntry["tier"]): Promise<HotpathEntry[]>;
+  removeHotpathEntry(entityId: Hash): Promise<void>;
   evictWeakest(tier: HotpathEntry["tier"], communityId?: string): Promise<void>;
   getResidentCount(): Promise<number>;
+
+  // --- Page activity ---
   putPageActivity(activity: PageActivity): Promise<void>;
   getPageActivity(pageId: Hash): Promise<PageActivity | undefined>;
 }

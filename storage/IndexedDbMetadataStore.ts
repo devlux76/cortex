@@ -159,7 +159,7 @@ export class IndexedDbMetadataStore implements MetadataStore {
       // Store the book itself
       tx.objectStore(STORE.books).put(book);
 
-      // Update page→book reverse index for every page in this book
+      // Update page->book reverse index for every page in this book
       const idxStore = tx.objectStore(STORE.pageToBook);
       for (const pageId of book.pageIds) {
         const getReq = idxStore.get(pageId);
@@ -403,55 +403,59 @@ export class IndexedDbMetadataStore implements MetadataStore {
     return this._put(STORE.hotpathIndex, entry);
   }
 
-  getHotpathEntries(tier?: HotpathEntry["tier"]): Promise<HotpathEntry[]> {
-    return new Promise((resolve, reject) => {
-      const tx = this.db.transaction(STORE.hotpathIndex, "readonly");
-      const store = tx.objectStore(STORE.hotpathIndex);
-
-      if (tier !== undefined) {
-        const idx = store.index("by-tier");
+  async getHotpathEntries(tier?: HotpathEntry["tier"]): Promise<HotpathEntry[]> {
+    if (tier !== undefined) {
+      return new Promise((resolve, reject) => {
+        const tx = this.db.transaction(STORE.hotpathIndex, "readonly");
+        const idx = tx.objectStore(STORE.hotpathIndex).index("by-tier");
         const req = idx.getAll(IDBKeyRange.only(tier));
         req.onsuccess = () => resolve(req.result as HotpathEntry[]);
         req.onerror = () => reject(req.error);
-      } else {
-        const req = store.getAll();
-        req.onsuccess = () => resolve(req.result as HotpathEntry[]);
-        req.onerror = () => reject(req.error);
-      }
-    });
-  }
-
-  evictWeakest(tier: HotpathEntry["tier"], communityId?: string): Promise<void> {
+      });
+    }
     return new Promise((resolve, reject) => {
-      const tx = this.db.transaction(STORE.hotpathIndex, "readwrite");
-      const store = tx.objectStore(STORE.hotpathIndex);
-      const idx = store.index("by-tier");
-      const req = idx.getAll(IDBKeyRange.only(tier));
-
-      req.onsuccess = () => {
-        let entries = req.result as HotpathEntry[];
-        if (communityId !== undefined) {
-          entries = entries.filter((e) => e.communityId === communityId);
-        }
-        if (entries.length === 0) {
-          resolve();
-          return;
-        }
-        // Find the entry with the lowest salience
-        let weakest = entries[0];
-        for (let i = 1; i < entries.length; i++) {
-          if (entries[i].salience < weakest.salience) {
-            weakest = entries[i];
-          }
-        }
-        store.delete(weakest.entityId);
-        promisifyTransaction(tx).then(resolve).catch(reject);
-      };
+      const tx = this.db.transaction(STORE.hotpathIndex, "readonly");
+      const req = tx.objectStore(STORE.hotpathIndex).getAll();
+      req.onsuccess = () => resolve(req.result as HotpathEntry[]);
       req.onerror = () => reject(req.error);
     });
   }
 
-  getResidentCount(): Promise<number> {
+  removeHotpathEntry(entityId: Hash): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(STORE.hotpathIndex, "readwrite");
+      tx.objectStore(STORE.hotpathIndex).delete(entityId);
+      promisifyTransaction(tx).then(resolve).catch(reject);
+    });
+  }
+
+  async evictWeakest(
+    tier: HotpathEntry["tier"],
+    communityId?: string,
+  ): Promise<void> {
+    const entries = await this.getHotpathEntries(tier);
+    const filtered = communityId !== undefined
+      ? entries.filter((e) => e.communityId === communityId)
+      : entries;
+
+    if (filtered.length === 0) return;
+
+    // Deterministic: break ties by entityId (smallest wins)
+    let weakest = filtered[0];
+    for (let i = 1; i < filtered.length; i++) {
+      const e = filtered[i];
+      if (
+        e.salience < weakest.salience ||
+        (e.salience === weakest.salience && e.entityId < weakest.entityId)
+      ) {
+        weakest = e;
+      }
+    }
+
+    await this.removeHotpathEntry(weakest.entityId);
+  }
+
+  async getResidentCount(): Promise<number> {
     return new Promise((resolve, reject) => {
       const tx = this.db.transaction(STORE.hotpathIndex, "readonly");
       const req = tx.objectStore(STORE.hotpathIndex).count();

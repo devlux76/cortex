@@ -9,7 +9,7 @@ import {
 } from "../core/HotpathPolicy";
 
 // ---------------------------------------------------------------------------
-// computeCapacity — H(t) = ⌈c · √(t · log₂(1+t))⌉
+// computeCapacity — H(t) = ceil(c * sqrt(t * log2(1+t)))
 // ---------------------------------------------------------------------------
 
 describe("computeCapacity", () => {
@@ -62,7 +62,7 @@ describe("computeCapacity", () => {
 });
 
 // ---------------------------------------------------------------------------
-// computeSalience — σ = α·H_in + β·R + γ·Q
+// computeSalience — sigma = alpha*H_in + beta*R + gamma*Q
 // ---------------------------------------------------------------------------
 
 describe("computeSalience", () => {
@@ -86,7 +86,7 @@ describe("computeSalience", () => {
   });
 
   it("uses default weights when none provided", () => {
-    const { alpha, beta, gamma } = DEFAULT_HOTPATH_POLICY;
+    const { alpha, beta, gamma } = DEFAULT_HOTPATH_POLICY.salienceWeights;
     const expected = alpha * 3 + beta * 0.5 + gamma * 7;
     expect(computeSalience(3, 0.5, 7)).toBe(expected);
   });
@@ -205,12 +205,12 @@ describe("DEFAULT_HOTPATH_POLICY", () => {
 
   it("contains expected constant values", () => {
     expect(DEFAULT_HOTPATH_POLICY.c).toBe(0.5);
-    expect(DEFAULT_HOTPATH_POLICY.alpha).toBe(0.5);
-    expect(DEFAULT_HOTPATH_POLICY.beta).toBe(0.3);
-    expect(DEFAULT_HOTPATH_POLICY.gamma).toBe(0.2);
-    expect(DEFAULT_HOTPATH_POLICY.q_s).toBe(0.10);
-    expect(DEFAULT_HOTPATH_POLICY.q_v).toBe(0.20);
-    expect(DEFAULT_HOTPATH_POLICY.q_b).toBe(0.20);
-    expect(DEFAULT_HOTPATH_POLICY.q_p).toBe(0.50);
+    expect(DEFAULT_HOTPATH_POLICY.salienceWeights.alpha).toBe(0.5);
+    expect(DEFAULT_HOTPATH_POLICY.salienceWeights.beta).toBe(0.3);
+    expect(DEFAULT_HOTPATH_POLICY.salienceWeights.gamma).toBe(0.2);
+    expect(DEFAULT_HOTPATH_POLICY.tierQuotaRatios.shelf).toBe(0.10);
+    expect(DEFAULT_HOTPATH_POLICY.tierQuotaRatios.volume).toBe(0.20);
+    expect(DEFAULT_HOTPATH_POLICY.tierQuotaRatios.book).toBe(0.20);
+    expect(DEFAULT_HOTPATH_POLICY.tierQuotaRatios.page).toBe(0.50);
   });
 });
