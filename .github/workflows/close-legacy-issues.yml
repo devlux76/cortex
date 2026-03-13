@@ -21,9 +21,11 @@ jobs:
             const repo = context.repo.repo;
 
             // Exact issue numbers created by the old sync-github-project.mjs script.
+            // NOTE: #56 (P0-X: Fix Architectural Naming Drift) is intentionally excluded —
+            // it is a live parent tracking issue with real subtasks (P0-X1..P0-X7).
             const LEGACY_ISSUES = [
               21, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35,
-              36, 37, 38, 39, 40, 41, 42, 56, 57, 58, 59, 60, 61, 62, 63
+              36, 37, 38, 39, 40, 41, 42, 57, 58, 59, 60, 61, 62, 63
             ];
 
             // Ensure the "wontfix" label exists
