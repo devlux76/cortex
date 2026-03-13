@@ -12,5 +12,14 @@ export default tseslint.config(
     rules: {
       "@typescript-eslint/no-explicit-any": "off"
     }
-  }
+  },
+  {
+    // Node 18+ ships native fetch; declare it so ESLint doesn't flag it.
+    files: ["**/*.mjs"],
+    languageOptions: {
+      globals: {
+        fetch: "readonly",
+      },
+    },
+  },
 );
