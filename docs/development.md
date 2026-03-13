@@ -21,7 +21,7 @@ This guide covers building, testing, debugging, and contributing to CORTEX.
 ## Prerequisites
 
 - [Bun](https://bun.sh/) 1.2 or later (**recommended** — used in CI)
-- [Node.js](https://nodejs.org/) 18 or later (LTS) — still supported if you prefer npm
+- [Node.js](https://nodejs.org/) 24 LTS (Krypton) — required minimum if you prefer npm over Bun
 - [Playwright](https://playwright.dev/) browsers (installed automatically via `bun install` / `npm install`)
 - [Electron](https://www.electronjs.org/) (installed as an optional dev dependency)
 - [Docker](https://www.docker.com/) — required only for the containerised Electron debug lane

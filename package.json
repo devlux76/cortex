@@ -43,6 +43,9 @@
   "dependencies": {
     "@huggingface/transformers": "^3.8.1"
   },
+  "engines": {
+    "node": ">=24"
+  },
   "trustedDependencies": [
     "onnxruntime-node",
     "protobufjs"
