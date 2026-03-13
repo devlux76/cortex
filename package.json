@@ -11,7 +11,7 @@
     "test:unit": "vitest run tests/*.test.ts tests/**/*.test.ts",
     "test:watch": "vitest tests/*.test.ts tests/**/*.test.ts",
     "dev:harness": "bun scripts/runtime-harness-server.mjs",
-    "test:browser": "playwright test tests/runtime/browser-harness.spec.mjs",
+    "test:browser": "playwright test",
     "test:electron": "bun scripts/run-electron-runtime-smoke.mjs",
     "test:electron:playwright": "bun scripts/run-electron-runtime-tests.mjs",
     "test:electron:desktop": "CORTEX_ELECTRON_HEADLESS=0 CORTEX_ELECTRON_SHOW=1 bun scripts/run-electron-runtime-smoke.mjs",

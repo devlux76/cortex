@@ -157,13 +157,13 @@ This document tracks the implementation status of each major module in CORTEX. I
 | Embedding Tests | ✅ Complete | `tests/embeddings/*.test.ts` | Provider resolver, runner, real/dummy backends |
 | Backend Smoke Tests | ✅ Complete | `tests/BackendSmoke.test.ts` | All vector backends instantiate cleanly |
 | Runtime Tests | ✅ Complete | `tests/runtime/*.spec.mjs` | Browser harness validated; Electron context-sensitive |
-| Integration Tests | ❌ Missing | `tests/integration/*.test.ts` (planned) | End-to-end: ingest → persist → query → coherent result |
+| Integration Tests | ✅ Complete | `tests/integration/IngestQuery.test.ts` | End-to-end: ingest → persist → query → verify results; persistence across sessions |
 | Hotpath Policy Tests | ✅ Complete | `tests/HotpathPolicy.test.ts` | H(t) sublinearity and monotonicity; tier quota sums; community quota minimums; salience determinism |
 | Salience Engine Tests | ✅ Complete | `tests/SalienceEngine.test.ts` | Bootstrap fills to H(t); steady-state eviction; community/tier quota enforcement; determinism |
 | Scaling Benchmarks | ❌ Missing | `tests/benchmarks/HotpathScaling.bench.ts` (planned) | Synthetic graphs at 1K/10K/100K/1M; assert resident count ≤ H(t); query cost sublinear |
 | Benchmarks | 🟡 Partial | `tests/benchmarks/DummyEmbedderHotpath.bench.ts` | Baseline dummy embedder benchmark; real-provider and hotpath scaling benchmarks needed |
 
-**Testing Status:** 8/12 complete (67%)
+**Testing Status:** 9/12 complete (75%)
 
 ---
 
