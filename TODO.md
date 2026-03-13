@@ -132,7 +132,7 @@ These items **must** be completed to have a usable system. Without them, users c
 
 **Why:** Users need to add memories to the system.
 
-- [ ] **P0-C1:** Implement `hippocampus/PageBuilder.ts`
+- [x] **P0-C1:** Implement `hippocampus/PageBuilder.ts`
   - Create `Page` entities from text chunks
   - Generate `pageId`, `contentHash`, `vectorHash`
   - Sign with provided key pair
