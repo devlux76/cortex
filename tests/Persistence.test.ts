@@ -19,7 +19,7 @@ import type {
   Book,
   Edge,
   HotpathEntry,
-  MetroidNeighbor,
+  SemanticNeighbor,
   Page,
   PageActivity,
   Shelf,
@@ -286,7 +286,7 @@ const EDGE_B: Edge = {
   lastUpdatedAt: "2026-03-11T00:00:00.000Z",
 };
 
-const NEIGHBORS: MetroidNeighbor[] = [
+const NEIGHBORS: SemanticNeighbor[] = [
   { neighborPageId: "page-def", cosineSimilarity: 0.9, distance: 0.1 },
   { neighborPageId: "page-ghi", cosineSimilarity: 0.7, distance: 0.3 },
 ];
@@ -415,72 +415,72 @@ describe("IndexedDbMetadataStore", () => {
     expect(neighbors).toEqual([]);
   });
 
-  // --- MetroidNeighbors ---
+  // --- SemanticNeighbors ---
 
-  it("putMetroidNeighbors / getMetroidNeighbors round-trips neighbor list", async () => {
+  it("putSemanticNeighbors / getSemanticNeighbors round-trips neighbor list", async () => {
     const store = await IndexedDbMetadataStore.open(freshDbName());
-    await store.putMetroidNeighbors("page-abc", NEIGHBORS);
-    const result = await store.getMetroidNeighbors("page-abc");
+    await store.putSemanticNeighbors("page-abc", NEIGHBORS);
+    const result = await store.getSemanticNeighbors("page-abc");
     expect(result).toEqual(NEIGHBORS);
   });
 
-  it("getMetroidNeighbors respects maxDegree", async () => {
+  it("getSemanticNeighbors respects maxDegree", async () => {
     const store = await IndexedDbMetadataStore.open(freshDbName());
-    await store.putMetroidNeighbors("page-abc", NEIGHBORS);
-    const result = await store.getMetroidNeighbors("page-abc", 1);
+    await store.putSemanticNeighbors("page-abc", NEIGHBORS);
+    const result = await store.getSemanticNeighbors("page-abc", 1);
     expect(result).toHaveLength(1);
     expect(result[0].neighborPageId).toBe("page-def");
   });
 
-  it("getMetroidNeighbors returns empty array for unknown page", async () => {
+  it("getSemanticNeighbors returns empty array for unknown page", async () => {
     const store = await IndexedDbMetadataStore.open(freshDbName());
-    const result = await store.getMetroidNeighbors("no-such-page");
+    const result = await store.getSemanticNeighbors("no-such-page");
     expect(result).toEqual([]);
   });
 
-  it("putMetroidNeighbors overwrites existing list", async () => {
+  it("putSemanticNeighbors overwrites existing list", async () => {
     const store = await IndexedDbMetadataStore.open(freshDbName());
-    await store.putMetroidNeighbors("page-abc", NEIGHBORS);
-    const updated: MetroidNeighbor[] = [
+    await store.putSemanticNeighbors("page-abc", NEIGHBORS);
+    const updated: SemanticNeighbor[] = [
       { neighborPageId: "page-new", cosineSimilarity: 0.95, distance: 0.05 },
     ];
-    await store.putMetroidNeighbors("page-abc", updated);
-    const result = await store.getMetroidNeighbors("page-abc");
+    await store.putSemanticNeighbors("page-abc", updated);
+    const result = await store.getSemanticNeighbors("page-abc");
     expect(result).toHaveLength(1);
     expect(result[0].neighborPageId).toBe("page-new");
   });
 
-  // --- Induced Metroid subgraph (BFS) ---
+  // --- Induced semantic neighbor subgraph (BFS) ---
 
-  it("getInducedMetroidSubgraph returns seed nodes with zero hops", async () => {
+  it("getInducedNeighborSubgraph returns seed nodes with zero hops", async () => {
     const store = await IndexedDbMetadataStore.open(freshDbName());
-    await store.putMetroidNeighbors("page-abc", NEIGHBORS);
-    const subgraph = await store.getInducedMetroidSubgraph(["page-abc"], 0);
+    await store.putSemanticNeighbors("page-abc", NEIGHBORS);
+    const subgraph = await store.getInducedNeighborSubgraph(["page-abc"], 0);
     expect(subgraph.nodes).toEqual(["page-abc"]);
     expect(subgraph.edges).toHaveLength(0);
   });
 
-  it("getInducedMetroidSubgraph expands one hop correctly", async () => {
+  it("getInducedNeighborSubgraph expands one hop correctly", async () => {
     const store = await IndexedDbMetadataStore.open(freshDbName());
-    await store.putMetroidNeighbors("page-abc", NEIGHBORS);
+    await store.putSemanticNeighbors("page-abc", NEIGHBORS);
     // page-def and page-ghi have no further neighbors
-    const subgraph = await store.getInducedMetroidSubgraph(["page-abc"], 1);
+    const subgraph = await store.getInducedNeighborSubgraph(["page-abc"], 1);
     expect(subgraph.nodes.sort()).toEqual(
       ["page-abc", "page-def", "page-ghi"].sort(),
     );
     expect(subgraph.edges).toHaveLength(2);
   });
 
-  it("getInducedMetroidSubgraph does not revisit nodes", async () => {
+  it("getInducedNeighborSubgraph does not revisit nodes", async () => {
     const store = await IndexedDbMetadataStore.open(freshDbName());
     // Triangle: abc → def → abc (cycle)
-    await store.putMetroidNeighbors("page-abc", [
+    await store.putSemanticNeighbors("page-abc", [
       { neighborPageId: "page-def", cosineSimilarity: 0.9, distance: 0.1 },
     ]);
-    await store.putMetroidNeighbors("page-def", [
+    await store.putSemanticNeighbors("page-def", [
       { neighborPageId: "page-abc", cosineSimilarity: 0.9, distance: 0.1 },
     ]);
-    const subgraph = await store.getInducedMetroidSubgraph(["page-abc"], 5);
+    const subgraph = await store.getInducedNeighborSubgraph(["page-abc"], 5);
     const uniqueNodes = new Set(subgraph.nodes);
     expect(uniqueNodes.size).toBe(subgraph.nodes.length); // no duplicates
     expect(subgraph.nodes.sort()).toEqual(["page-abc", "page-def"].sort());
@@ -488,22 +488,22 @@ describe("IndexedDbMetadataStore", () => {
 
   // --- Dirty-recalc flags ---
 
-  it("needsMetroidRecalc returns false before any flag is set", async () => {
+  it("needsNeighborRecalc returns false before any flag is set", async () => {
     const store = await IndexedDbMetadataStore.open(freshDbName());
-    expect(await store.needsMetroidRecalc("vol-001")).toBe(false);
+    expect(await store.needsNeighborRecalc("vol-001")).toBe(false);
   });
 
-  it("flagVolumeForMetroidRecalc / needsMetroidRecalc round-trips", async () => {
+  it("flagVolumeForNeighborRecalc / needsNeighborRecalc round-trips", async () => {
     const store = await IndexedDbMetadataStore.open(freshDbName());
-    await store.flagVolumeForMetroidRecalc("vol-001");
-    expect(await store.needsMetroidRecalc("vol-001")).toBe(true);
+    await store.flagVolumeForNeighborRecalc("vol-001");
+    expect(await store.needsNeighborRecalc("vol-001")).toBe(true);
   });
 
-  it("clearMetroidRecalcFlag resets the flag", async () => {
+  it("clearNeighborRecalcFlag resets the flag", async () => {
     const store = await IndexedDbMetadataStore.open(freshDbName());
-    await store.flagVolumeForMetroidRecalc("vol-001");
-    await store.clearMetroidRecalcFlag("vol-001");
-    expect(await store.needsMetroidRecalc("vol-001")).toBe(false);
+    await store.flagVolumeForNeighborRecalc("vol-001");
+    await store.clearNeighborRecalcFlag("vol-001");
+    expect(await store.needsNeighborRecalc("vol-001")).toBe(false);
   });
 
   // --- HotpathEntry CRUD ---
