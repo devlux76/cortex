@@ -1,5 +1,4 @@
 import type { Hash, Page } from "../core/types";
-import type { KeyPair } from "../core/crypto/sign";
 import { hashBinary, hashText } from "../core/crypto/hash";
 import { signData } from "../core/crypto/sign";
 
