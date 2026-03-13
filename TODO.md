@@ -51,10 +51,13 @@ These items **must** be completed to have a usable system. Without them, users c
 
 - [ ] **P0-F2:** Add HotpathPolicy test coverage (`tests/HotpathPolicy.test.ts`)
   - H(t) grows sublinearly: verify `H(10_000) / 10_000 < H(1_000) / 1_000`
-  - H(t) is monotonically non-decreasing: verify H(t+1) ≥ H(t) for all t
-  - Tier quotas sum exactly to capacity: `q_s + q_v + q_b + q_p === 1.0`
-  - Community quotas sum to tier budget and each slot ≥ 1
+  - H(t) is monotonically non-decreasing over a representative range: verify `H(t+1) >= H(t)` for each `t` in `[0, 1, 2, 10, 100, 1_000, 10_000, 100_000]`
+  - H(t) is a finite integer ≥ 1 for edge inputs: `t = 0`, `t = 1`, `t = Number.MAX_SAFE_INTEGER`; result must never be `NaN`, `Infinity`, or `< 1`
+  - Derived tier-quota *counts* sum exactly to capacity: `deriveTierQuotas(cap).shelf + .volume + .book + .page === cap` for `cap` in `[1, 10, 100, 1_000]`
+  - Community quota counts sum exactly to `tier_budget`: `sum(deriveCommunityQuotas(budget, sizes)) === budget` for representative `(budget, sizes)` inputs including edge cases (`budget = 0`, empty `sizes` array, `budget < sizes.length`)
+  - Community quotas never produce `NaN`, `Infinity`, or negative values for any valid input, including `sizes` with a single community or all equal sizes
   - Salience is deterministic for same inputs
+  - Salience clamps output to a finite number: never `NaN` or `Infinity` for extreme weight or hit-count values
 
 - [ ] **P0-F3:** Extend `core/types.ts`
   - Add `PageActivity` interface: `{ pageId: Hash; queryHitCount: number; lastQueryAt: string; communityId?: string }`
