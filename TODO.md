@@ -354,35 +354,60 @@ These items add hierarchical routing and coherent path ordering. They transform 
 
 ### P1-M: MetroidBuilder (DELIVERS: dialectical epistemology)
 
-**Why:** MetroidBuilder is the core of what makes CORTEX an _epistemic_ system rather than a vector search engine. Without it, the system merely returns nearest neighbors and cannot explore opposing perspectives, detect knowledge gaps, or trigger P2P curiosity requests.
+**Why:** MetroidBuilder is the core of what makes CORTEX an _epistemic_ system rather than a vector search engine. Without it, the system merely returns nearest neighbors and cannot explore opposing perspectives, detect knowledge gaps, or trigger P2P curiosity requests. The Metroid loop converts conceptual opposition into navigable exploration steps.
 
 - [ ] **P1-M1:** Implement `cortex/MetroidBuilder.ts`
-  - Accept a query embedding and a list of resident medoids (shelf/volume/book representatives)
-  - Select m1: the medoid with highest cosine similarity to the query
-  - Read `matryoshkaProtectedDim` from `ModelProfile` (the field added to `core/ModelProfile.ts` as the per-model protected floor — e.g. 128 for embeddinggemma-300m, 64 for nomic-embed-text-v1.5). If `undefined` on the current model, return `{ m1, m2: null, c: null, knowledgeGap: true }` immediately.
-  - Freeze all dimensions with index < `matryoshkaProtectedDim`
-  - In the unfrozen upper dimensions (index >= `matryoshkaProtectedDim`), search for the nearest medoid with **opposing** semantic direction (minimum cosine similarity above a negative threshold, or maximum angular distance)
-  - This medoid becomes m2 (antithesis)
-  - Compute centroid: protected dims (< matryoshkaProtectedDim) copied from m1 vector; unfrozen dims averaged element-wise: `c[i] = (m1[i] + m2[i]) / 2`
-  - Return `Metroid { m1, m2, c }`; if no valid m2 found, return `{ m1, m2: null, c: null, knowledgeGap: true }`
+  - Accept a query embedding `q` and a list of resident medoids (shelf/volume/book representatives)
+  - **Thesis (select m1):** Find `m1` via medoid search — the medoid minimizing distance to `q`. A
+    medoid (not a centroid) is always an existing memory node; it ensures the search anchor is an
+    actual data point rather than an averaged phantom position. This keeps the search on the
+    correct conceptual road.
+  - Read `matryoshkaProtectedDim` from `ModelProfile` (e.g. 128 for embeddinggemma-300m, 64 for
+    nomic-embed-text-v1.5). If `undefined` on the current model (non-Matryoshka), return
+    `{ m1, m2: null, c: null, knowledgeGap: true }` immediately.
+  - **Freeze:** Lock all dimensions with index < `matryoshkaProtectedDim`.
+  - **Antithesis (find m2):** In the unfrozen upper dimensions (index >= `matryoshkaProtectedDim`):
+    1. Score every candidate medoid as `-cosine_similarity(candidate_free_dims, m1_free_dims)`.
+       The highest-scoring candidates are farthest from m1 in the free dimensions — maximal
+       conceptual divergence.
+    2. Find the **medoid of that cosine-opposite set** (the top-scoring candidates). This is `m2`.
+    3. `m2` must be an existing memory node (not a computed position). The medoid operation
+       ensures this. This is distinct from simply finding the node with the lowest cosine
+       similarity to m1.
+  - **Synthesis (freeze centroid):** Compute `c` once and freeze it:
+    - Protected dims (< `matryoshkaProtectedDim`): copy from m1 (domain invariant).
+    - Free dims (>= `matryoshkaProtectedDim`): `c[i] = (m1[i] + m2[i]) / 2`.
+    - This frozen `c` is never recalculated. All future candidates in the Matryoshka unwind are
+      evaluated relative to this frozen platform.
+  - Return `Metroid { m1, m2, c }`; if no valid m2 found, return
+    `{ m1, m2: null, c: null, knowledgeGap: true }`
 
 - [ ] **P1-M2:** Implement Matryoshka dimensional unwinding in `cortex/MetroidBuilder.ts`
-  - After initial Metroid construction, progressively expand the antithesis search into deeper embedding layers
-  - At each step, lower the protected dimension boundary by one Matryoshka tier
-  - Re-evaluate `m2` at each tier; prefer the deepest tier's Metroid as the final result
-  - Stop when the protected dimension floor is reached
+  - After the initial Metroid construction, progressively expand the antithesis search into deeper
+    embedding layers by shifting the protected dimension boundary outward one Matryoshka tier at a
+    time.
+  - At each new tier, find a new `m2` candidate via cosine-opposite medoid search in the expanded
+    free dimensions.
+  - Evaluate each candidate against the **frozen** `c` (not a recomputed centroid). If close
+    enough to `c`, accept and freeze this step; take the next conceptual leap. If not,
+    continue unwinding.
+  - Stop when the protected dimension floor is reached or a satisfactory `m2` is accepted.
+  - If no satisfactory `m2` is found at any layer, return `knowledgeGap: true`.
 
 - [ ] **P1-M3:** Add MetroidBuilder test coverage
   - `tests/cortex/MetroidBuilder.test.ts`
-  - Test m1 selection: highest similarity medoid is chosen
-  - Test m2 selection: most semantically opposite medoid is chosen
-  - Test centroid computation: midpoint between m1 and m2 vectors
+  - Test m1 selection: the medoid minimising distance to q is chosen (not the centroid)
+  - Test m2 selection: medoid of cosine-opposite set — not merely nearest semantically-opposing node
+  - Test centroid computation: protected dims copied from m1; free dims averaged element-wise
+  - Test centroid is frozen: subsequent unwinding steps do not recompute c
   - Test dimensional unwinding: search expands progressively through Matryoshka layers
   - Test knowledge gap: when no valid m2 exists in any layer, returns `knowledgeGap: true`
   - Test protected dimensions are never searched for antithesis
   - Test determinism: same inputs always produce same Metroid
 
-**Exit Criteria:** MetroidBuilder constructs valid Metroids and correctly detects knowledge gaps.
+**Exit Criteria:** MetroidBuilder constructs valid Metroids (m1 via medoid search, m2 via
+cosine-opposite medoid of the top-scoring candidates, c computed once and never recomputed during
+Matryoshka unwinding) and correctly detects knowledge gaps.
 
 ---
 

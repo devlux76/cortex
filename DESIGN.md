@@ -95,19 +95,25 @@ Three separate mathematical constructs are central to CORTEX. They must never be
 
 ### The Metroid
 
-A Metroid is a structured search probe used for epistemically balanced exploration of a topic.
+A Metroid is a structured search primitive for epistemically balanced exploration of a topic.
+
+The name captures a key architectural insight: what looks like an obstacle to progress — a medoid representing conceptual opposition — is not an enemy. The centroid computed from that opposition can be **held as a stable, frozen platform**, turning semantic divergence into a navigable step toward a goal. Every Metroid construction converts the antithesis (m2) into the anchor for the frozen centroid (c), which then provides structural support for deeper exploration.
+
+A Metroid replaces all prior sparse nearest-neighbor graph constructions as the canonical mechanism for guided semantic exploration in CORTEX. Opposition, divergence, and curiosity-driven augmentation are the designed search dynamics — not similarity-chasing.
 
 ```
 Metroid = { m1, m2, c }
 ```
 
 Where:
-- **m1** — thesis medoid: the cluster representative most relevant to the query topic
-- **m2** — antithesis medoid: a cluster representative discovered through constrained Matryoshka search to represent semantic opposition to m1
-- **c** — centroid: the synthetic center of mass between m1 and m2.
+- **m1** — thesis medoid: found via medoid search from the query vector. A medoid (not a centroid) is always an existing memory node — it keeps the search on the correct conceptual road.
+- **m2** — antithesis medoid: the medoid of the cosine-opposite set — not merely the nearest semantically-opposing node, but the **most coherent existing memory node in the direction of maximal divergence** from m1. Like m1, m2 is always an actual memory node, never a computed phantom position.
+- **c** — centroid: the synthetic center of mass between m1 and m2, computed **once** and **frozen** as a stable platform.
   `c` is a "Kansas space" position — typically empty; no real node lives at the centroid.
   Its value is as a neutral vantage point: from `c`, distances to both poles and all
   candidates can be measured without anchoring bias toward either m1 or m2.
+
+**Philosophical foundation:** Centroids (means) provide gravitational pull toward the midpoint. Medoids (medians) keep the search on the right road by anchoring to actual existing nodes. Neither alone guarantees epistemic honesty. The Metroid loop combines them: the medoid ensures the search never drifts to a phantom position; the frozen centroid ensures all subsequent evaluation is unbiased between the poles.
 
 The Metroid is constructed at query time by the `MetroidBuilder`. It is **not** a persistent graph structure. It is a transient epistemological instrument.
 
@@ -115,32 +121,67 @@ The Metroid is constructed at query time by the `MetroidBuilder`. It is **not** 
 
 ### MetroidBuilder Algorithm
 
-1. **Select m1** — Identify the topic medoid most relevant to the query embedding.
-2. **Freeze protected dimensions** — Lock the lower Matryoshka embedding dimensions that encode invariant semantic context (domain, language register, topic class). These dimensions are never searched for antithesis.
-3. **Search for m2** — Within the remaining (unfrozen) upper dimensions, search for the nearest medoid that represents semantic opposition to m1.
-4. **Compute centroid** — Compute `c` as a center of mass between m1 and m2:
-   - Protected dimensions (index < `matryoshkaProtectedDim`): copy directly from m1. These dimensions are invariant; averaging them would dilute the domain anchor that makes the antithesis search meaningful.
-   - Unfrozen dimensions (index >= `matryoshkaProtectedDim`): compute the element-wise average of m1 and m2 — `c[i] = (m1[i] + m2[i]) / 2`.
-   - The result is a full-dimensional vector that can be used directly as a scoring anchor.
+One full Metroid step is a **thesis → freeze → antithesis → synthesis** cycle:
 
-   **Important:** `c` is a synthetic position — a "Kansas space". In most cases nothing actually
-   exists at the centroid; it is an empty field in embedding space, equidistant from both poles.
-   Its value is as a neutral vantage point. Standing at `c`, you can immediately measure whether
-   any candidate is closer to m1 (thesis), closer to m2 (antithesis), or equidistant from both
-   (genuinely synthetic). Scoring by proximity to `c` produces unbiased, balanced retrieval.
-   Scoring from m1 or m2 would pull all results toward one pole.
-5. **Use centroid as scoring vantage point** — Weight candidates by their distance to `c`, not to m1 or m2.
+1. **Thesis — Select m1** — From the query vector `q`, perform a medoid search to find `m1`: the
+   median representative of the most relevant cluster. A medoid is always an existing memory node,
+   ensuring the search stays on the correct conceptual road. Centroids (means) provide
+   gravitational pull; medoids (medians) provide the road.
+
+2. **Freeze** — Lock the first `n` protected Matryoshka dimensions in place. These dimensions
+   encode invariant semantic context (domain, language register, topic class). Locking them
+   preserves early decisions as fixed structure — preventing the search from drifting into
+   vocabulary that shares surface-level patterns but belongs to a different conceptual domain.
+
+3. **Antithesis — Find m2** — On the remaining free (unfrozen) dimensions:
+   - Compute the **cosine-opposite score** for every candidate medoid: score each candidate as
+     `-cosine_similarity(candidate_free_dims, m1_free_dims)`. The highest-scoring candidates are
+     farthest from m1 in the free dimensions — representing maximal conceptual divergence.
+   - Find the **medoid of that cosine-opposite set** (the top-scoring candidates). This is `m2`.
+   - `m2` is the medoid of the top-scoring candidates — not the result of a direct vector
+     negation. The medoid operation selects the most coherent existing memory node in the
+     direction of maximal divergence. The medoid operation ensures `m2` is always
+     an actual memory node.
+
+4. **Synthesis — Freeze the centroid** — Compute `c` as the center of mass between m1 and m2
+   and immediately **freeze it**. `c` is computed once per Metroid construction and never
+   recalculated:
+   - Protected dimensions (index < `matryoshkaProtectedDim`): copy directly from m1. These
+     dimensions are invariant; averaging them would dilute the domain anchor.
+   - Free dimensions (index >= `matryoshkaProtectedDim`): element-wise average of m1 and m2 —
+     `c[i] = (m1[i] + m2[i]) / 2`.
+   - `c` is a "Kansas space" position — typically empty; no real node lives at the centroid.
+     Its value is as a neutral vantage point: from `c`, distances to both poles and all
+     candidates can be measured without anchoring bias toward either m1 or m2.
+
+5. **Evaluate subsequent candidates against the frozen centroid** — All further medoids
+   (`m3`, `m4`, ...) found during Matryoshka unwinding are evaluated relative to this frozen `c`:
    - Near `c`: synthesis territory — balanced between both poles.
    - Much closer to m1 than to `c`: thesis-supporting.
    - Much closer to m2 than to `c`: antithesis-supporting.
-   - Far from `c`, m1, and m2 simultaneously: a third conceptual region not captured by either pole — signal for further Matryoshka unwinding or a knowledge gap.
-   Scoring from `c` avoids anchoring bias; see the Dialectical Search section for the full zone model.
-6. **Unwind Matryoshka layers** — Progressively free deeper embedding dimensions and repeat from step 3. Each unwinding broadens the antithesis search.
-7. **Stop at the protected dimension** — The protected lower dimensions are never unwound. This preserves semantic invariants throughout all levels of search.
+   - Far from `c`, m1, and m2 simultaneously: third conceptual region — signal for further
+     unwinding or a knowledge gap.
+   The centroid is a platform. Opposition has been frozen into a stepping stone.
+
+6. **Unwind Matryoshka layers** — Progressively free deeper embedding dimensions and repeat from
+   step 3. Each unwinding broadens the antithesis search space. Subsequent antithesis candidates
+   are still evaluated relative to the original frozen `c` — it is never recomputed.
+
+7. **Stop at the protected dimension** — The protected lower dimensions are never unwound. Once
+   the Matryoshka unwind has reached the protected floor, no further antithesis search is possible.
+   If no satisfactory `m2` was found at any layer, set `knowledge_gap = true` and broadcast a
+   curiosity query (see Knowledge Gap Detection).
 
 **Why protect dimensions?**
 
-Without dimensional protection, high-dimensional similarity in unrelated vocabulary can dominate the search. Specifically, upper Matryoshka dimensions encode fine-grained distinctions that may closely match surface-level word patterns regardless of topic. Protected lower dimensions encode domain context (e.g., "food/cooking") that anchors the search. Without this anchor, a query about pizza toppings could accumulate similarity mass toward adhesive-related terms in the high dimensions — because words describing how things stick together are statistically present in both culinary and industrial glue contexts. The protected dimensions ensure the culinary domain context is never overridden by this incidental high-dimensional similarity.
+Without dimensional protection, high-dimensional similarity in unrelated vocabulary can dominate
+the search. Upper Matryoshka dimensions encode fine-grained distinctions that may closely match
+surface-level word patterns regardless of topic. Protected lower dimensions encode domain context
+(e.g., "food/cooking") that anchors the search. Without this anchor, a query about pizza toppings
+could accumulate similarity mass toward adhesive-related terms — because words describing how
+things stick together are statistically present in both culinary and industrial glue contexts.
+The protected dimensions ensure the culinary domain context is never overridden by this incidental
+high-dimensional similarity.
 
 ---
 
@@ -154,10 +195,15 @@ CORTEX uses Matryoshka Representation Learning (MRL) models that pack semantic i
 At each unwinding step:
 1. The protected dimension boundary shifts one layer outward.
 2. The antithesis search space expands into the newly freed dimensions.
-3. A new `m2` candidate is evaluated against the expanded space.
-4. The Metroid `{ m1, m2, c }` is recomputed with the updated `m2`.
+3. A new `m2` candidate is found via cosine-opposite medoid search in the expanded space.
+4. The new candidate is evaluated relative to the **frozen** `c` (computed in the first synthesis
+   step and never recalculated). If it is close enough to `c`, the step is accepted; otherwise
+   the search continues unwinding or declares a knowledge gap.
 
-This produces progressively wider dialectical exploration while maintaining semantic coherence. The search terminates either when the protected dimension is reached or when a satisfactory `m2` is found.
+This produces progressively wider dialectical exploration while maintaining semantic coherence.
+The frozen centroid ensures that each expansion step is measured against a stable platform rather
+than a shifting target. The search terminates either when the protected dimension floor is reached
+or when a satisfactory `m2` is found.
 
 ---
 
@@ -729,9 +775,19 @@ where nothing in the memory graph typically exists. Its value is as a neutral va
 scoring candidates by distance to `c` gives equal weight to both poles. A candidate closer to m1
 is thesis-supporting; closer to m2 is antithesis-supporting; near `c` is genuinely balanced.
 
-**Metroid** (CORTEX architectural term): A structured dialectical search probe constructed at query time: `{ m1, m2, c }`, where m1 is the thesis medoid, m2 is the antithesis medoid, and c is the centroid (protected dims from m1; unfrozen dims averaged). **A Metroid is never stored as a persistent graph structure.** It is an ephemeral instrument used by the CORTEX retrieval subsystem.
+**Metroid** (CORTEX architectural term): A structured dialectical search primitive constructed at
+query time: `{ m1, m2, c }`. m1 is the thesis medoid (found via medoid search from query vector q);
+m2 is the antithesis medoid (the medoid of the cosine-opposite set in the free dimensions — not
+merely a semantically-opposing node, but the most coherent representative of maximal divergence);
+c is the centroid (protected dims from m1; free dims averaged), computed **once and frozen** as a
+stable evaluation platform. All subsequent candidates in the Matryoshka unwind are evaluated
+relative to this frozen c. **A Metroid is never stored as a persistent graph structure.** It is an
+ephemeral instrument used by the CORTEX retrieval subsystem.
 
-**MetroidBuilder**: The CORTEX module responsible for constructing a Metroid for a given query via Matryoshka dimensional unwinding. Planned module: `cortex/MetroidBuilder.ts`.
+**MetroidBuilder**: The CORTEX module responsible for constructing a Metroid for a given query via
+Matryoshka dimensional unwinding. Runs the thesis→freeze→antithesis→synthesis loop: m1 via medoid
+search; m2 via cosine-opposite medoid; c computed once and frozen; subsequent candidates evaluated
+relative to frozen c. Planned module: `cortex/MetroidBuilder.ts`.
 
 **Semantic neighbor graph** (also: proximity graph, neighbor graph): The sparse radius-graph of cosine-similarity edges between pages, used for subgraph expansion during retrieval. This is **not** the same as a Metroid. The edges connect pages with high cosine similarity and are used for BFS expansion. Currently named `MetroidNeighbor` / `metroid_neighbors` in the codebase — this is a naming error that must be corrected (tracked in TODO as P0-X).
 
