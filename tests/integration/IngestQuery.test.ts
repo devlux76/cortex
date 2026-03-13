@@ -398,7 +398,7 @@ describe("integration (v0.5): hierarchical and dialectical ingest/query", () => 
     (globalThis as Record<string, unknown>)["IDBKeyRange"] = FakeIDBKeyRange;
   });
 
-  it("ingest produces full Page → Book → Volume → Shelf hierarchy", async () => {
+  it("ingest produces a single Book containing all ingested pages", async () => {
     const dbName = freshDbName();
     const metadataStore = await IndexedDbMetadataStore.open(dbName);
     const vectorStore = new MemoryVectorStore();
@@ -417,32 +417,21 @@ describe("integration (v0.5): hierarchical and dialectical ingest/query", () => 
     // Pages were created
     expect(result.pages.length).toBeGreaterThanOrEqual(1);
 
-    // Book was created and accessible
+    // Exactly one Book was created and it contains ALL ingested pages
     expect(result.book).toBeDefined();
     const storedBook = await metadataStore.getBook(result.book!.bookId);
     expect(storedBook).toBeDefined();
     expect(storedBook!.medoidPageId).toBeDefined();
     expect(storedBook!.pageIds).toContain(storedBook!.medoidPageId);
-
-    // Volumes were created (at least one)
-    expect(result.volumes).toBeDefined();
-    expect(result.volumes!.length).toBeGreaterThanOrEqual(1);
-    for (const volume of result.volumes!) {
-      const stored = await metadataStore.getVolume(volume.volumeId);
-      expect(stored).toBeDefined();
-      expect(stored!.bookIds.length).toBeGreaterThanOrEqual(1);
-      expect(stored!.prototypeOffsets.length).toBeGreaterThanOrEqual(1);
+    // Every page from the ingest must be a member of the book
+    for (const page of result.pages) {
+      expect(storedBook!.pageIds).toContain(page.pageId);
     }
+    // The book covers all pages — not just a subset
+    expect(storedBook!.pageIds.length).toBe(result.pages.length);
 
-    // Shelves were created (at least one)
-    expect(result.shelves).toBeDefined();
-    expect(result.shelves!.length).toBeGreaterThanOrEqual(1);
-    for (const shelf of result.shelves!) {
-      const stored = await metadataStore.getShelf(shelf.shelfId);
-      expect(stored).toBeDefined();
-      expect(stored!.volumeIds.length).toBeGreaterThanOrEqual(1);
-      expect(stored!.routingPrototypeOffsets.length).toBeGreaterThanOrEqual(1);
-    }
+    // Volumes and Shelves are assembled by the Daydreamer; not created at ingest time
+    expect(result.book).toBeDefined(); // only book is returned
   });
 
   it("hotpath entries exist for hierarchy prototypes after ingest", async () => {
@@ -535,8 +524,6 @@ describe("integration (v0.5): hierarchical and dialectical ingest/query", () => 
     // Non-Matryoshka model: no matryoshkaProtectedDim
     const profile = makeProfile();
     const runner = makeRunner(makeBackend());
-    const { WasmVectorBackend } = await import("../../WasmVectorBackend");
-    const vectorBackend = new WasmVectorBackend();
     const { query } = await import("../../cortex/Query");
 
     await ingestText(ASTRONOMY_TEXT, {
@@ -552,7 +539,6 @@ describe("integration (v0.5): hierarchical and dialectical ingest/query", () => 
       embeddingRunner: runner,
       vectorStore,
       metadataStore,
-      vectorBackend,
       topK: 3,
     });
 

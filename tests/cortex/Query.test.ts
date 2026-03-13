@@ -8,48 +8,7 @@ import { EmbeddingRunner } from "../../embeddings/EmbeddingRunner";
 import { generateKeyPair } from "../../core/crypto/sign";
 import { ingestText } from "../../hippocampus/Ingest";
 import { query } from "../../cortex/Query";
-import { topKByScore } from "../../TopK";
-import type { BackendKind } from "../../BackendKind";
 import type { ModelProfile } from "../../core/ModelProfile";
-import type { VectorBackend } from "../../VectorBackend";
-
-class TestVectorBackend implements VectorBackend {
-  readonly kind: BackendKind = "wasm";
-
-  async dotMany(
-    query: Float32Array,
-    matrix: Float32Array,
-    dim: number,
-    count: number,
-  ): Promise<Float32Array> {
-    const out = new Float32Array(count);
-    for (let i = 0; i < count; i++) {
-      let sum = 0;
-      const offset = i * dim;
-      for (let j = 0; j < dim; j++) {
-        sum += query[j] * matrix[offset + j];
-      }
-      out[i] = sum;
-    }
-    return out;
-  }
-
-  async project(): Promise<Float32Array> {
-    throw new Error("Not implemented");
-  }
-
-  async hashToBinary(): Promise<Uint32Array> {
-    throw new Error("Not implemented");
-  }
-
-  async hammingTopK(): Promise<any> {
-    throw new Error("Not implemented");
-  }
-
-  async topKFromScores(scores: Float32Array, k: number) {
-    return topKByScore(scores, k);
-  }
-}
 
 let dbCounter = 0;
 function freshDbName(): string {
@@ -67,7 +26,6 @@ describe("cortex query (dialectical orchestrator)", () => {
     const vectorStore = new MemoryVectorStore();
 
     const backend = new DeterministicDummyEmbeddingBackend({ dimension: 4 });
-    const vectorBackend = new TestVectorBackend();
 
     const runner = new EmbeddingRunner(async () => ({
       backend,
@@ -91,7 +49,6 @@ describe("cortex query (dialectical orchestrator)", () => {
       embeddingRunner: runner,
       vectorStore,
       metadataStore,
-      vectorBackend,
       topK: 5,
     });
 
@@ -111,7 +68,6 @@ describe("cortex query (dialectical orchestrator)", () => {
     const keyPair = await generateKeyPair();
 
     const backend = new DeterministicDummyEmbeddingBackend({ dimension: 4 });
-    const vectorBackend = new TestVectorBackend();
 
     const runner = new EmbeddingRunner(async () => ({
       backend,
@@ -148,7 +104,6 @@ describe("cortex query (dialectical orchestrator)", () => {
       embeddingRunner: runner,
       vectorStore,
       metadataStore,
-      vectorBackend,
       topK: 1,
     });
 
@@ -179,7 +134,6 @@ describe("cortex query (dialectical orchestrator)", () => {
     const keyPair = await generateKeyPair();
 
     const backend = new DeterministicDummyEmbeddingBackend({ dimension: 4 });
-    const vectorBackend = new TestVectorBackend();
 
     const runner = new EmbeddingRunner(async () => ({
       backend,
@@ -216,7 +170,6 @@ describe("cortex query (dialectical orchestrator)", () => {
       embeddingRunner: runner,
       vectorStore,
       metadataStore,
-      vectorBackend,
       topK: ingestResult.pages.length,
     });
 
@@ -239,7 +192,6 @@ describe("cortex query (dialectical orchestrator)", () => {
     const keyPair = await generateKeyPair();
 
     const backend = new DeterministicDummyEmbeddingBackend({ dimension: 4 });
-    const vectorBackend = new TestVectorBackend();
 
     const runner = new EmbeddingRunner(async () => ({
       backend,
@@ -274,7 +226,6 @@ describe("cortex query (dialectical orchestrator)", () => {
       embeddingRunner: runner,
       vectorStore,
       metadataStore,
-      vectorBackend,
       topK: 2,
     });
 

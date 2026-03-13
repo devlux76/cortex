@@ -1,6 +1,5 @@
 import type { ModelProfile } from "../core/ModelProfile";
 import type { Hash, MetadataStore, Page, VectorStore } from "../core/types";
-import type { VectorBackend } from "../VectorBackend";
 import type { EmbeddingRunner } from "../embeddings/EmbeddingRunner";
 import { runPromotionSweep } from "../core/SalienceEngine";
 import type { QueryResult } from "./QueryResult";
@@ -14,7 +13,6 @@ export interface QueryOptions {
   embeddingRunner: EmbeddingRunner;
   vectorStore: VectorStore;
   metadataStore: MetadataStore;
-  vectorBackend: VectorBackend;
   topK?: number;
   /** BFS depth for semantic neighbor subgraph expansion. 2 hops covers direct
    *  neighbors and their neighbors, which is the minimum needed to surface
@@ -34,7 +32,6 @@ export async function query(
     topK = 10,
     maxHops = 2,
   } = options;
-
   const nowIso = new Date().toISOString();
 
   const embeddings = await embeddingRunner.embed([queryText]);

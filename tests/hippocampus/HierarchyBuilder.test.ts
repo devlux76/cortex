@@ -257,7 +257,7 @@ describe("HierarchyBuilder", () => {
     expect(result.shelves).toHaveLength(0);
   });
 
-  it("ingestText result includes volumes and shelves", async () => {
+  it("ingestText produces exactly one Book covering all ingested pages", async () => {
     const metadataStore = await IndexedDbMetadataStore.open(freshDbName());
     const vectorStore = new MemoryVectorStore();
     const keyPair = await generateKeyPair();
@@ -280,11 +280,18 @@ describe("HierarchyBuilder", () => {
       keyPair,
     });
 
+    // Exactly one Book — the entire ingest
     expect(result.book).toBeDefined();
-    expect(result.volumes).toBeDefined();
-    expect(result.shelves).toBeDefined();
-    expect(result.volumes!.length).toBeGreaterThanOrEqual(1);
-    expect(result.shelves!.length).toBeGreaterThanOrEqual(1);
+    // The book must contain every ingested page
+    for (const page of result.pages) {
+      expect(result.book!.pageIds).toContain(page.pageId);
+    }
+    expect(result.book!.pageIds.length).toBe(result.pages.length);
+    // The medoid must be one of the ingested pages
+    expect(result.book!.pageIds).toContain(result.book!.medoidPageId);
+    // Volumes and Shelves are Daydreamer responsibilities, not created at ingest time
+    expect((result as { volumes?: unknown }).volumes).toBeUndefined();
+    expect((result as { shelves?: unknown }).shelves).toBeUndefined();
   });
 
   it("adds SemanticNeighbor edges between consecutive pages within each book slice", async () => {

@@ -442,7 +442,10 @@ interface Page {
 ```
 
 #### Book
-Ordered sequence of pages with representative medoid.
+Ordered sequence of pages from a **single ingest call** with a representative medoid.
+One `ingestText()` call always produces exactly one Book — the entire ingested document.
+A collection of Books forms a Volume; a collection of Volumes forms a Shelf.
+Books are identified by `SHA-256(sorted pageIds)` so their identity is content-addressed.
 
 ```typescript
 interface Book {
@@ -634,14 +637,19 @@ Rather than returning nearest neighbors by similarity, Cortex traces a coherent 
 2. **Generate Embeddings** — Batch embed with selected provider
 3. **Persist Vectors** — Append to OPFS vector file
 4. **Persist Pages** — Write page metadata to IndexedDB; initialise `PageActivity` record
-5. **Build/Attach Hierarchy** — Construct/update books, volumes, shelves; attempt hotpath admission for each level's medoid/prototype using tier quota via `SalienceEngine`
-6. **Fast Semantic Neighbor Insert** — Update semantic neighbor graph incrementally; bounded degree via `HotpathPolicy`; check new page for hotpath admission
+5. **Create Ingest Book** — Build exactly one Book for the entire ingest: compute the medoid page (minimum total cosine distance to all other pages in the document), derive `bookId = SHA-256(sorted pageIds)`, persist. Hotpath admission for the book runs via `SalienceEngine`. Volumes and Shelves are assembled lazily by the Daydreamer from accumulated Books.
+6. **Fast Semantic Neighbor Insert** — Update semantic neighbor graph incrementally; bounded degree via `HotpathPolicy`; check new pages for hotpath admission
 7. **Mark Dirty** — Flag volumes for full recalc by Daydreamer
 
-**Incremental Strategy:**
-Fast local semantic neighbor insertion keeps ingest-time latency low. At ingest time, only the initial forward and reverse edges are created — neighbors are selected by cosine similarity within Williams-cutoff **distance** (not a fixed K; the cutoff is derived from `HotpathPolicy`). On degree overflow, the lowest-cosine-similarity neighbor is evicted.
+**Incremental Strategy (fast and lightweight):**
+Ingest must remain fast and lightweight. At ingest time only two classes of edges are created:
+- **Document-order adjacency** — Forward and reverse `SemanticNeighbor` edges between each consecutive page pair within the book slice, inserted unconditionally (document-adjacent chunks are always related). This uses a pre-built `Map<pageId, embedding>` for O(1) lookups; no O(n²) index scans.
+- **Proximity edges** — Additional `SemanticNeighbor` edges to nearby pages already in the corpus, bounded by cosine-distance cutoff and `maxDegree` eviction.
 
-Full cross-edge reconnection is intentionally deferred: Daydreamer walks the graph during idle passes to build additional edges, strengthening or pruning connections via LTP/LTD. This avoids a full graph recalculation on every insert while still converging to a well-connected graph over time. Hotpath admission runs at ingest time for new pages and hierarchy prototypes.
+Full cross-edge reconnection is intentionally deferred: Daydreamer walks the graph during idle passes to build additional edges — connections we never noticed at ingest time — and strengthens or prunes them via LTP/LTD. This keeps ingest cost sublinear while converging to a well-connected graph over time.
+
+**IndexedDB Schema Upgrade Strategy:**
+During early development (pre-v1.0) the schema upgrade path intentionally drops and recreates object stores rather than migrating data. This keeps upgrade code minimal and avoids cruft until the data model stabilises. The neighbor graph is rebuilt from scratch after any ingest replay.
 
 ## Consolidation Design
 

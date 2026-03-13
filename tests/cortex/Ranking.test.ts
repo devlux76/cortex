@@ -134,7 +134,7 @@ describe("Ranking", () => {
       keyPair,
     });
 
-    const volumeIds = (ingestResult.volumes ?? []).map((v) => v.volumeId);
+    const volumeIds = ((ingestResult as { volumes?: Array<{ volumeId: string }> }).volumes ?? []).map((v) => v.volumeId);
     if (volumeIds.length === 0) {
       // No volumes built — skip the scoring assertions; the structure test still passes
       return;
@@ -211,7 +211,7 @@ describe("Ranking", () => {
       keyPair,
     });
 
-    const shelfIds = (ingestResult.shelves ?? []).map((s) => s.shelfId);
+    const shelfIds = ((ingestResult as { shelves?: Array<{ shelfId: string }> }).shelves ?? []).map((s) => s.shelfId);
     if (shelfIds.length === 0) {
       return;
     }

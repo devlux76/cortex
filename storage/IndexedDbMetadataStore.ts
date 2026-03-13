@@ -75,7 +75,10 @@ function applyUpgrade(db: IDBDatabase): void {
   if (!db.objectStoreNames.contains(STORE.metroidNeighbors)) {
     db.createObjectStore(STORE.metroidNeighbors, { keyPath: "pageId" });
   }
-  // v3: renamed metroid_neighbors → neighbor_graph; drop old store if present
+  // v3: renamed metroid_neighbors → neighbor_graph (SemanticNeighbor).
+  // At this stage of development no one has live data, so we intentionally
+  // drop the old store and let the graph be rebuilt from scratch on next
+  // ingest. No migration is needed or warranted yet.
   if (db.objectStoreNames.contains("metroid_neighbors")) {
     db.deleteObjectStore("metroid_neighbors");
   }

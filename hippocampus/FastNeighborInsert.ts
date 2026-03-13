@@ -100,11 +100,34 @@ export async function insertSemanticNeighbors(
     if (p) offsetMap.set(allPageIds[i], p.embeddingOffset);
   }
 
-  const allOffsets = allPageIds.map((id) => offsetMap.get(id) ?? 0);
-  const allVectors = await vectorStore.readVectors(allOffsets, dim);
+  // (a) Throw if any newPageId is missing from the store — a missing new page
+  // is always a programming error (it should have been persisted before calling
+  // insertSemanticNeighbors) and would silently corrupt the graph.
+  for (const newId of newPageIds) {
+    if (!offsetMap.has(newId)) {
+      throw new Error(
+        `Page ${newId} not found in metadata store; persist it before inserting semantic neighbors`,
+      );
+    }
+  }
+
+  // (b) Filter allPageIds to only those that are present in the store.
+  // Missing entries are silently dropped — they may have been deleted between
+  // the getAllPages() call and this point. The vector/id arrays stay aligned.
+  const resolvedPageIds: Hash[] = [];
+  const resolvedOffsets: number[] = [];
+  for (const id of allPageIds) {
+    const offset = offsetMap.get(id);
+    if (offset !== undefined) {
+      resolvedPageIds.push(id);
+      resolvedOffsets.push(offset);
+    }
+  }
+
+  const allVectors = await vectorStore.readVectors(resolvedOffsets, dim);
   const vectorMap = new Map<Hash, Float32Array>();
-  for (let i = 0; i < allPageIds.length; i++) {
-    vectorMap.set(allPageIds[i], allVectors[i]);
+  for (let i = 0; i < resolvedPageIds.length; i++) {
+    vectorMap.set(resolvedPageIds[i], allVectors[i]);
   }
 
   // Collect all (pageId, neighborPageId) pairs that need their stored neighbor

@@ -103,7 +103,7 @@ function searchM2(
 
   if (oppositeSet.length === 0) return null;
 
-  const medoidIdx = findMedoidIndex(oppositeSet.map((s) => s.candidate.embedding));
+  const medoidIdx = findMedoidIndex(oppositeSet.map((s) => s.candidate.embedding.slice(protectedDim)));
   return oppositeSet[medoidIdx].candidate;
 }
 
