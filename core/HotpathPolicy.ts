@@ -175,13 +175,6 @@ export function deriveCommunityQuotas(
   const quotas = new Array<number>(n).fill(minPerCommunity);
   const remaining = budget - minPerCommunity * n;
 
-  if (remaining < 0) {
-    // Budget < n communities — give 1 to the first `budget` communities
-    const result = new Array<number>(n).fill(0);
-    for (let i = 0; i < budget; i++) result[i] = 1;
-    return result;
-  }
-
   if (remaining === 0 || totalSize === 0) return quotas;
 
   // Phase 2: distribute remaining proportionally (largest-remainder)
