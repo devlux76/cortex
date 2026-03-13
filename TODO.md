@@ -518,6 +518,18 @@ These items add idle background maintenance and privacy-safe interest sharing. T
 
 ---
 
+### P3-H: GitHub sync smoke test (VALIDATES: automation pipeline)
+
+**Why:** Ensure the `TODO.md` → GitHub issue sync path works end-to-end (milestones/labels/issues created by `scripts/sync-github-project.mjs`).
+
+- [ ] **P3-H1:** Push this change to `main` so the sync workflow runs
+- [ ] **P3-H2:** Verify a new issue is created automatically from this task group
+- [ ] **P3-H3:** Mark this task complete once the issue exists and the workflow succeeded
+
+**Exit Criteria:** A GitHub issue was created from this task group after pushing to `main`, and the sync workflow succeeded.
+
+---
+
 ## 🔵 Lower Priority — Polish & Ship
 
 These items improve quality, performance, and developer experience. Not blockers for v1.0 launch.

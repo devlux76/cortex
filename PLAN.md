@@ -177,6 +177,7 @@ This document tracks the implementation status of each major module in CORTEX. I
 | Model-Derived Guard | ✅ Complete | `scripts/guard-model-derived.mjs` | Scans for hardcoded model numerics; enforces source-of-truth |
 | Test Runner | ✅ Complete | `package.json` (Vitest scripts) | Unit, browser, electron, runtime, benchmark targets |
 | CI Pipeline | 🟡 Partial | `.github/workflows/*` (if exists) | Needs verification; not examined in detail |
+| GitHub Issue Sync | ✅ Complete | `scripts/sync-github-project.mjs`, `.github/workflows/sync-github-project.yml` | Syncs TODO.md → GitHub issues/milestones; smoke test via TODO task |
 
 **Build Status:** 5/6 complete (83%)
 
