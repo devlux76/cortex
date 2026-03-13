@@ -1,4 +1,4 @@
-import type { Book, Hash, MetadataStore, Shelf, Volume, VectorStore } from "../core/types";
+import type { Book, Hash, MetadataStore, SemanticNeighbor, Shelf, Volume, VectorStore } from "../core/types";
 import type { ModelProfile } from "../core/ModelProfile";
 import type { HotpathPolicy } from "../core/HotpathPolicy";
 import { hashText } from "../core/crypto/hash";
@@ -11,6 +11,11 @@ import { runPromotionSweep } from "../core/SalienceEngine";
 const PAGES_PER_BOOK = 8;
 const BOOKS_PER_VOLUME = 4;
 const VOLUMES_PER_SHELF = 4;
+
+// Max neighbors per page for the adjacency edges added by the hierarchy builder.
+// Adjacency edges represent document-order contiguity and bypass the cosine
+// cutoff used by FastNeighborInsert, so they must still be bounded by policy.
+const ADJACENCY_MAX_DEGREE = 16;
 
 export interface BuildHierarchyOptions {
   modelProfile: ModelProfile;
@@ -80,6 +85,36 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
   return chunks;
 }
 
+/**
+ * Merge a candidate into a neighbor list, respecting maxDegree.
+ * If at capacity, evicts the neighbor with the lowest cosineSimilarity.
+ * Returns the updated list sorted by cosineSimilarity descending.
+ */
+function mergeAdjacentNeighbor(
+  existing: SemanticNeighbor[],
+  candidate: SemanticNeighbor,
+  maxDegree: number,
+): SemanticNeighbor[] {
+  const deduped = existing.filter((n) => n.neighborPageId !== candidate.neighborPageId);
+
+  if (deduped.length < maxDegree) {
+    deduped.push(candidate);
+  } else {
+    let weakestIdx = 0;
+    for (let i = 1; i < deduped.length; i++) {
+      if (deduped[i].cosineSimilarity < deduped[weakestIdx].cosineSimilarity) {
+        weakestIdx = i;
+      }
+    }
+    if (candidate.cosineSimilarity > deduped[weakestIdx].cosineSimilarity) {
+      deduped[weakestIdx] = candidate;
+    }
+  }
+
+  deduped.sort((a, b) => b.cosineSimilarity - a.cosineSimilarity);
+  return deduped;
+}
+
 export async function buildHierarchy(
   pageIds: Hash[],
   options: BuildHierarchyOptions,
@@ -99,6 +134,12 @@ export async function buildHierarchy(
   });
   const pageVectors = await vectorStore.readVectors(pageOffsets, dim);
 
+  // Build a Map<pageId, vector> for O(1) lookups throughout the hierarchy build.
+  const pageVectorMap = new Map<Hash, Float32Array>();
+  for (let i = 0; i < pageIds.length; i++) {
+    pageVectorMap.set(pageIds[i], pageVectors[i]);
+  }
+
   // -------------------------------------------------------------------------
   // Level 1: Pages → Books
   // -------------------------------------------------------------------------
@@ -110,8 +151,9 @@ export async function buildHierarchy(
     const bookId = await hashText(sortedChunk.join("|"));
 
     const chunkVectors = chunk.map((id) => {
-      const idx = pageIds.indexOf(id);
-      return pageVectors[idx];
+      const vec = pageVectorMap.get(id);
+      if (!vec) throw new Error(`Vector not found for page ${id}`);
+      return vec;
     });
 
     const medoidIdx = selectMedoidIndex(chunkVectors);
@@ -120,6 +162,32 @@ export async function buildHierarchy(
     const book: Book = { bookId, pageIds: chunk, medoidPageId, meta: {} };
     await metadataStore.putBook(book);
     books.push(book);
+  }
+
+  // Add SemanticNeighbor edges between consecutive pages within each book slice.
+  // These document-order adjacency edges are always inserted regardless of cosine
+  // cutoff, because adjacent text chunks of the same source are always related.
+  for (const book of books) {
+    for (let i = 0; i < book.pageIds.length - 1; i++) {
+      const aId = book.pageIds[i];
+      const bId = book.pageIds[i + 1];
+      const aVec = pageVectorMap.get(aId);
+      const bVec = pageVectorMap.get(bId);
+      if (!aVec || !bVec) continue;
+
+      const sim = cosineSimilarity(aVec, bVec);
+      const dist = 1 - sim;
+      const forwardEdge: SemanticNeighbor = { neighborPageId: bId, cosineSimilarity: sim, distance: dist };
+      const reverseEdge: SemanticNeighbor = { neighborPageId: aId, cosineSimilarity: sim, distance: dist };
+
+      // Forward: a → b
+      const existingA = await metadataStore.getSemanticNeighbors(aId);
+      await metadataStore.putSemanticNeighbors(aId, mergeAdjacentNeighbor(existingA, forwardEdge, ADJACENCY_MAX_DEGREE));
+
+      // Reverse: b → a
+      const existingB = await metadataStore.getSemanticNeighbors(bId);
+      await metadataStore.putSemanticNeighbors(bId, mergeAdjacentNeighbor(existingB, reverseEdge, ADJACENCY_MAX_DEGREE));
+    }
   }
 
   await runPromotionSweep(books.map((b) => b.bookId), metadataStore, policy);
@@ -135,8 +203,9 @@ export async function buildHierarchy(
     const volumeId = await hashText(sortedBookIds.join("|"));
 
     const medoidVectors = bookChunk.map((b) => {
-      const idx = pageIds.indexOf(b.medoidPageId);
-      return pageVectors[idx];
+      const vec = pageVectorMap.get(b.medoidPageId);
+      if (!vec) throw new Error(`Vector not found for medoid page ${b.medoidPageId}`);
+      return vec;
     });
 
     const centroid = computeCentroid(medoidVectors);

@@ -6,7 +6,8 @@ import { MemoryVectorStore } from "../../storage/MemoryVectorStore";
 import { DeterministicDummyEmbeddingBackend } from "../../embeddings/DeterministicDummyEmbeddingBackend";
 import { EmbeddingRunner } from "../../embeddings/EmbeddingRunner";
 import { generateKeyPair } from "../../core/crypto/sign";
-import { ingestText } from "../../hippocampus/Ingest";
+import { buildPage } from "../../hippocampus/PageBuilder";
+import { chunkText } from "../../hippocampus/Chunker";
 import { insertSemanticNeighbors } from "../../hippocampus/FastNeighborInsert";
 import type { ModelProfile } from "../../core/ModelProfile";
 
@@ -24,6 +25,11 @@ const PROFILE: ModelProfile = {
   source: "metadata",
 };
 
+/**
+ * Builds `pageCount` pages directly without calling ingestText/buildHierarchy,
+ * so the SemanticNeighbor graph starts empty. This keeps FastNeighborInsert
+ * tests fully isolated from HierarchyBuilder's adjacency-edge insertion.
+ */
 async function makeFixture(pageCount: number) {
   const metadataStore = await IndexedDbMetadataStore.open(freshDbName());
   const vectorStore = new MemoryVectorStore();
@@ -40,16 +46,31 @@ async function makeFixture(pageCount: number) {
 
   const words = Array.from({ length: pageCount * 4 }, (_, i) => `word${i}`);
   const text = words.join(" ");
+  const chunks = chunkText(text, PROFILE);
+  const useChunks = chunks.slice(0, pageCount);
+  const embeddings = await runner.embed(useChunks);
 
-  const result = await ingestText(text, {
-    modelProfile: PROFILE,
-    embeddingRunner: runner,
-    vectorStore,
-    metadataStore,
-    keyPair,
-  });
+  const createdAt = new Date().toISOString();
+  const pageIds: string[] = [];
 
-  return { metadataStore, vectorStore, pageIds: result.pages.map((p) => p.pageId) };
+  for (let i = 0; i < useChunks.length; i++) {
+    const embedding = embeddings[i];
+    const offset = await vectorStore.appendVector(embedding);
+    const page = await buildPage({
+      content: useChunks[i],
+      embedding,
+      embeddingOffset: offset,
+      embeddingDim: PROFILE.embeddingDimension,
+      creatorPubKey: keyPair.publicKey,
+      signingKey: keyPair.signingKey,
+      createdAt,
+    });
+    await metadataStore.putPage(page);
+    await metadataStore.putPageActivity({ pageId: page.pageId, queryHitCount: 0, lastQueryAt: createdAt });
+    pageIds.push(page.pageId);
+  }
+
+  return { metadataStore, vectorStore, pageIds };
 }
 
 describe("FastNeighborInsert", () => {

@@ -286,4 +286,39 @@ describe("HierarchyBuilder", () => {
     expect(result.volumes!.length).toBeGreaterThanOrEqual(1);
     expect(result.shelves!.length).toBeGreaterThanOrEqual(1);
   });
+
+  it("adds SemanticNeighbor edges between consecutive pages within each book slice", async () => {
+    const { metadataStore, vectorStore, pageIds } = await makeFixture(4);
+
+    const { books } = await buildHierarchy(pageIds, {
+      modelProfile: PROFILE,
+      vectorStore,
+      metadataStore,
+    });
+
+    // For each book with at least 2 pages, every consecutive pair should have
+    // a SemanticNeighbor edge in both directions.
+    for (const book of books) {
+      for (let i = 0; i < book.pageIds.length - 1; i++) {
+        const aId = book.pageIds[i];
+        const bId = book.pageIds[i + 1];
+
+        // Forward: a → b
+        const aNeighbors = await metadataStore.getSemanticNeighbors(aId);
+        const aHasB = aNeighbors.some((n) => n.neighborPageId === bId);
+        expect(aHasB).toBe(true);
+
+        // Reverse: b → a
+        const bNeighbors = await metadataStore.getSemanticNeighbors(bId);
+        const bHasA = bNeighbors.some((n) => n.neighborPageId === aId);
+        expect(bHasA).toBe(true);
+
+        // Edge data should be structurally valid.
+        const edge = aNeighbors.find((n) => n.neighborPageId === bId)!;
+        expect(edge.cosineSimilarity).toBeGreaterThanOrEqual(-1);
+        expect(edge.cosineSimilarity).toBeLessThanOrEqual(1);
+        expect(edge.distance).toBeCloseTo(1 - edge.cosineSimilarity, 5);
+      }
+    }
+  });
 });
