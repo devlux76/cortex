@@ -42,5 +42,9 @@
   },
   "dependencies": {
     "@huggingface/transformers": "^3.8.1"
-  }
+  },
+  "trustedDependencies": [
+    "onnxruntime-node",
+    "protobufjs"
+  ]
 }
