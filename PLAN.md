@@ -1,7 +1,7 @@
 # CORTEX Implementation Plan
 
-**Version:** 1.0
-**Last Updated:** 2026-03-12
+**Version:** 1.1
+**Last Updated:** 2026-03-13
 
 This document tracks the implementation status of each major module in CORTEX. It shows what's been built, what's in progress, and what remains.
 
@@ -20,12 +20,14 @@ This document tracks the implementation status of each major module in CORTEX. I
 
 | Module | Status | Files | Notes |
 |--------|--------|-------|-------|
-| Core Types | ✅ Complete | `core/types.ts` | All entity interfaces defined (Page, Book, Volume, Shelf, Edge, MetroidNeighbor, storage interfaces) |
+| Core Types | 🟡 Partial | `core/types.ts` | All entity interfaces defined; needs `PageActivity`, `HotpathEntry`, `TierQuotas`, and `MetadataStore` hotpath method signatures |
 | Model Profiles | ✅ Complete | `core/ModelProfile.ts`, `core/ModelDefaults.ts`, `core/ModelProfileResolver.ts`, `core/BuiltInModelProfiles.ts` | Source-of-truth for model-derived numerics; guard script enforces compliance |
 | Numeric Constants | ✅ Complete | `core/NumericConstants.ts` | Runtime constants (byte sizes, workgroup limits) centralized |
 | Crypto Helpers | ✅ Complete | `core/crypto/hash.ts`, `core/crypto/sign.ts`, `core/crypto/verify.ts` | SHA-256 hashing; Ed25519 sign/verify; 26 tests passing |
+| Hotpath Policy | ❌ Missing | `core/HotpathPolicy.ts` (planned) | Central Williams Bound policy: `computeCapacity`, `computeSalience`, `deriveTierQuotas`, `deriveCommunityQuotas`; all policy constants (c, α, β, γ, tier quotas) as frozen default policy object |
+| Salience Engine | ❌ Missing | `core/SalienceEngine.ts` (planned) | Per-node salience computation, promotion/eviction lifecycle helpers, community-aware admission logic |
 
-**Foundation Status:** 4/4 complete (100%)
+**Foundation Status:** 4/6 complete (67%)
 
 ---
 
@@ -35,9 +37,9 @@ This document tracks the implementation status of each major module in CORTEX. I
 |--------|--------|-------|-------|
 | Vector Store (OPFS) | ✅ Complete | `storage/OPFSVectorStore.ts` | Append-only binary vector file; byte-offset addressing; test coverage via `tests/Persistence.test.ts` |
 | Vector Store (Memory) | ✅ Complete | `storage/MemoryVectorStore.ts` | In-memory implementation for testing |
-| Metadata Store (IndexedDB) | ✅ Complete | `storage/IndexedDbMetadataStore.ts` | Full CRUD for all entities; reverse indexes; Metroid neighbor operations; dirty-volume flags; test coverage via `tests/Persistence.test.ts` |
+| Metadata Store (IndexedDB) | 🟡 Partial | `storage/IndexedDbMetadataStore.ts` | Full CRUD for all entities; reverse indexes; Metroid neighbor operations; dirty-volume flags; needs `hotpath_index` and `page_activity` object stores; hotpath CRUD methods; test coverage via `tests/Persistence.test.ts` |
 
-**Storage Status:** 3/3 complete (100%)
+**Storage Status:** 2.5/3 complete (83%)
 
 ---
 
@@ -77,9 +79,9 @@ This document tracks the implementation status of each major module in CORTEX. I
 |--------|--------|-------|-------|
 | Text Chunking | ❌ Missing | `hippocampus/Chunker.ts` (planned) | Token-aware page boundary detection respecting ModelProfile limits |
 | Page ID Generation | ❌ Missing | `hippocampus/PageIdGenerator.ts` (planned) | Deterministic hash-based ID creation |
-| Ingest Orchestrator | ❌ Missing | `hippocampus/Ingest.ts` (planned) | Main entry point: chunk → embed → persist → build hierarchy → fast neighbor insert |
-| Hierarchy Builder | ❌ Missing | `hippocampus/HierarchyBuilder.ts` (planned) | Construct/update Books, Volumes, Shelves from new Pages |
-| Fast Neighbor Insert | ❌ Missing | `hippocampus/FastMetroidInsert.ts` (planned) | Incremental Metroid neighbor update (avoid full recalc) |
+| Ingest Orchestrator | ❌ Missing | `hippocampus/Ingest.ts` (planned) | Main entry point: chunk → embed → persist → initialise PageActivity → build hierarchy → fast neighbor insert → hotpath admission |
+| Hierarchy Builder | ❌ Missing | `hippocampus/HierarchyBuilder.ts` (planned) | Construct/update Books, Volumes, Shelves; attempt tier-quota hotpath admission for each level's medoid/prototype; Williams-derived fanout bounds; trigger split via ClusterStability when bounds exceeded |
+| Fast Neighbor Insert | ❌ Missing | `hippocampus/FastMetroidInsert.ts` (planned) | Incremental Metroid neighbor update; max degree derived from HotpathPolicy (not hardcoded K); evict lowest-weight neighbor on degree overflow; check new page for hotpath admission |
 
 **Hippocampus Status:** 0/5 complete (0%)
 
@@ -91,12 +93,12 @@ This document tracks the implementation status of each major module in CORTEX. I
 
 | Module | Status | Files | Notes |
 |--------|--------|-------|-------|
-| Ranking Pipeline | ❌ Missing | `cortex/Ranking.ts` (planned) | Shelf → Volume → Book → Page hierarchical scoring |
-| Seed Selection | ❌ Missing | `cortex/SeedSelection.ts` (planned) | Threshold-based top-k page selection |
-| Subgraph Expansion | 🟡 Partial | `storage/IndexedDbMetadataStore.ts` (`getInducedMetroidSubgraph`) | BFS expansion implemented in storage layer; needs orchestration wrapper |
+| Ranking Pipeline | ❌ Missing | `cortex/Ranking.ts` (planned) | Resident-first scoring cascade: HOT shelves → HOT volumes → HOT books → HOT pages; spill to WARM/COLD only when coverage insufficient |
+| Seed Selection | ❌ Missing | `cortex/SeedSelection.ts` (planned) | Threshold-based top-k page selection from ranking output |
+| Subgraph Expansion | 🟡 Partial | `storage/IndexedDbMetadataStore.ts` (`getInducedMetroidSubgraph`) | BFS expansion implemented in storage layer; needs dynamic Williams bounds; needs orchestration wrapper |
 | Open TSP Solver | ❌ Missing | `cortex/OpenTSPSolver.ts` (planned) | Dummy-node open-path heuristic for coherent ordering |
-| Query Orchestrator | ❌ Missing | `cortex/Query.ts` (planned) | Main entry point: embed query → rank → expand → solve path → return result |
-| Result DTO | ❌ Missing | `cortex/QueryResult.ts` (planned) | Structured query result with provenance metadata |
+| Query Orchestrator | ❌ Missing | `cortex/Query.ts` (planned) | Main entry point: embed → resident-first ranking → subgraph expansion with dynamic bounds → TSP path → query cost meter → early-stop; return result |
+| Result DTO | ❌ Missing | `cortex/QueryResult.ts` (planned) | Structured query result with provenance metadata (coherence path, subgraph size, hop count, edge weights) |
 
 **Cortex Status:** 0.5/6 complete (8%)
 
@@ -109,15 +111,15 @@ This document tracks the implementation status of each major module in CORTEX. I
 | Module | Status | Files | Notes |
 |--------|--------|-------|-------|
 | Idle Scheduler | ❌ Missing | `daydreamer/IdleScheduler.ts` (planned) | Cooperative background loop; interruptible; respects CPU budget |
-| Hebbian Updates | ❌ Missing | `daydreamer/HebbianUpdater.ts` (planned) | LTP (strengthen), LTD (decay), prune below threshold |
-| Prototype Recomputation | ❌ Missing | `daydreamer/PrototypeRecomputer.ts` (planned) | Recalculate volume/shelf medoids and centroids |
-| Full Metroid Recalc | ❌ Missing | `daydreamer/FullMetroidRecalc.ts` (planned) | Rebuild bounded neighbor lists for dirty volumes |
+| Hebbian Updates | ❌ Missing | `daydreamer/HebbianUpdater.ts` (planned) | LTP (strengthen), LTD (decay), prune below threshold; recompute σ(v) for changed nodes; run promotion/eviction sweep |
+| Prototype Recomputation | ❌ Missing | `daydreamer/PrototypeRecomputer.ts` (planned) | Recalculate volume/shelf medoids and centroids; recompute salience for affected entries; run tier-quota promotion/eviction |
+| Full Metroid Recalc | ❌ Missing | `daydreamer/FullMetroidRecalc.ts` (planned) | Rebuild bounded neighbor lists for dirty volumes; batch size bounded by O(√(t log t)) per idle cycle; recompute salience after recalc |
 | Experience Replay | ❌ Missing | `daydreamer/ExperienceReplay.ts` (planned) | Simulate queries to reinforce connections |
-| Cluster Stability | ❌ Missing | `daydreamer/ClusterStability.ts` (planned) | Detect/trigger split/merge for unstable clusters |
+| Cluster Stability | ❌ Missing | `daydreamer/ClusterStability.ts` (planned) | Detect/trigger split/merge for unstable clusters; run lightweight label propagation for community detection; store community labels in PageActivity |
 
 **Daydreamer Status:** 0/6 complete (0%)
 
-**Note:** Not a v1 blocker — system can ship without background consolidation (manual recalc only).
+**Note:** Not a v1 blocker — system can ship without background consolidation (manual recalc only). Community detection is required before graph-community quota enforcement is active.
 
 ---
 
@@ -126,8 +128,9 @@ This document tracks the implementation status of each major module in CORTEX. I
 | Module | Status | Files | Notes |
 |--------|--------|-------|-------|
 | Routing Policy | ✅ Complete | `Policy.ts` | Derives routing dimensions from ModelProfile; integration tested |
+| Hotpath Policy | ❌ Missing | `core/HotpathPolicy.ts` (planned) | Williams Bound capacity formula, salience weights, tier quotas, community quotas; separate from model-derived numerics |
 
-**Policy Status:** 1/1 complete (100%)
+**Policy Status:** 1/2 complete (50%)
 
 ---
 
@@ -149,15 +152,18 @@ This document tracks the implementation status of each major module in CORTEX. I
 | Module | Status | Files | Notes |
 |--------|--------|-------|-------|
 | Unit Tests | ✅ Complete | `tests/*.test.ts`, `tests/**/*.test.ts` | 115 tests across 13 files; all passing |
-| Persistence Tests | ✅ Complete | `tests/Persistence.test.ts` | Full storage layer coverage (OPFS, IndexedDB, Metroid neighbors) |
+| Persistence Tests | ✅ Complete | `tests/Persistence.test.ts` | Full storage layer coverage (OPFS, IndexedDB, Metroid neighbors); needs extension for hotpath stores |
 | Model Tests | ✅ Complete | `tests/model/*.test.ts` | Profile resolution, defaults, routing policy |
 | Embedding Tests | ✅ Complete | `tests/embeddings/*.test.ts` | Provider resolver, runner, real/dummy backends |
 | Backend Smoke Tests | ✅ Complete | `tests/BackendSmoke.test.ts` | All vector backends instantiate cleanly |
 | Runtime Tests | ✅ Complete | `tests/runtime/*.spec.mjs` | Browser harness validated; Electron context-sensitive |
 | Integration Tests | ❌ Missing | `tests/integration/*.test.ts` (planned) | End-to-end: ingest → persist → query → coherent result |
-| Benchmarks | 🟡 Partial | `tests/benchmarks/DummyEmbedderHotpath.bench.ts` | Baseline dummy embedder benchmark; real-provider benchmarks needed |
+| Hotpath Policy Tests | ❌ Missing | `tests/HotpathPolicy.test.ts` (planned) | H(t) sublinearity and monotonicity; tier quota sums; community quota minimums; salience determinism |
+| Salience Engine Tests | ❌ Missing | `tests/SalienceEngine.test.ts` (planned) | Bootstrap fills to H(t); steady-state eviction; community/tier quota enforcement; determinism |
+| Scaling Benchmarks | ❌ Missing | `tests/benchmarks/HotpathScaling.bench.ts` (planned) | Synthetic graphs at 1K/10K/100K/1M; assert resident count ≤ H(t); query cost sublinear |
+| Benchmarks | 🟡 Partial | `tests/benchmarks/DummyEmbedderHotpath.bench.ts` | Baseline dummy embedder benchmark; real-provider and hotpath scaling benchmarks needed |
 
-**Testing Status:** 7/9 complete (78%)
+**Testing Status:** 6/12 complete (50%)
 
 ---
 
@@ -180,19 +186,19 @@ This document tracks the implementation status of each major module in CORTEX. I
 
 | Layer | Completion | Critical Gap |
 |-------|-----------|--------------|
-| Foundation | 100% | — |
-| Storage | 100% | — |
+| Foundation | 67% | HotpathPolicy, SalienceEngine, type extensions |
+| Storage | 83% | Hotpath IndexedDB stores |
 | Vector Compute | 100% | — |
 | Embedding | 83% | WebGL provider (low priority) |
 | Hippocampus | 0% | **CRITICAL** — No ingest path |
 | Cortex | 8% | **CRITICAL** — No retrieval path |
 | Daydreamer | 0% | Not v1 blocker |
-| Policy | 100% | — |
+| Policy | 50% | HotpathPolicy |
 | Runtime | 100% | — |
-| Testing | 78% | Integration tests |
+| Testing | 50% | Integration tests, hotpath tests, scaling benchmarks |
 | Build/CI | 83% | — |
 
-**System-Wide Completion:** ~60% (infrastructure complete; orchestration layers missing)
+**System-Wide Completion:** ~55% (infrastructure complete; Williams Bound policy foundation and orchestration layers missing)
 
 ---
 
@@ -218,83 +224,101 @@ This document tracks the implementation status of each major module in CORTEX. I
 
 ### Phase 1: Unblock Basic Functionality (Ship v0.1)
 
-**Goal:** Enable ingest and retrieval for a single user session.
+**Goal:** Enable ingest and retrieval for a single user session, with Williams Bound policy foundation in place.
 
 1. **Crypto Helpers** (`core/crypto/*`) ✅ **Complete**
    - SHA-256 hashing for text and binary
    - Ed25519 signing/verification
    - 26 tests passing
 
-2. **Text Chunking** (`hippocampus/Chunker.ts`)
+2. **Williams Bound Policy Foundation**
+   - `core/HotpathPolicy.ts` — `computeCapacity`, `computeSalience`, `deriveTierQuotas`, `deriveCommunityQuotas`; all constants as frozen default policy object
+   - `core/SalienceEngine.ts` — `computeNodeSalience`, `batchComputeSalience`, `shouldPromote`, `selectEvictionTarget`; bootstrap and steady-state lifecycle
+   - Extend `core/types.ts` — `PageActivity`, `HotpathEntry`, `TierQuotas`, `MetadataStore` hotpath method signatures
+   - Extend `storage/IndexedDbMetadataStore.ts` — `hotpath_index` and `page_activity` object stores; implement new `MetadataStore` hotpath methods
+   - Tests: `tests/HotpathPolicy.test.ts`, `tests/SalienceEngine.test.ts`, extend `tests/Persistence.test.ts`
+
+3. **Text Chunking** (`hippocampus/Chunker.ts`)
    - Token-aware splitting respecting ModelProfile limits
    - Preserve sentence boundaries where possible
    - Test with various text lengths
 
-3. **Hippocampus Ingest** (`hippocampus/Ingest.ts`)
+4. **Hippocampus Ingest** (`hippocampus/Ingest.ts`)
    - Chunk → Embed → Persist orchestration
-   - Build Page entities with proper hashing/signing
+   - Build Page entities with proper hashing/signing; initialise `PageActivity` record
    - Single-Book hierarchy (defer Volume/Shelf)
-   - Basic Metroid neighbor insertion (K-nearest)
+   - Basic Metroid neighbor insertion with Williams-bounded degree
 
-4. **Cortex Query** (`cortex/Query.ts`)
+5. **Cortex Query** (`cortex/Query.ts`)
    - Embed query
-   - Flat page ranking (skip hierarchy for now)
+   - Flat page ranking against resident hotpath (skip full hierarchy for now)
    - Return top-K pages by similarity
    - Skip TSP coherence path (just ranked list)
 
-5. **Integration Test** (`tests/integration/IngestQuery.test.ts`)
+6. **Integration Test** (`tests/integration/IngestQuery.test.ts`)
    - Ingest text → Retrieve by query → Validate results
    - Persistence across sessions
 
-**Exit Criteria:** User can ingest text and retrieve relevant pages by query.
+**Exit Criteria:** User can ingest text and retrieve relevant pages by query; Williams Bound policy is in place.
 
 ---
 
-### Phase 2: Add Hierarchy & Coherence (Ship v0.5)
+### Phase 2: Add Hierarchy, Coherence & Resident-First Routing (Ship v0.5)
 
-**Goal:** Hierarchical routing and coherent path ordering.
+**Goal:** Hierarchical routing, coherent path ordering, and fully resident-first query path.
 
 1. **Hierarchy Builder** (`hippocampus/HierarchyBuilder.ts`)
    - Cluster pages into Books (medoid selection)
    - Cluster books into Volumes (prototype computation)
    - Build Shelves for coarse routing
+   - Attempt tier-quota hotpath admission for each level's medoid/prototype via `SalienceEngine`
+   - Williams-derived fanout bounds; trigger split via `ClusterStability` when exceeded
 
 2. **Ranking Pipeline** (`cortex/Ranking.ts`)
-   - Shelf → Volume → Book → Page cascade
+   - Resident-first cascade: HOT shelves → HOT volumes → HOT books → HOT pages
+   - Spill to WARM/COLD only when resident coverage insufficient
 
 3. **Open TSP Solver** (`cortex/OpenTSPSolver.ts`)
    - Dummy-node open-path heuristic
    - Test on synthetic graphs
 
 4. **Full Query Orchestrator** (`cortex/Query.ts` — upgrade)
-   - Hierarchical ranking
-   - Subgraph expansion
+   - Resident-first hierarchical ranking
+   - Dynamic subgraph expansion bounds from `HotpathPolicy`
+   - Query cost meter; early-stop on budget exceeded
    - Coherent path via TSP
    - Rich result DTO with provenance
 
-**Exit Criteria:** User gets coherent ordered context chains, not just similarity-ranked pages.
+**Exit Criteria:** User gets coherent ordered context chains through the resident hotpath; query latency controlled by H(t).
 
 ---
 
-### Phase 3: Background Consolidation (Ship v1.0)
+### Phase 3: Background Consolidation & Community Quotas (Ship v1.0)
 
-**Goal:** Idle maintenance keeps memory healthy.
+**Goal:** Idle maintenance keeps memory healthy; community-aware hotpath coverage active.
 
 1. **Idle Scheduler** (`daydreamer/IdleScheduler.ts`)
    - Cooperative, interruptible loop
    - CPU budget awareness
 
 2. **Hebbian Updater** (`daydreamer/HebbianUpdater.ts`)
-   - LTP/LTD rules
-   - Edge pruning
+   - LTP/LTD rules; edge pruning
+   - Recompute σ(v) for changed nodes; run promotion/eviction sweep
 
 3. **Full Metroid Recalc** (`daydreamer/FullMetroidRecalc.ts`)
    - Rebuild neighbor lists for dirty volumes
+   - O(√(t log t)) batch size per idle cycle
 
 4. **Prototype Recomputer** (`daydreamer/PrototypeRecomputer.ts`)
    - Update volume/shelf prototypes
+   - Tier-quota promotion/eviction after recomputation
 
-**Exit Criteria:** System self-maintains over extended use; no manual intervention required.
+5. **Community Detection** (`daydreamer/ClusterStability.ts` — extend)
+   - Label propagation on Metroid neighbor graph
+   - Store community labels in `PageActivity.communityId`
+   - Wire community IDs into `SalienceEngine` promotion/eviction
+
+**Exit Criteria:** System self-maintains over extended use; community-aware hotpath quotas enforced.
 
 ---
 
@@ -307,10 +331,10 @@ This document tracks the implementation status of each major module in CORTEX. I
    - Edge cases and error paths
    - Performance regression tests
 
-2. **Benchmark Suite** (`tests/benchmarks/*`)
-   - Real-provider throughput
-   - Query latency across corpus sizes
-   - Storage overhead
+2. **Scaling Benchmark Suite** (`tests/benchmarks/HotpathScaling.bench.ts`)
+   - Synthetic graphs at 1K, 10K, 100K, 1M nodes+edges
+   - Assert: resident count never exceeds H(t); query cost scales sublinearly
+   - Record baselines in `benchmarks/BASELINES.md`
 
 3. **Documentation** (`docs/*`)
    - API reference
@@ -319,7 +343,7 @@ This document tracks the implementation status of each major module in CORTEX. I
 
 4. **CI Hardening**
    - Electron runtime gate policy
-   - Guard scripts in merge checks
+   - Guard scripts in merge checks (model-derived + hotpath policy)
    - Benchmark baselines
 
 **Exit Criteria:** All tests pass; benchmarks recorded; docs complete; ready for public use.
@@ -334,11 +358,15 @@ This document tracks the implementation status of each major module in CORTEX. I
 
 ### Blocker 2: No Query Orchestration
 **Impact:** Cannot retrieve memories.
-**Mitigation:** Phase 1 priority; flat ranking acceptable for v0.1.
+**Mitigation:** Phase 1 priority; flat ranking against resident hotpath acceptable for v0.1.
+
+### Blocker 3: No HotpathPolicy or SalienceEngine
+**Impact:** Cannot enforce Williams Bound invariants; all subsequent phases depend on these.
+**Mitigation:** Phase 1 priority; implement before ingest/query orchestration.
 
 ### Risk 1: TSP Complexity
 Open TSP is NP-hard; heuristic may be slow on large subgraphs.
-**Mitigation:** Bound subgraph size (<30 nodes); defer to Phase 2; use deterministic greedy heuristic.
+**Mitigation:** Dynamic Williams-derived subgraph bounds shrink the problem as graph grows; defer to Phase 2; use deterministic greedy heuristic.
 
 ### Risk 2: Electron Runtime Stability
 Host-shell Electron can SIGSEGV in constrained contexts.
@@ -347,6 +375,10 @@ Host-shell Electron can SIGSEGV in constrained contexts.
 ### Risk 3: WebGL Provider Gap
 Transformers.js doesn't expose `webgl` device directly.
 **Mitigation:** Low priority; `webgpu` and `wasm` sufficient for most users; explicit ORT adapter deferred to Phase 4.
+
+### Risk 4: Empirical Calibration of `c`
+The Williams Bound scaling constant `c` is not theorem-given; wrong value causes either hotpath over-allocation (wastes RAM) or under-allocation (defeats purpose).
+**Mitigation:** Default `c = 0.5` is conservative; scaling benchmarks in Phase 4 will validate and tune. Keep `c` in `core/HotpathPolicy.ts` as an overrideable policy constant.
 
 ---
 
@@ -415,5 +447,7 @@ After every implementation pass:
 
 - **Metroid vs medoid:** Use `Metroid` in all API surfaces and docs; `medoid` only in algorithmic comments.
 - **Model-derived numerics:** Never hardcode; always source from `core/` model profile modules.
+- **Policy-derived constants:** Never hardcode; always source from `core/HotpathPolicy.ts`.
 - **Test philosophy:** TDD (Red → Green → Refactor) for all new slices.
 - **Runtime realism:** Browser and Electron lanes are required merge gates.
+- **Williams Bound invariant:** The resident hotpath count must never exceed H(t). Enforce in tests and assert in benchmarks.

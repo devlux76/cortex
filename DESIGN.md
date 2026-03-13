@@ -1,7 +1,7 @@
 # CORTEX Design Specification
 
-**Version:** 1.0
-**Last Updated:** 2026-03-12
+**Version:** 1.1
+**Last Updated:** 2026-03-13
 
 ## Executive Summary
 
@@ -48,7 +48,137 @@ Idle background consolidation that prevents catastrophic forgetting.
 
 **Performance Target:** Opportunistic, interruptible, no foreground blocking
 
-## Data Model
+## The Williams Bound & Sublinear Growth
+
+### Motivation
+
+CORTEX applies the Williams 2025 result — S = O(√(t log t)) — as a universal sublinear growth law everywhere the system trades space against time: the resident hotpath index, per-tier hierarchy quotas, per-community graph budgets, Metroid degree limits, and Daydreamer maintenance batch sizing. This single principle ensures the system stays efficient as the memory graph scales from hundreds to millions of nodes.
+
+### Graph Mass Definition
+
+```
+t = |V| + |E|  =  total pages  +  (Hebbian edges + Metroid edges)
+```
+
+This is the canonical measure of graph complexity used in all capacity formulas.
+
+### Resident Hotpath Capacity
+
+```
+H(t) = ⌈c · √(t · log₂(1 + t))⌉
+```
+
+`c` is an empirically tuned constant (default in `core/HotpathPolicy.ts`; not a theorem output). H(t) defines the maximum number of entities resident in the in-memory hotpath index across all tiers.
+
+**Growth properties (required by tests):**
+- H(t) is monotonically non-decreasing as t grows
+- H(t) grows sublinearly relative to t (confirmed by benchmark at 1K, 10K, 100K, 1M)
+
+### Three-Zone Memory Model
+
+| Zone | Resident? | Storage | Typical Lookup Cost |
+|------|-----------|---------|---------------------|
+| **HOT** | Yes — in resident index, capacity H(t) | RAM | Sub-millisecond |
+| **WARM** | No — indexed, not resident | IndexedDB | Single-digit milliseconds |
+| **COLD** | No — raw bytes only, no index entry | OPFS | Tens of milliseconds |
+
+All data is retained locally across all three zones. Zones control lookup **cost**, not data **lifetime**. The runtime continuously promotes and evicts entries between HOT and WARM based on salience.
+
+### Node Salience
+
+Each page `v` carries a node-level salience score that drives promotion into and eviction from the hotpath:
+
+```
+σ(v) = α · H_in(v)  +  β · R(v)  +  γ · Q(v)
+```
+
+| Component | Meaning |
+|-----------|---------|
+| `H_in(v)` | Sum of incident Hebbian edge weights |
+| `R(v)` | Recency score — exponential decay from `createdAt` / `lastQueryAt` |
+| `Q(v)` | Query-hit count for the node |
+| α, β, γ | Tunable weights summing to 1.0 (defaults: 0.5 / 0.3 / 0.2) |
+
+Salience requires lightweight per-page activity metadata (`queryHitCount`, `lastQueryAt`) stored in the `page_activity` IndexedDB object store.
+
+### Hierarchical Tier Quotas
+
+H(t) is partitioned across the four-tier hierarchy so no single tier can monopolise the resident index:
+
+| Tier | Default Quota | Purpose |
+|------|--------------|---------|
+| Shelf | q_s = 10% | Routing prototypes |
+| Volume | q_v = 20% | Cluster prototypes |
+| Book | q_b = 20% | Book medoids |
+| Page | q_p = 50% | Individual page representatives |
+
+**Constraint:** q_s + q_v + q_b + q_p = 1.0
+
+Within each tier, entries are ranked by salience; the highest-salience representatives are admitted up to the tier budget. Shelf, Volume, and Book representatives are selected by the medoid statistic within their cluster, then ranked by salience for admission.
+
+### Graph-Community Coverage Quotas
+
+Within each tier's budget, slots are allocated proportionally across detected graph communities to prevent a single dense topic from consuming all capacity. The allocation uses the **largest-remainder method** to guarantee the quotas sum exactly to `tier_budget`:
+
+1. Compute the ideal fractional share for each community:
+   ```
+   share(Cᵢ) = tier_budget · nᵢ / N
+   ```
+2. Floor each share to get a base allocation:
+   ```
+   base(Cᵢ) = ⌊share(Cᵢ)⌋
+   ```
+3. Distribute the remaining `tier_budget − Σ base(Cᵢ)` slots one-by-one to the communities with the largest fractional remainders (`share(Cᵢ) − base(Cᵢ)`), breaking ties by community size (larger community wins).
+4. Communities that receive a base of 0 and are not selected in step 3 are **excluded** from this tier (no slot). This is intentional: sparse communities are not promoted until they grow.
+
+The resulting quotas sum to exactly `tier_budget` regardless of the number or sizes of communities, even when there are more communities than `tier_budget`.
+
+where `nᵢ` is the number of pages in community Cᵢ and N is the total page count. Community detection runs via lightweight label propagation on the Metroid neighbor graph during Daydreamer idle passes.
+
+This **dual constraint** — tier quota × community quota — ensures both vertical coverage across hierarchy levels and horizontal coverage across topics.
+
+### Promotion and Eviction Lifecycle
+
+**Bootstrap phase** (while resident count < H(t)): admit the highest-salience candidate not yet resident.
+
+**Steady-state phase**: promote a new or updated node only if its salience exceeds the weakest resident in the same tier and community bucket. On promotion, evict the weakest; break ties by recency.
+
+**Trigger points:**
+- On ingest — newly ingested pages become candidates
+- On query hit — `queryHitCount` increases; salience is recomputed; promotion sweep runs
+- On Daydreamer pass — after LTP/LTD, recompute salience for affected nodes; run promotion sweep
+
+### Sublinear Fanout Bounds
+
+Maximum children per hierarchy node also respect Williams-derived limits to prevent unbounded fan-out:
+
+```
+Max volumes per shelf  =  O(√(|volumes| · log |volumes|))
+Max books per volume   =  O(√(|books_in_volume| · log |books_in_volume|))
+```
+
+When exceeded, `HierarchyBuilder` or `ClusterStability` triggers a split.
+
+### Dynamic Subgraph Expansion Bounds
+
+The fixed `<30 node` subgraph target is replaced by dynamic formulas that shrink gracefully as the graph grows:
+
+```
+t_eff            =  max(t, 2)                                       -- bootstrap floor (see below)
+maxSubgraphSize  =  min(30,  ⌊√(t_eff · log₂(1+t_eff)) / log₂(t_eff)⌋)
+maxHops          =  max(1,  ⌈log₂(log₂(1 + t_eff))⌉)
+perHopBranching  =  max(1,  ⌊maxSubgraphSize ^ (1 / maxHops)⌋)
+```
+
+**Domain and bootstrap floor.** The raw formulas are undefined when t ≤ 1 (`log₂(1) = 0` → division by zero; `log₂(t) < 0` for t < 1). The effective-mass floor `t_eff = max(t, 2)` eliminates these edge cases. At cold-start (t < 2) the formulas evaluate conservatively to `maxSubgraphSize = 1, maxHops = 1, perHopBranching = 1`, which is safe and correct — a single-node subgraph is the only valid result when fewer than two nodes exist. As the corpus grows past the floor the clamp becomes inactive (`t_eff = t` for all t ≥ 2), so large-corpus dynamics are completely unaffected. The explicit `max(1, …)` guards on `maxHops` and `perHopBranching` provide a secondary safety net against rounding to zero on very small but valid inputs.
+
+This keeps subgraph expansion cost sublinear in graph mass at scale while remaining well-behaved during cold-start and for tiny corpora.
+
+### Policy Source of Truth
+
+All hotpath constants — `c`, `α`, `β`, `γ`, `q_s`, `q_v`, `q_b`, `q_p` — live in `core/HotpathPolicy.ts` as a frozen default policy object. These are **policy-derived constants** (not model-derived) and are kept strictly separate from `core/ModelDefaults.ts`. A companion guard (or an extension to `guard:model-derived`) is planned (see TODO.md P3-E3) to prevent these constants from being hardcoded elsewhere; until that guard is in place, discipline is enforced by convention.
+
+---
 
 ### Entity Hierarchy
 
@@ -142,6 +272,37 @@ interface MetroidNeighbor {
 }
 ```
 
+### Hotpath Entities
+
+#### PageActivity
+Lightweight per-page activity metadata maintained alongside each Page. Drives salience computation and community assignment.
+
+```typescript
+interface PageActivity {
+  pageId: Hash;
+  queryHitCount: number;      // incremented on each query hit
+  lastQueryAt: string;        // ISO timestamp of most recent query hit
+  communityId?: string;       // set by Daydreamer label propagation
+}
+```
+
+#### HotpathEntry
+The shared record type for HOT membership. Used in two complementary roles:
+
+1. **Live RAM index** — the active resident set (size ≤ H(t)) that every query scans first.
+2. **IndexedDB persistence** — the `hotpath_index` store holds a periodic snapshot of the live index so that HOT membership and salience values survive a page reload or machine reboot. On startup, `HotpathEntry` rows are loaded from IndexedDB to reconstruct the RAM index without requiring a full corpus replay.
+
+The Daydreamer worker owns the write path to `hotpath_index`; it checkpoints the live index whenever it runs its maintenance cycle (LTP/LTD pass), making the persisted snapshot no more than one cycle stale.
+
+```typescript
+interface HotpathEntry {
+  entityId: Hash;             // pageId, bookId, volumeId, or shelfId
+  tier: 'shelf' | 'volume' | 'book' | 'page';
+  salience: number;           // σ value at last computation
+  communityId?: string;       // community this entry counts against
+}
+```
+
 ## Storage Architecture
 
 ### Vector Storage (OPFS)
@@ -164,27 +325,38 @@ Structured entity storage with automatic reverse indexes.
 - `metroid_neighbors` (sparse NN graph)
 - `flags` (dirty-volume recalc markers)
 - `page_to_book`, `book_to_volume`, `volume_to_shelf` (reverse indexes)
+- `hotpath_index` (periodic HOT-membership checkpoint, keyed by `entityId`; loaded on startup to reconstruct the RAM resident index; written by Daydreamer each maintenance cycle)
+- `page_activity` (per-page activity metadata for salience computation)
 
 ## Retrieval Design
 
 ### Cortex Query Path
 
 1. **Embed Query** — Generate query embedding
-2. **Rank Shelves** — Score using coarse prototypes
-3. **Rank Volumes** — Within top shelves
-4. **Rank Books** — Within top volumes
-5. **Rank Pages** — Select seed pages
-6. **Expand Subgraph** — BFS through Metroid neighbors (bounded hops)
-7. **Solve Coherent Path** — Open TSP with dummy-node heuristic
-8. **Return Result** — Ordered memory chain + provenance metadata
+2. **Score Resident Shelves** — Score query against HOT shelf prototypes in H(t) resident index
+3. **Score Resident Volumes** — Score against HOT volume prototypes within top-ranked shelves
+4. **Score Resident Books** — Score against HOT book medoids within top-ranked volumes
+5. **Score Resident Pages** — Score against HOT page representatives within top-ranked books
+6. **Spill to Warm/Cold** — If resident coverage is insufficient, expand lookup to WARM (IndexedDB) and COLD (OPFS) tiers
+7. **Expand Subgraph** — BFS through Metroid neighbors using dynamic bounds (see below)
+8. **Solve Coherent Path** — Open TSP with dummy-node heuristic
+9. **Return Result** — Ordered memory chain + provenance metadata
 
-**Key Constraints:**
-- Keep query-time subgraphs small (target <30 nodes)
-- Prefer sparse graph expansion over global traversal
-- Deterministic under same input for reproducibility
+Steps 2–5 operate exclusively on the resident set of size H(t), making H(t) the primary latency-control mechanism. Spill to WARM/COLD (step 6) occurs only when the resident set does not contain sufficient coverage.
+
+**Query Cost Meter:** The query path counts vector operations. If the cumulative cost exceeds a Williams-derived budget, the query early-stops and returns the best result found so far.
 
 ### Coherence via Open TSP
 Rather than returning nearest neighbors by similarity, Cortex traces a coherent path through the induced subgraph using a dummy-node open TSP strategy. This produces a natural "narrative flow" through related memories.
+
+### Key Constraints
+- Steps 2–5 operate on the resident hotpath (H(t) entries), not the full corpus
+- Subgraph expansion uses dynamic Williams-derived bounds, not a fixed node cap:
+  - `maxSubgraphSize = min(30, ⌊√(t · log₂(1+t)) / log₂(t)⌋)`
+  - `maxHops = ⌈log₂(log₂(1 + t))⌉`
+  - `perHopBranching = ⌊maxSubgraphSize ^ (1/maxHops)⌋`
+- Deterministic under same input for reproducibility
+- Query cost is metered; early-stop prevents unbounded latency
 
 ## Ingestion Design
 
@@ -193,13 +365,13 @@ Rather than returning nearest neighbors by similarity, Cortex traces a coherent 
 1. **Chunk Text** — Split into pages respecting token budgets from ModelProfile
 2. **Generate Embeddings** — Batch embed with selected provider
 3. **Persist Vectors** — Append to OPFS vector file
-4. **Persist Pages** — Write page metadata to IndexedDB
-5. **Build/Attach Hierarchy** — Construct/update books, volumes, shelves
-6. **Fast Neighbor Insert** — Update Metroid neighbors incrementally
+4. **Persist Pages** — Write page metadata to IndexedDB; initialise `PageActivity` record
+5. **Build/Attach Hierarchy** — Construct/update books, volumes, shelves; attempt hotpath admission for each level's medoid/prototype using tier quota via `SalienceEngine`
+6. **Fast Neighbor Insert** — Update Metroid neighbors incrementally; bounded degree via `HotpathPolicy`; check new page for hotpath admission
 7. **Mark Dirty** — Flag volumes for full recalc by Daydreamer
 
 **Incremental Strategy:**
-Fast local Metroid neighbor insertion keeps query-time latency low. Full neighborhood recalculation is deferred to idle Daydreamer passes.
+Fast local Metroid neighbor insertion keeps query-time latency low. Full neighborhood recalculation is deferred to idle Daydreamer passes. Hotpath admission runs at ingest time for new pages and hierarchy prototypes.
 
 ## Consolidation Design
 
@@ -208,24 +380,35 @@ Fast local Metroid neighbor insertion keeps query-time latency low. Full neighbo
 **LTP/LTD (Hebbian Updates):**
 - Strengthen edges traversed during successful queries
 - Decay unused edges toward zero
-- Prune edges below threshold
+- Prune edges below threshold, keeping Metroid degree within Williams-derived bounds
+- After LTP/LTD: recompute σ(v) for all nodes whose incident edges changed; run promotion/eviction sweep via `SalienceEngine`
 
 **Prototype Recomputation:**
 - Recompute volume/shelf medoids and centroids
 - Update prototype vectors in vector file
+- After recomputation: recompute salience for affected representative entries; run tier-quota promotion/eviction for volume and shelf tiers
 
 **Full Metroid Recalc:**
 - For dirty volumes, recompute all pairwise similarities
-- Rebuild bounded neighbor lists
-- Clear dirty flags
+- Bound batch size: process at most O(√(t log t)) pairwise comparisons per idle cycle
+- Prioritise dirtiest volumes first
+- Rebuild bounded neighbor lists; degree limit derived from `HotpathPolicy`
+- Clear dirty flags; recompute salience for affected nodes; run promotion sweep
+
+**Community Detection:**
+- Run lightweight label propagation on the Metroid neighbor graph during idle passes
+- Store community labels in `PageActivity.communityId`
+- Rerun when dirty-volume flags indicate meaningful structural change
+- Empty communities release their slots; new communities receive at least one slot
 
 **Experience Replay:**
 - Simulate queries over recent memories
 - Reinforce important connection patterns
 
 **Cluster Stability:**
-- Detect unstable clusters (high variance, imbalanced size)
+- Detect unstable clusters (high variance, imbalanced size, Williams fanout violation)
 - Trigger split/merge when thresholds exceeded
+- Run community detection after structural changes
 
 ## Security & Trust
 
@@ -270,12 +453,13 @@ Keep cryptographic service separate from routing/storage concerns. All hashing/s
 | Operation | Target | Hardware Assumption |
 |-----------|--------|---------------------|
 | Ingest single page | <50ms | WebGPU-class |
-| Query seed ranking | <20ms | Moderate corpus |
-| Coherence path solve | <10ms | <30 node subgraph |
+| Query seed ranking (resident) | <20ms | H(t) resident index |
+| Coherence path solve | <10ms | Dynamic subgraph (≤30 nodes) |
 | Daydreamer work | Interruptible | No blocking |
+| Hotpath promotion/eviction | <5ms | Per trigger point |
 
 **Graceful Degradation:**
-All operations must complete on WASM fallback, albeit slower.
+All operations must complete on WASM fallback, albeit slower. The resident hotpath index reduces query latency proportionally to H(t) coverage of the working set.
 
 ## Non-Negotiable Constraints
 
@@ -283,6 +467,7 @@ All operations must complete on WASM fallback, albeit slower.
 2. **Fast Local Retrieval** — Must work on degraded hardware
 3. **Persistent Local State** — Survive browser restart with integrity checks
 4. **Idle Consolidation** — Background quality improvements, not expensive write-time computation
+5. **Sublinear Growth** — The resident hotpath index must never exceed H(t); all space-time tradeoff subsystems must target O(√(t log t)) scaling
 
 ## System Boundaries
 
@@ -303,6 +488,18 @@ All operations must complete on WASM fallback, albeit slower.
 
 **medoid** (mathematical term): The underlying clustering statistic. Reserved for algorithmic comments and internal statistical descriptions only.
 
+**Hotpath**: The in-memory resident index of H(t) entries spanning all four hierarchy tiers. The hotpath is the first lookup target for every query; misses spill to WARM/COLD storage. HOT membership and salience are checkpointed to the `hotpath_index` IndexedDB store by Daydreamer each maintenance cycle, allowing the RAM index to be restored after a page reload or machine reboot without full corpus replay.
+
+**Williams Bound**: The theoretical result S = O(√(t log t)) from Williams 2025, applied here as a universal sublinear growth law for all space-time tradeoff subsystems in CORTEX.
+
+**Graph mass (t)**: t = |V| + |E| = total pages plus all edges (Hebbian + Metroid). The canonical input to all capacity and bound formulas.
+
+**Salience (σ)**: Node-level score combining Hebbian edge weight, recency, and query-hit frequency. Drives admission to and eviction from the hotpath.
+
+**Three-zone model**: HOT (resident), WARM (IndexedDB-indexed), COLD (OPFS bytes only). All zones retain data locally; zones differ only in lookup cost.
+
+**Community**: A topically coherent subgraph identified by label propagation on the Metroid neighbor graph. Community quotas prevent any single topic from monopolising the hotpath.
+
 ## Model-Derived Numerics
 
 **Critical Rule:** All numeric values derived from ML model architecture (embedding dimensions, context lengths, thresholds) must **never** be hardcoded as magic numbers.
@@ -315,6 +512,25 @@ All operations must complete on WASM fallback, albeit slower.
 
 **Enforcement:** `npm run guard:model-derived` scans for violations before CI merge.
 
+## Policy-Derived Constants
+
+A parallel class of constants governs the Williams Bound hotpath architecture. These are **not** model-derived (they do not depend on ML architecture); they are empirically tuned policy values.
+
+**Source of Truth:** `core/HotpathPolicy.ts` — frozen default policy object
+
+| Constant | Default | Meaning |
+|----------|---------|---------|
+| `c` | 0.5 | Scaling factor in H(t) formula |
+| `α` | 0.5 | Salience weight for Hebbian connectivity |
+| `β` | 0.3 | Salience weight for recency |
+| `γ` | 0.2 | Salience weight for query-hit frequency |
+| `q_s` | 0.10 | Shelf tier quota fraction |
+| `q_v` | 0.20 | Volume tier quota fraction |
+| `q_b` | 0.20 | Book tier quota fraction |
+| `q_p` | 0.50 | Page tier quota fraction |
+
+**Enforcement:** Policy constants must not be hardcoded outside `core/HotpathPolicy.ts`. A companion guard or ESLint rule prevents silent duplication.
+
 ## Future Directions (Post-v1)
 
 - **P2P Memory Exchange** — Signed subgraph payloads over WebRTC
@@ -323,3 +539,4 @@ All operations must complete on WASM fallback, albeit slower.
 - **Adaptive Chunking** — Context-aware page boundary detection
 - **Multi-Modal Support** — Image/audio embeddings alongside text
 - **CRDT-based Merge** — Conflict-free replicated data structures for multi-device sync
+- **Empirical Calibration of c** — Instrument real workloads to tune the Williams Bound scaling constant across diverse corpus profiles
