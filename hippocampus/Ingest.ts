@@ -1,4 +1,5 @@
-import type { Book, ModelProfile, MetadataStore, VectorStore } from "../core/types";
+import type { Book, MetadataStore, VectorStore } from "../core/types";
+import type { ModelProfile } from "../core/ModelProfile";
 import { hashText } from "../core/crypto/hash";
 import type { KeyPair } from "../core/crypto/sign";
 import { EmbeddingRunner } from "../embeddings/EmbeddingRunner";

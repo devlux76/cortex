@@ -6,7 +6,7 @@ import { generateKeyPair } from "../../core/crypto/sign";
 import { verifySignature } from "../../core/crypto/verify";
 import { hashBinary, hashText } from "../../core/crypto/hash";
 
-function canonicalizePageForSigning(page: Omit<Page, "signature">) {
+function canonicalizePageForSigning(page: Page) {
   return JSON.stringify({
     pageId: page.pageId,
     content: page.content,
@@ -44,9 +44,10 @@ describe("buildPage", () => {
     expect(page.pageId).toBe(expectedContentHash);
     expect(page.contentHash).toBe(expectedContentHash);
 
-    const rawVector = embedding.buffer.slice(
+    const rawVector = new Uint8Array(
+      embedding.buffer,
       embedding.byteOffset,
-      embedding.byteOffset + embedding.byteLength,
+      embedding.byteLength,
     );
     const expectedVectorHash = await hashBinary(rawVector);
     expect(page.vectorHash).toBe(expectedVectorHash);
