@@ -78,7 +78,7 @@ export async function batchComputeSalience(
 ): Promise<Map<Hash, number>> {
   const results = new Map<Hash, number>();
 
-  // Parallelise I/O across all pages
+  // Parallelize I/O across all pages
   const entries = await Promise.all(
     pageIds.map(async (id) => {
       const salience = await computeNodeSalience(id, metadataStore, policy, now);
@@ -265,16 +265,14 @@ export async function runPromotionSweep(
     const communityId = communityMap.get(candidateId);
     const tier: HotpathEntry["tier"] = "page";
 
-    // Check current capacity
-    const entries = await metadataStore.getHotpathEntries();
-    const currentCount = entries.length;
+    // Fetch current state (re-read after any mutation in a previous iteration)
+    const allEntries = await metadataStore.getHotpathEntries();
+    const currentCount = allEntries.length;
     const graphMass = currentCount + candidateIds.length;
     const capacity = computeCapacity(graphMass, policy.c);
     const capacityRemaining = capacity - currentCount;
-
-    // Check tier quota
     const tierQuotas = deriveTierQuotas(capacity, policy.tierQuotaRatios);
-    const tierEntries = await metadataStore.getHotpathEntries(tier);
+    const tierEntries = allEntries.filter((e) => e.tier === tier);
 
     // Check community quota within tier
     if (communityId !== undefined) {

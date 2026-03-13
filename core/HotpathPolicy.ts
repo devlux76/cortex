@@ -62,6 +62,7 @@ export function computeCapacity(
   if (!Number.isFinite(graphMass) || graphMass < 0) {
     return 1;
   }
+  // Zero mass is a valid edge case (empty graph) — return minimum capacity
   if (graphMass === 0) return 1;
 
   const log2 = Math.log2(1 + graphMass);

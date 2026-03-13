@@ -114,8 +114,7 @@ export class IndexedDbMetadataStore implements MetadataStore {
       const req = indexedDB.open(dbName, DB_VERSION);
 
       req.onupgradeneeded = (event) => {
-        const oldVersion = event.oldVersion;
-        applyUpgrade((event.target as IDBOpenDBRequest).result, oldVersion);
+        applyUpgrade((event.target as IDBOpenDBRequest).result, event.oldVersion);
       };
 
       req.onsuccess = () => resolve(new IndexedDbMetadataStore(req.result));
