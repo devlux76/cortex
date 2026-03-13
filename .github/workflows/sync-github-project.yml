@@ -1,0 +1,38 @@
+name: Sync GitHub Project
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "TODO.md"
+  workflow_dispatch:
+
+concurrency:
+  group: sync-github-project
+  cancel-in-progress: false
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Sync GitHub Project (milestones, labels, issues)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run sync:github-project
