@@ -99,6 +99,23 @@ export interface HotpathEntry {
 }
 
 /** Per-tier slot budgets derived from H(t). */
+// Hotpath / Williams Bound types
+// ---------------------------------------------------------------------------
+
+export interface PageActivity {
+  pageId: Hash;
+  queryHitCount: number;
+  lastQueryAt: string;
+  communityId?: string;
+}
+
+export interface HotpathEntry {
+  entityId: Hash;
+  tier: "shelf" | "volume" | "book" | "page";
+  salience: number;
+  communityId?: string;
+}
+
 export interface TierQuotas {
   shelf: number;
   volume: number;
@@ -196,6 +213,8 @@ export interface MetadataStore {
   getResidentCount(): Promise<number>;
 
   // --- Page activity ---
+  evictWeakest(tier: HotpathEntry["tier"], communityId?: string): Promise<void>;
+  getResidentCount(): Promise<number>;
   putPageActivity(activity: PageActivity): Promise<void>;
   getPageActivity(pageId: Hash): Promise<PageActivity | undefined>;
 }

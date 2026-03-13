@@ -84,6 +84,51 @@ function applyUpgrade(db: IDBDatabase, oldVersion: number): void {
     hotpathStore.createIndex("by-tier", "tier");
 
     // Page activity keyed by pageId
+function applyUpgrade(db: IDBDatabase): void {
+  // v1 stores
+  if (!db.objectStoreNames.contains(STORE.pages)) {
+    db.createObjectStore(STORE.pages, { keyPath: "pageId" });
+  }
+  if (!db.objectStoreNames.contains(STORE.books)) {
+    db.createObjectStore(STORE.books, { keyPath: "bookId" });
+  }
+  if (!db.objectStoreNames.contains(STORE.volumes)) {
+    db.createObjectStore(STORE.volumes, { keyPath: "volumeId" });
+  }
+  if (!db.objectStoreNames.contains(STORE.shelves)) {
+    db.createObjectStore(STORE.shelves, { keyPath: "shelfId" });
+  }
+
+  if (!db.objectStoreNames.contains(STORE.edges)) {
+    const edgeStore = db.createObjectStore(STORE.edges, {
+      keyPath: ["fromPageId", "toPageId"],
+    });
+    edgeStore.createIndex("by-from", "fromPageId");
+  }
+
+  if (!db.objectStoreNames.contains(STORE.metroidNeighbors)) {
+    db.createObjectStore(STORE.metroidNeighbors, { keyPath: "pageId" });
+  }
+  if (!db.objectStoreNames.contains(STORE.flags)) {
+    db.createObjectStore(STORE.flags, { keyPath: "volumeId" });
+  }
+
+  if (!db.objectStoreNames.contains(STORE.pageToBook)) {
+    db.createObjectStore(STORE.pageToBook, { keyPath: "pageId" });
+  }
+  if (!db.objectStoreNames.contains(STORE.bookToVolume)) {
+    db.createObjectStore(STORE.bookToVolume, { keyPath: "bookId" });
+  }
+  if (!db.objectStoreNames.contains(STORE.volumeToShelf)) {
+    db.createObjectStore(STORE.volumeToShelf, { keyPath: "volumeId" });
+  }
+
+  // v2 stores — hotpath index + page activity
+  if (!db.objectStoreNames.contains(STORE.hotpathIndex)) {
+    const hp = db.createObjectStore(STORE.hotpathIndex, { keyPath: "entityId" });
+    hp.createIndex("by-tier", "tier");
+  }
+  if (!db.objectStoreNames.contains(STORE.pageActivity)) {
     db.createObjectStore(STORE.pageActivity, { keyPath: "pageId" });
   }
 }
@@ -444,6 +489,55 @@ export class IndexedDbMetadataStore implements MetadataStore {
   }
 
   async getResidentCount(): Promise<number> {
+  getHotpathEntries(tier?: HotpathEntry["tier"]): Promise<HotpathEntry[]> {
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(STORE.hotpathIndex, "readonly");
+      const store = tx.objectStore(STORE.hotpathIndex);
+
+      if (tier !== undefined) {
+        const idx = store.index("by-tier");
+        const req = idx.getAll(IDBKeyRange.only(tier));
+        req.onsuccess = () => resolve(req.result as HotpathEntry[]);
+        req.onerror = () => reject(req.error);
+      } else {
+        const req = store.getAll();
+        req.onsuccess = () => resolve(req.result as HotpathEntry[]);
+        req.onerror = () => reject(req.error);
+      }
+    });
+  }
+
+  evictWeakest(tier: HotpathEntry["tier"], communityId?: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(STORE.hotpathIndex, "readwrite");
+      const store = tx.objectStore(STORE.hotpathIndex);
+      const idx = store.index("by-tier");
+      const req = idx.getAll(IDBKeyRange.only(tier));
+
+      req.onsuccess = () => {
+        let entries = req.result as HotpathEntry[];
+        if (communityId !== undefined) {
+          entries = entries.filter((e) => e.communityId === communityId);
+        }
+        if (entries.length === 0) {
+          resolve();
+          return;
+        }
+        // Find the entry with the lowest salience
+        let weakest = entries[0];
+        for (let i = 1; i < entries.length; i++) {
+          if (entries[i].salience < weakest.salience) {
+            weakest = entries[i];
+          }
+        }
+        store.delete(weakest.entityId);
+        promisifyTransaction(tx).then(resolve).catch(reject);
+      };
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  getResidentCount(): Promise<number> {
     return new Promise((resolve, reject) => {
       const tx = this.db.transaction(STORE.hotpathIndex, "readonly");
       const req = tx.objectStore(STORE.hotpathIndex).count();

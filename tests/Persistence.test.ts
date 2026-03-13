@@ -18,8 +18,10 @@ import { FLOAT32_BYTES } from "../core/NumericConstants";
 import type {
   Book,
   Edge,
+  HotpathEntry,
   MetroidNeighbor,
   Page,
+  PageActivity,
   Shelf,
   VectorStore,
   Volume,
@@ -502,5 +504,128 @@ describe("IndexedDbMetadataStore", () => {
     await store.flagVolumeForMetroidRecalc("vol-001");
     await store.clearMetroidRecalcFlag("vol-001");
     expect(await store.needsMetroidRecalc("vol-001")).toBe(false);
+  });
+
+  // --- HotpathEntry CRUD ---
+
+  it("putHotpathEntry / getHotpathEntries round-trips an entry", async () => {
+    const store = await IndexedDbMetadataStore.open(freshDbName());
+    const entry: HotpathEntry = {
+      entityId: "page-abc",
+      tier: "page",
+      salience: 0.85,
+      communityId: "comm-1",
+    };
+    await store.putHotpathEntry(entry);
+    const entries = await store.getHotpathEntries("page");
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toEqual(entry);
+  });
+
+  it("getHotpathEntries without tier returns all entries", async () => {
+    const store = await IndexedDbMetadataStore.open(freshDbName());
+    const e1: HotpathEntry = { entityId: "e1", tier: "page", salience: 0.5 };
+    const e2: HotpathEntry = { entityId: "e2", tier: "book", salience: 0.7 };
+    const e3: HotpathEntry = { entityId: "e3", tier: "shelf", salience: 0.3 };
+    await store.putHotpathEntry(e1);
+    await store.putHotpathEntry(e2);
+    await store.putHotpathEntry(e3);
+    const all = await store.getHotpathEntries();
+    expect(all).toHaveLength(3);
+  });
+
+  it("getHotpathEntries filters by tier", async () => {
+    const store = await IndexedDbMetadataStore.open(freshDbName());
+    await store.putHotpathEntry({ entityId: "e1", tier: "page", salience: 0.5 });
+    await store.putHotpathEntry({ entityId: "e2", tier: "book", salience: 0.7 });
+    await store.putHotpathEntry({ entityId: "e3", tier: "page", salience: 0.3 });
+    const pages = await store.getHotpathEntries("page");
+    expect(pages).toHaveLength(2);
+    expect(pages.every((e) => e.tier === "page")).toBe(true);
+  });
+
+  it("evictWeakest removes the entry with lowest salience in a tier", async () => {
+    const store = await IndexedDbMetadataStore.open(freshDbName());
+    await store.putHotpathEntry({ entityId: "e1", tier: "page", salience: 0.9 });
+    await store.putHotpathEntry({ entityId: "e2", tier: "page", salience: 0.1 });
+    await store.putHotpathEntry({ entityId: "e3", tier: "page", salience: 0.5 });
+    await store.evictWeakest("page");
+    const remaining = await store.getHotpathEntries("page");
+    expect(remaining).toHaveLength(2);
+    expect(remaining.map((e) => e.entityId).sort()).toEqual(["e1", "e3"]);
+  });
+
+  it("evictWeakest scoped by communityId", async () => {
+    const store = await IndexedDbMetadataStore.open(freshDbName());
+    await store.putHotpathEntry({ entityId: "e1", tier: "page", salience: 0.9, communityId: "c1" });
+    await store.putHotpathEntry({ entityId: "e2", tier: "page", salience: 0.1, communityId: "c1" });
+    await store.putHotpathEntry({ entityId: "e3", tier: "page", salience: 0.05, communityId: "c2" });
+    await store.evictWeakest("page", "c1");
+    const remaining = await store.getHotpathEntries("page");
+    expect(remaining).toHaveLength(2);
+    // e2 should be evicted (lowest in c1), e3 (c2) untouched
+    expect(remaining.map((e) => e.entityId).sort()).toEqual(["e1", "e3"]);
+  });
+
+  it("evictWeakest is a no-op when tier is empty", async () => {
+    const store = await IndexedDbMetadataStore.open(freshDbName());
+    await store.evictWeakest("shelf");
+    const entries = await store.getHotpathEntries("shelf");
+    expect(entries).toHaveLength(0);
+  });
+
+  it("getResidentCount returns correct count after multiple puts", async () => {
+    const store = await IndexedDbMetadataStore.open(freshDbName());
+    expect(await store.getResidentCount()).toBe(0);
+    await store.putHotpathEntry({ entityId: "e1", tier: "page", salience: 0.5 });
+    await store.putHotpathEntry({ entityId: "e2", tier: "book", salience: 0.3 });
+    await store.putHotpathEntry({ entityId: "e3", tier: "volume", salience: 0.1 });
+    expect(await store.getResidentCount()).toBe(3);
+  });
+
+  it("getResidentCount decreases after eviction", async () => {
+    const store = await IndexedDbMetadataStore.open(freshDbName());
+    await store.putHotpathEntry({ entityId: "e1", tier: "page", salience: 0.5 });
+    await store.putHotpathEntry({ entityId: "e2", tier: "page", salience: 0.1 });
+    expect(await store.getResidentCount()).toBe(2);
+    await store.evictWeakest("page");
+    expect(await store.getResidentCount()).toBe(1);
+  });
+
+  // --- PageActivity CRUD ---
+
+  it("putPageActivity / getPageActivity round-trips a PageActivity", async () => {
+    const store = await IndexedDbMetadataStore.open(freshDbName());
+    const activity: PageActivity = {
+      pageId: "page-abc",
+      queryHitCount: 5,
+      lastQueryAt: "2026-03-13T00:00:00.000Z",
+      communityId: "comm-1",
+    };
+    await store.putPageActivity(activity);
+    const result = await store.getPageActivity("page-abc");
+    expect(result).toEqual(activity);
+  });
+
+  it("getPageActivity returns undefined for unknown pageId", async () => {
+    const store = await IndexedDbMetadataStore.open(freshDbName());
+    const result = await store.getPageActivity("unknown");
+    expect(result).toBeUndefined();
+  });
+
+  it("putPageActivity overwrites existing activity", async () => {
+    const store = await IndexedDbMetadataStore.open(freshDbName());
+    await store.putPageActivity({
+      pageId: "page-abc",
+      queryHitCount: 1,
+      lastQueryAt: "2026-03-12T00:00:00.000Z",
+    });
+    await store.putPageActivity({
+      pageId: "page-abc",
+      queryHitCount: 10,
+      lastQueryAt: "2026-03-13T00:00:00.000Z",
+    });
+    const result = await store.getPageActivity("page-abc");
+    expect(result?.queryHitCount).toBe(10);
   });
 });
