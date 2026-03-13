@@ -135,6 +135,9 @@ export async function query(
   const combined = [...hotpathResults, ...coldResults];
   combined.sort((a, b) => b.score - a.score);
 
+  // Ensure combined results are sorted by descending score for top-K semantics.
+  combined.sort((a, b) => b.score - a.score);
+
   // Update activity for returned pages
   await Promise.all(combined.map(async ({ page }) => {
     const activity = await metadataStore.getPageActivity(page.pageId);
