@@ -2,10 +2,12 @@ import type {
   Book,
   Edge,
   Hash,
+  HotpathEntry,
   MetadataStore,
   MetroidNeighbor,
   MetroidSubgraph,
   Page,
+  PageActivity,
   Shelf,
   Volume,
 } from "../core/types";
@@ -14,7 +16,7 @@ import type {
 // Schema constants
 // ---------------------------------------------------------------------------
 
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 /** Object-store names used across the schema. */
 const STORE = {
@@ -28,6 +30,8 @@ const STORE = {
   pageToBook: "page_to_book",
   bookToVolume: "book_to_volume",
   volumeToShelf: "volume_to_shelf",
+  hotpathIndex: "hotpath_index",
+  pageActivity: "page_activity",
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -47,28 +51,52 @@ function promisifyTransaction(tx: IDBTransaction): Promise<void> {
 // ---------------------------------------------------------------------------
 
 function applyUpgrade(db: IDBDatabase): void {
-  // Primary entity stores
-  db.createObjectStore(STORE.pages, { keyPath: "pageId" });
-  db.createObjectStore(STORE.books, { keyPath: "bookId" });
-  db.createObjectStore(STORE.volumes, { keyPath: "volumeId" });
-  db.createObjectStore(STORE.shelves, { keyPath: "shelfId" });
+  // v1 stores
+  if (!db.objectStoreNames.contains(STORE.pages)) {
+    db.createObjectStore(STORE.pages, { keyPath: "pageId" });
+  }
+  if (!db.objectStoreNames.contains(STORE.books)) {
+    db.createObjectStore(STORE.books, { keyPath: "bookId" });
+  }
+  if (!db.objectStoreNames.contains(STORE.volumes)) {
+    db.createObjectStore(STORE.volumes, { keyPath: "volumeId" });
+  }
+  if (!db.objectStoreNames.contains(STORE.shelves)) {
+    db.createObjectStore(STORE.shelves, { keyPath: "shelfId" });
+  }
 
-  // Hebbian edges: compound primary key + index on fromPageId
-  const edgeStore = db.createObjectStore(STORE.edges, {
-    keyPath: ["fromPageId", "toPageId"],
-  });
-  edgeStore.createIndex("by-from", "fromPageId");
+  if (!db.objectStoreNames.contains(STORE.edges)) {
+    const edgeStore = db.createObjectStore(STORE.edges, {
+      keyPath: ["fromPageId", "toPageId"],
+    });
+    edgeStore.createIndex("by-from", "fromPageId");
+  }
 
-  // Metroid NN neighbors (pageId → MetroidNeighbor[])
-  db.createObjectStore(STORE.metroidNeighbors, { keyPath: "pageId" });
+  if (!db.objectStoreNames.contains(STORE.metroidNeighbors)) {
+    db.createObjectStore(STORE.metroidNeighbors, { keyPath: "pageId" });
+  }
+  if (!db.objectStoreNames.contains(STORE.flags)) {
+    db.createObjectStore(STORE.flags, { keyPath: "volumeId" });
+  }
 
-  // Dirty-recalc flags (volumeId → { volumeId, needsRecalc })
-  db.createObjectStore(STORE.flags, { keyPath: "volumeId" });
+  if (!db.objectStoreNames.contains(STORE.pageToBook)) {
+    db.createObjectStore(STORE.pageToBook, { keyPath: "pageId" });
+  }
+  if (!db.objectStoreNames.contains(STORE.bookToVolume)) {
+    db.createObjectStore(STORE.bookToVolume, { keyPath: "bookId" });
+  }
+  if (!db.objectStoreNames.contains(STORE.volumeToShelf)) {
+    db.createObjectStore(STORE.volumeToShelf, { keyPath: "volumeId" });
+  }
 
-  // Reverse-index stores
-  db.createObjectStore(STORE.pageToBook, { keyPath: "pageId" });
-  db.createObjectStore(STORE.bookToVolume, { keyPath: "bookId" });
-  db.createObjectStore(STORE.volumeToShelf, { keyPath: "volumeId" });
+  // v2 stores — hotpath index + page activity
+  if (!db.objectStoreNames.contains(STORE.hotpathIndex)) {
+    const hp = db.createObjectStore(STORE.hotpathIndex, { keyPath: "entityId" });
+    hp.createIndex("by-tier", "tier");
+  }
+  if (!db.objectStoreNames.contains(STORE.pageActivity)) {
+    db.createObjectStore(STORE.pageActivity, { keyPath: "pageId" });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -365,6 +393,83 @@ export class IndexedDbMetadataStore implements MetadataStore {
 
   clearMetroidRecalcFlag(volumeId: Hash): Promise<void> {
     return this._put(STORE.flags, { volumeId, needsRecalc: false });
+  }
+
+  // -------------------------------------------------------------------------
+  // Hotpath index
+  // -------------------------------------------------------------------------
+
+  putHotpathEntry(entry: HotpathEntry): Promise<void> {
+    return this._put(STORE.hotpathIndex, entry);
+  }
+
+  getHotpathEntries(tier?: HotpathEntry["tier"]): Promise<HotpathEntry[]> {
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(STORE.hotpathIndex, "readonly");
+      const store = tx.objectStore(STORE.hotpathIndex);
+
+      if (tier !== undefined) {
+        const idx = store.index("by-tier");
+        const req = idx.getAll(IDBKeyRange.only(tier));
+        req.onsuccess = () => resolve(req.result as HotpathEntry[]);
+        req.onerror = () => reject(req.error);
+      } else {
+        const req = store.getAll();
+        req.onsuccess = () => resolve(req.result as HotpathEntry[]);
+        req.onerror = () => reject(req.error);
+      }
+    });
+  }
+
+  evictWeakest(tier: HotpathEntry["tier"], communityId?: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(STORE.hotpathIndex, "readwrite");
+      const store = tx.objectStore(STORE.hotpathIndex);
+      const idx = store.index("by-tier");
+      const req = idx.getAll(IDBKeyRange.only(tier));
+
+      req.onsuccess = () => {
+        let entries = req.result as HotpathEntry[];
+        if (communityId !== undefined) {
+          entries = entries.filter((e) => e.communityId === communityId);
+        }
+        if (entries.length === 0) {
+          resolve();
+          return;
+        }
+        // Find the entry with the lowest salience
+        let weakest = entries[0];
+        for (let i = 1; i < entries.length; i++) {
+          if (entries[i].salience < weakest.salience) {
+            weakest = entries[i];
+          }
+        }
+        store.delete(weakest.entityId);
+        promisifyTransaction(tx).then(resolve).catch(reject);
+      };
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  getResidentCount(): Promise<number> {
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(STORE.hotpathIndex, "readonly");
+      const req = tx.objectStore(STORE.hotpathIndex).count();
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // Page activity
+  // -------------------------------------------------------------------------
+
+  putPageActivity(activity: PageActivity): Promise<void> {
+    return this._put(STORE.pageActivity, activity);
+  }
+
+  async getPageActivity(pageId: Hash): Promise<PageActivity | undefined> {
+    return this._get<PageActivity>(STORE.pageActivity, pageId);
   }
 
   // -------------------------------------------------------------------------

@@ -79,6 +79,31 @@ export interface MetroidSubgraph {
 }
 
 // ---------------------------------------------------------------------------
+// Hotpath / Williams Bound types
+// ---------------------------------------------------------------------------
+
+export interface PageActivity {
+  pageId: Hash;
+  queryHitCount: number;
+  lastQueryAt: string;
+  communityId?: string;
+}
+
+export interface HotpathEntry {
+  entityId: Hash;
+  tier: "shelf" | "volume" | "book" | "page";
+  salience: number;
+  communityId?: string;
+}
+
+export interface TierQuotas {
+  shelf: number;
+  volume: number;
+  book: number;
+  page: number;
+}
+
+// ---------------------------------------------------------------------------
 // Storage abstractions
 // ---------------------------------------------------------------------------
 
@@ -144,4 +169,12 @@ export interface MetadataStore {
   needsMetroidRecalc(volumeId: Hash): Promise<boolean>;
   flagVolumeForMetroidRecalc(volumeId: Hash): Promise<void>;
   clearMetroidRecalcFlag(volumeId: Hash): Promise<void>;
+
+  // --- Hotpath index ---
+  putHotpathEntry(entry: HotpathEntry): Promise<void>;
+  getHotpathEntries(tier?: HotpathEntry["tier"]): Promise<HotpathEntry[]>;
+  evictWeakest(tier: HotpathEntry["tier"], communityId?: string): Promise<void>;
+  getResidentCount(): Promise<number>;
+  putPageActivity(activity: PageActivity): Promise<void>;
+  getPageActivity(pageId: Hash): Promise<PageActivity | undefined>;
 }
