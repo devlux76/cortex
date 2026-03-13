@@ -260,19 +260,19 @@ export async function runPromotionSweep(
     return diff !== 0 ? diff : a.localeCompare(b);
   });
 
+  const tier: HotpathEntry["tier"] = "page";
+  let allEntries = await metadataStore.getHotpathEntries();
+  let tierEntries = allEntries.filter((e) => e.tier === tier);
+  let currentCount = allEntries.length;
+
   for (const candidateId of sorted) {
     const candidateSalience = salienceMap.get(candidateId) ?? 0;
     const communityId = communityMap.get(candidateId);
-    const tier: HotpathEntry["tier"] = "page";
 
-    // Fetch current state (re-read after any mutation in a previous iteration)
-    const allEntries = await metadataStore.getHotpathEntries();
-    const currentCount = allEntries.length;
     const graphMass = currentCount + candidateIds.length;
     const capacity = computeCapacity(graphMass, policy.c);
     const capacityRemaining = capacity - currentCount;
     const tierQuotas = deriveTierQuotas(capacity, policy.tierQuotaRatios);
-    const tierEntries = allEntries.filter((e) => e.tier === tier);
 
     // Check community quota within tier
     if (communityId !== undefined) {
@@ -297,12 +297,21 @@ export async function runPromotionSweep(
 
         if (candidateSalience > weakestSalience) {
           await metadataStore.removeHotpathEntry(weakestId);
-          await metadataStore.putHotpathEntry({
+          allEntries = allEntries.filter((e) => e.entityId !== weakestId);
+          tierEntries = tierEntries.filter((e) => e.entityId !== weakestId);
+          currentCount -= 1;
+
+          const promotedEntry = {
             entityId: candidateId,
             tier,
             salience: candidateSalience,
             communityId,
-          });
+          } as HotpathEntry;
+
+          await metadataStore.putHotpathEntry(promotedEntry);
+          allEntries.push(promotedEntry);
+          tierEntries.push(promotedEntry);
+          currentCount += 1;
         }
         continue;
       }
