@@ -23,6 +23,10 @@ function dot(a: Float32Array, b: Float32Array): number {
   return sum;
 }
 
+/**
+ * Concatenates an array of equal-length vectors into a single flat buffer.
+ * @param vectors - Must be non-empty; every element must have the same length.
+ */
 function concatVectors(vectors: Float32Array[]): Float32Array {
   const dim = vectors[0].length;
   const out = new Float32Array(vectors.length * dim);
@@ -128,6 +132,7 @@ export async function query(
   }
 
   const combined = [...hotpathResults, ...coldResults];
+  combined.sort((a, b) => b.score - a.score);
 
   // Update activity for returned pages
   await Promise.all(combined.map(async ({ page }) => {
