@@ -15,6 +15,8 @@ The engine models three biological brain regions:
 |---|---|
 | `README.md` | Product vision and quick start |
 | `DESIGN.md` | Complete architecture specification and design principles |
+| `PLAN.md` | Module-by-module implementation status and development phases |
+| `TODO.md` | Prioritized actionable tasks to ship v1.0 |
 
 Keep `DESIGN.md` synchronized with the real code state after every implementation pass.
 

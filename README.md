@@ -114,6 +114,8 @@ bun run dev:harness # start the browser runtime harness at http://127.0.0.1:4173
 | Document | Purpose |
 |---|---|
 | [`DESIGN.md`](DESIGN.md) | Architecture specification and core design principles |
+| [`PLAN.md`](PLAN.md) | Module-by-module implementation status and development phases |
+| [`TODO.md`](TODO.md) | Prioritized actionable tasks to ship v1.0 |
 | [`ARCHITECTURE-REVIEW.md`](ARCHITECTURE-REVIEW.md) | Repository-wide architectural drift report and correction tasks |
 | [`docs/api.md`](docs/api.md) | API reference for developers integrating with CORTEX |
 | [`docs/development.md`](docs/development.md) | Build, test, debug, and Docker workflow |

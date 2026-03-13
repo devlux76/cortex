@@ -1,7 +1,7 @@
 name: Close Legacy Issues
 
-# One-shot workflow: closes all pre-existing issues that were created by the
-# removed sync-github-project.mjs script. Run manually, then delete this file.
+# One-shot workflow: closes the 29 issues created by the removed
+# sync-github-project.mjs script. Run manually once, then delete this file.
 
 on:
   workflow_dispatch:
@@ -10,15 +10,21 @@ permissions:
   issues: write
 
 jobs:
-  close-all:
+  close-legacy:
     runs-on: ubuntu-latest
     steps:
-      - name: Close all open issues as won't-fix
+      - name: Close legacy sync-generated issues as won't-fix
         uses: actions/github-script@v7
         with:
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
+
+            // Exact issue numbers created by the old sync-github-project.mjs script.
+            const LEGACY_ISSUES = [
+              21, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35,
+              36, 37, 38, 39, 40, 41, 42, 56, 57, 58, 59, 60, 61, 62, 63
+            ];
 
             // Ensure the "wontfix" label exists
             try {
@@ -32,36 +38,32 @@ jobs:
               });
             }
 
-            // Paginate through all open issues
-            let page = 1;
             let closed = 0;
-            while (true) {
-              const { data: issues } = await github.rest.issues.listForRepo({
-                owner, repo,
-                state: "open",
-                per_page: 100,
-                page,
-              });
-              if (issues.length === 0) break;
-
-              for (const issue of issues) {
-                // Skip pull requests (they appear in the issues API)
-                if (issue.pull_request) continue;
-
+            for (const num of LEGACY_ISSUES) {
+              try {
+                const { data: issue } = await github.rest.issues.get({
+                  owner, repo,
+                  issue_number: num,
+                });
+                if (issue.state === "closed") {
+                  console.log(`#${num} already closed — skipping`);
+                  continue;
+                }
                 await github.rest.issues.addLabels({
                   owner, repo,
-                  issue_number: issue.number,
+                  issue_number: num,
                   labels: ["wontfix"],
                 });
                 await github.rest.issues.update({
                   owner, repo,
-                  issue_number: issue.number,
+                  issue_number: num,
                   state: "closed",
                   state_reason: "not_planned",
                 });
-                console.log(`Closed #${issue.number}: ${issue.title}`);
+                console.log(`Closed #${num}: ${issue.title}`);
                 closed++;
+              } catch (err) {
+                console.log(`#${num}: skipped (${err.message})`);
               }
-              page++;
             }
-            console.log(`\nDone — closed ${closed} issues.`);
+            console.log(`\nDone — closed ${closed} legacy issues.`);
