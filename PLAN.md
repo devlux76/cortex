@@ -113,14 +113,14 @@ This document tracks the implementation status of each major module in CORTEX. I
 
 | Module | Status | Files | Notes |
 |--------|--------|-------|-------|
-| Idle Scheduler | ❌ Missing | `daydreamer/IdleScheduler.ts` (planned) | Cooperative background loop; interruptible; respects CPU budget |
-| Hebbian Updates | ❌ Missing | `daydreamer/HebbianUpdater.ts` (planned) | LTP (strengthen), LTD (decay), prune below threshold; recompute σ(v) for changed nodes; run promotion/eviction sweep |
-| Prototype Recomputation | ❌ Missing | `daydreamer/PrototypeRecomputer.ts` (planned) | Recalculate volume/shelf medoids and centroids; recompute salience for affected entries; run tier-quota promotion/eviction |
-| Full Neighbor Graph Recalc | ❌ Missing | `daydreamer/FullNeighborRecalc.ts` (planned) | Rebuild bounded neighbor lists for dirty volumes; batch size bounded by O(√(t log t)) per idle cycle; recompute salience after recalc. **Note:** Currently planned as `FullMetroidRecalc` — this is a naming error; see TODO P0-X. |
+| Idle Scheduler | ✅ Complete | `daydreamer/IdleScheduler.ts` | Cooperative background loop; interruptible; respects CPU budget |
+| Hebbian Updates | ✅ Complete | `daydreamer/HebbianUpdater.ts` | LTP (strengthen), LTD (decay), prune below threshold; recompute σ(v) for changed nodes; run promotion/eviction sweep |
+| Prototype Recomputation | ✅ Complete | `daydreamer/PrototypeRecomputer.ts` | Recalculate volume/shelf medoids and centroids; recompute salience for affected entries; run tier-quota promotion/eviction |
+| Full Neighbor Graph Recalc | ✅ Complete | `daydreamer/FullNeighborRecalc.ts` | Rebuild bounded neighbor lists for dirty volumes; batch size bounded by O(√(t log t)) per idle cycle; recompute salience after recalc. |
 | Experience Replay | ❌ Missing | `daydreamer/ExperienceReplay.ts` (planned) | Simulate queries to reinforce connections |
-| Cluster Stability | ❌ Missing | `daydreamer/ClusterStability.ts` (planned) | Detect/trigger split/merge for unstable clusters; run lightweight label propagation for community detection; store community labels in PageActivity |
+| Cluster Stability | ✅ Complete | `daydreamer/ClusterStability.ts` | Lightweight label propagation for community detection; stores community labels in PageActivity; detects oversized and empty communities |
 
-**Daydreamer Status:** 0/6 complete (0%)
+**Daydreamer Status:** 4/6 complete (66%)
 
 **Note:** Not a v1 blocker — system can ship without background consolidation (manual recalc only). Community detection is required before graph-community quota enforcement is active.
 
@@ -311,34 +311,35 @@ This document tracks the implementation status of each major module in CORTEX. I
 
 **Goal:** Idle maintenance keeps memory healthy, community-aware hotpath coverage stays diverse, and privacy-safe interest sharing is available.
 
-1. **Idle Scheduler** (`daydreamer/IdleScheduler.ts`)
+1. **Idle Scheduler** (`daydreamer/IdleScheduler.ts`) ✅ Complete
    - Cooperative, interruptible loop
    - CPU budget awareness
 
-2. **Hebbian Updater** (`daydreamer/HebbianUpdater.ts`)
+2. **Hebbian Updater** (`daydreamer/HebbianUpdater.ts`) ✅ Complete
    - LTP/LTD rules; edge pruning
    - Recompute σ(v) for changed nodes; run promotion/eviction sweep
 
-3. **Full Neighbor Graph Recalc** (`daydreamer/FullNeighborRecalc.ts`)
+3. **Full Neighbor Graph Recalc** (`daydreamer/FullNeighborRecalc.ts`) ✅ Complete
    - Rebuild neighbor lists for dirty volumes
    - O(√(t log t)) batch size per idle cycle
 
-4. **Prototype Recomputer** (`daydreamer/PrototypeRecomputer.ts`)
+4. **Prototype Recomputer** (`daydreamer/PrototypeRecomputer.ts`) ✅ Complete
    - Update volume/shelf prototypes
    - Tier-quota promotion/eviction after recomputation
 
-5. **Community Detection** (`daydreamer/ClusterStability.ts` — extend)
+5. **Community Detection** (`daydreamer/ClusterStability.ts`) ✅ Complete
    - Label propagation on semantic neighbor graph
    - Store community labels in `PageActivity.communityId`
-   - Wire community IDs into `SalienceEngine` promotion/eviction
+   - Community IDs wired into `SalienceEngine` promotion/eviction (already implemented in P0)
 
-6. **Smart Interest Sharing** (`sharing/*` planned)
+6. **Smart Interest Sharing** (`sharing/*`) ✅ Complete
    - `sharing/EligibilityClassifier.ts` — classify candidate nodes for share eligibility; block identity/PII-bearing nodes
    - `sharing/SubgraphExporter.ts` — export signed, topic-scoped graph slices from eligible nodes only
    - `sharing/SubgraphImporter.ts` — verify signatures/provenance and merge imported slices into local discovery index
    - `sharing/PeerExchange.ts` — opt-in peer transport for exchanging eligible graph slices
+   - `sharing/CuriosityBroadcaster.ts` — rate-limited broadcast of curiosity probes with fragment response handling
 
-**Exit Criteria:** System self-maintains over extended use; community-aware hotpath quotas enforced; privacy-safe smart sharing works end-to-end.
+**Exit Criteria:** System self-maintains over extended use; community-aware hotpath quotas enforced; privacy-safe smart sharing works end-to-end. ✅ **ACHIEVED**
 
 ---
 

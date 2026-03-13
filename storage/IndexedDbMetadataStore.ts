@@ -231,6 +231,15 @@ export class IndexedDbMetadataStore implements MetadataStore {
     return this._get<Volume>(STORE.volumes, volumeId);
   }
 
+  async getAllVolumes(): Promise<Volume[]> {
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(STORE.volumes, "readonly");
+      const req = tx.objectStore(STORE.volumes).getAll();
+      req.onsuccess = () => resolve(req.result as Volume[]);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
   // -------------------------------------------------------------------------
   // Shelf CRUD + reverse index
   // -------------------------------------------------------------------------
@@ -266,6 +275,15 @@ export class IndexedDbMetadataStore implements MetadataStore {
     return this._get<Shelf>(STORE.shelves, shelfId);
   }
 
+  async getAllShelves(): Promise<Shelf[]> {
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(STORE.shelves, "readonly");
+      const req = tx.objectStore(STORE.shelves).getAll();
+      req.onsuccess = () => resolve(req.result as Shelf[]);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
   // -------------------------------------------------------------------------
   // Hebbian edges
   // -------------------------------------------------------------------------
@@ -277,6 +295,14 @@ export class IndexedDbMetadataStore implements MetadataStore {
       for (const edge of edges) {
         store.put(edge);
       }
+      promisifyTransaction(tx).then(resolve).catch(reject);
+    });
+  }
+
+  deleteEdge(fromPageId: Hash, toPageId: Hash): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(STORE.edges, "readwrite");
+      tx.objectStore(STORE.edges).delete([fromPageId, toPageId]);
       promisifyTransaction(tx).then(resolve).catch(reject);
     });
   }

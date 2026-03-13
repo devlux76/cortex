@@ -162,12 +162,18 @@ export interface MetadataStore {
 
   putVolume(volume: Volume): Promise<void>;
   getVolume(volumeId: Hash): Promise<Volume | undefined>;
+  /** Returns all volumes in the store. */
+  getAllVolumes(): Promise<Volume[]>;
 
   putShelf(shelf: Shelf): Promise<void>;
   getShelf(shelfId: Hash): Promise<Shelf | undefined>;
+  /** Returns all shelves in the store. */
+  getAllShelves(): Promise<Shelf[]>;
 
   // --- Hebbian edges ---
   putEdges(edges: Edge[]): Promise<void>;
+  /** Remove a single directed edge. */
+  deleteEdge(fromPageId: Hash, toPageId: Hash): Promise<void>;
   getNeighbors(pageId: Hash, limit?: number): Promise<Edge[]>;
 
   // --- Reverse-index helpers ---
