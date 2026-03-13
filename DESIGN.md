@@ -164,12 +164,15 @@ When exceeded, `HierarchyBuilder` or `ClusterStability` triggers a split.
 The fixed `<30 node` subgraph target is replaced by dynamic formulas that shrink gracefully as the graph grows:
 
 ```
-maxSubgraphSize  =  min(30,  ⌊√(t · log₂(1+t)) / log₂(t)⌋)
-maxHops          =  ⌈log₂(log₂(1 + t))⌉
-perHopBranching  =  ⌊maxSubgraphSize ^ (1 / maxHops)⌋
+t_eff            =  max(t, 2)                                       -- bootstrap floor (see below)
+maxSubgraphSize  =  min(30,  ⌊√(t_eff · log₂(1+t_eff)) / log₂(t_eff)⌋)
+maxHops          =  max(1,  ⌈log₂(log₂(1 + t_eff))⌉)
+perHopBranching  =  max(1,  ⌊maxSubgraphSize ^ (1 / maxHops)⌋)
 ```
 
-This keeps subgraph expansion cost sublinear in graph mass.
+**Domain and bootstrap floor.** The raw formulas are undefined when t ≤ 1 (`log₂(1) = 0` → division by zero; `log₂(t) < 0` for t < 1). The effective-mass floor `t_eff = max(t, 2)` eliminates these edge cases. At cold-start (t < 2) the formulas evaluate conservatively to `maxSubgraphSize = 1, maxHops = 1, perHopBranching = 1`, which is safe and correct — a single-node subgraph is the only valid result when fewer than two nodes exist. As the corpus grows past the floor the clamp becomes inactive (`t_eff = t` for all t ≥ 2), so large-corpus dynamics are completely unaffected. The explicit `max(1, …)` guards on `maxHops` and `perHopBranching` provide a secondary safety net against rounding to zero on very small but valid inputs.
+
+This keeps subgraph expansion cost sublinear in graph mass at scale while remaining well-behaved during cold-start and for tiny corpora.
 
 ### Policy Source of Truth
 
