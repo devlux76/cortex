@@ -388,7 +388,14 @@ function getCommunityDistribution(
   }
 
   const communities = [...communityCountMap.keys()].sort();
-  const sizes = communities.map((c) => communityCountMap.get(c) ?? 0);
+  const sizes = communities.map((c) => {
+    const count = communityCountMap.get(c) ?? 0;
+    // Treat the candidate community as having at least size 1 for quota derivation
+    if (c === candidateCommunityId && count === 0) {
+      return 1;
+    }
+    return count;
+  });
   const communityIndex = communities.indexOf(candidateCommunityId);
   const candidateCommunityCount = communityCountMap.get(candidateCommunityId) ?? 0;
 
