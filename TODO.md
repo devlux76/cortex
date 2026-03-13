@@ -657,4 +657,4 @@ Items 1–4 (Williams Bound foundation) should be done first — they are small,
 - **TDD Approach:** Write failing tests first, then implement to green.
 - **Documentation Sync:** Update PLAN.md module status as tasks complete.
 - **Williams Bound Invariant:** The resident count must never exceed H(t). Every test that touches the hotpath should assert this.
-- **Policy constants:** Never hardcode hotpath constants outside `core/HotpathPolicy.ts`. The guard in P3-E3 enforces this.
+- **Policy constants:** Never hardcode hotpath constants outside `core/HotpathPolicy.ts`. P3-E3 will add a guard to enforce this automatically; until then, enforce by convention.
