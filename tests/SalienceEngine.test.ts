@@ -104,8 +104,7 @@ class MockMetadataStore implements MetadataStore {
 
   // --- Stubs for unused MetadataStore methods ---
   async putPage(): Promise<void> { /* stub */ }
-  async getPage(): Promise<undefined> { return undefined; }
-  async putBook(): Promise<void> { /* stub */ }
+  async getPage(): Promise<undefined> { return undefined; }  async getAllPages(): Promise<any[]> { return []; }  async putBook(): Promise<void> { /* stub */ }
   async getBook(): Promise<undefined> { return undefined; }
   async putVolume(): Promise<void> { /* stub */ }
   async getVolume(): Promise<undefined> { return undefined; }
