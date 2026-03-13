@@ -139,8 +139,8 @@ These items **must** be completed to have a usable system. Without them, users c
   - Link pages via `prevPageId`/`nextPageId`
   - Initialise `PageActivity` records with zero counts
 
-- [ ] **P0-C2:** Implement `hippocampus/Ingest.ts` (minimal version)
-  - Entry point: `ingestText(text, modelProfile, vectorStore, metadataStore, keyPair)`
+- [x] **P0-C2:** Implement `hippocampus/Ingest.ts` (minimal version)
+  - Entry point: `ingestText(text, { modelProfile, embeddingRunner, vectorStore, metadataStore, keyPair, ... })`
   - Chunk text via `Chunker`
   - Batch embed chunks via `EmbeddingRunner`
   - Persist vectors to `VectorStore`

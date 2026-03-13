@@ -1,5 +1,4 @@
 import type { Hash, Page } from "../core/types";
-import type { KeyPair } from "../core/crypto/sign";
 import { hashBinary, hashText } from "../core/crypto/hash";
 import { signData } from "../core/crypto/sign";
 
@@ -43,10 +42,10 @@ export async function buildPage(options: BuildPageOptions): Promise<Page> {
   const contentHash = await hashText(content);
   const pageId = contentHash;
 
-  const rawVector = embedding.buffer.slice(
-    embedding.byteOffset,
-    embedding.byteOffset + embedding.byteLength,
-  );
+  // Copy into a new ArrayBuffer-backed view so we never pass a SharedArrayBuffer
+  // into WebCrypto (and keep TypeScript happy).
+  const rawVector = new Uint8Array(embedding.byteLength);
+  rawVector.set(new Uint8Array(embedding.buffer, embedding.byteOffset, embedding.byteLength));
   const vectorHash = await hashBinary(rawVector);
 
   const unsignedPage = {
