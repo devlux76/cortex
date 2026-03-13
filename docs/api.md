@@ -114,7 +114,7 @@ interface Edge {
 
 #### `SemanticNeighbor`
 
-A nearest-neighbour entry in the semantic neighbor radius graph — a sparse proximity graph connecting pages with high cosine similarity, used for BFS subgraph expansion during retrieval.
+A nearest-neighbor entry in the semantic neighbor radius graph — a sparse proximity graph connecting pages with high cosine similarity, used for BFS subgraph expansion during retrieval.
 
 ```typescript
 interface SemanticNeighbor {
