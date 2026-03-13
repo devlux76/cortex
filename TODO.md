@@ -354,9 +354,9 @@ These items add hierarchical routing and coherent path ordering. They transform 
 
 ---
 
-## 🟢 Medium Priority — Ship v1.0 (Background Consolidation)
+## 🟢 Medium Priority — Ship v1.0 (Background Consolidation + Smart Sharing)
 
-These items add idle background maintenance. System self-improves over time without user intervention.
+These items add idle background maintenance and privacy-safe interest sharing. Together they deliver v1.0's discovery value.
 
 ### P2-A: Idle Scheduler (UNBLOCKS: Daydreamer operations)
 
@@ -487,6 +487,34 @@ These items add idle background maintenance. System self-improves over time with
   - Test that label propagation converges and produces stable community assignments
 
 **Exit Criteria:** Community-aware hotpath quotas active; topic diversity enforced; label propagation stable.
+
+---
+
+### P2-G: Smart Interest Sharing & PII Guardrail (DELIVERS: discovery without identity leakage)
+
+**Why:** Interest sharing is core product value for both app and library surfaces. v1 must share public-interest graph sections while preventing personal data leakage.
+
+- [ ] **P2-G1:** Implement `sharing/EligibilityClassifier.ts`
+  - Classify candidate nodes as share-eligible vs blocked before export
+  - Detect identity/PII-bearing content (person-specific identifiers, credentials, financial/health traces)
+  - Emit deterministic eligibility decisions with reason codes for auditability
+
+- [ ] **P2-G2:** Implement `sharing/SubgraphExporter.ts`
+  - Build topic-scoped graph slices from eligible nodes only
+  - Preserve node/edge signatures and provenance
+  - Strip or coarsen personal metadata fields that are not needed for discovery
+
+- [ ] **P2-G3:** Implement `sharing/PeerExchange.ts` and `sharing/SubgraphImporter.ts`
+  - Opt-in peer exchange over P2P transport
+  - Verify signatures and schema on import; reject invalid or tampered payloads
+  - Merge imported slices into discovery pathways without exposing sender identity metadata
+
+- [ ] **P2-G4:** Add sharing safety and discovery tests
+  - `tests/sharing/EligibilityClassifier.test.ts`
+  - `tests/sharing/SubgraphExchange.test.ts`
+  - Assert blocked nodes are never exported; assert imported AI-interest updates are discoverable via query
+
+**Exit Criteria:** v1 can exchange signed public-interest slices over P2P, and share-blocking reliably prevents PII/identity leakage.
 
 ---
 
@@ -623,16 +651,44 @@ These items improve quality, performance, and developer experience. Not blockers
 
 ---
 
+### P3-G: Product Surface UX Contract
+
+**Why:** v1.0 needs an explicit UX contract for the standalone app while keeping the library surface headless and integration-first.
+
+- [ ] **P3-G1:** Add `docs/product-surfaces.md`
+  - Define app-vs-library scope, boundaries, and non-goals
+  - Define standalone extension user journey: passive capture -> search -> revisit
+  - Define what remains local-only and private in the app shell
+
+- [ ] **P3-G2:** Add standalone search UX checklist to `docs/product-surfaces.md`
+  - Search-first information architecture (query bar, results, lightweight metrics)
+  - Result-card contract (title, URL, snippet/thumbnail, visit recency, relevance signal)
+  - UX states: empty index, no matches, loading/indexing, error recovery
+
+- [ ] **P3-G3:** Add model-mode UX contract to `docs/product-surfaces.md`
+  - Nomic mode: multimodal recall (text + images in shared latent space)
+  - Gemma mode: fine-grained text recall (no image embedding)
+  - UI copy rules that make image-recall availability explicit by mode
+
+- [ ] **P3-G4:** Add rabbit-hole recall acceptance checklist
+  - Vague text recollection scenario recovers a previously visited page path
+  - Vague visual recollection scenario recovers a previously seen image when Nomic mode is enabled
+  - Add manual validation steps for model toggle behavior and capability messaging
+
+**Exit Criteria:** Standalone app UX contract and model-mode behavior are documented; library boundary remains explicit and implementation-ready.
+
+---
+
 ## 📋 Summary by Phase
 
 | Phase | Items | Status | Blocking |
 |-------|-------|--------|----------|
 | v0.1 (Minimal Viable) | 23 tasks (P0-A through P0-G + P0-E) | 🟡 In Progress (P0-A complete) | User cannot use system |
 | v0.5 (Hierarchical + Coherent) | 14 tasks (P1-A through P1-F) | ❌ Not started | Blocked by v0.1 |
-| v1.0 (Background Consolidation) | 14 tasks (P2-A through P2-F) | ❌ Not started | Blocked by v0.5 |
-| Polish & Ship | 17 tasks (P3-A through P3-F) | ❌ Not started | Not blocking v1.0 |
+| v1.0 (Background Consolidation + Smart Sharing) | 18 tasks (P2-A through P2-G) | ❌ Not started | Blocked by v0.5 |
+| Polish & Ship | 21 tasks (P3-A through P3-G) | ❌ Not started | Not blocking v1.0 |
 
-**Total:** ~68 actionable tasks
+**Total:** ~76 actionable tasks
 
 ---
 

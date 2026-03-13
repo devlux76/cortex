@@ -1,11 +1,38 @@
 # CORTEX Design Specification
 
 **Version:** 1.1
-**Last Updated:** 2026-03-13
+**Last Updated:** 2026-03-12
 
 ## Executive Summary
 
 CORTEX (**C**lustered **O**ntic **R**outing **T**hrough **E**ntangled e**X**changes) is a neurobiologically inspired, fully on-device episodic memory engine for autonomous agents. It runs 100% in the browser with no servers, no cloud, and no telemetry. All memory stays local and private.
+
+## Product Surface Reminder (App vs Library)
+
+The same core engine serves two product surfaces with different user expectations:
+
+### 1) Standalone App (Browser Extension)
+
+The standalone product should feel like a clean, fast, personalized search engine over the internet the user has actually seen.
+
+UX intent:
+- Passive capture of visited pages to build a private recall index
+- Search-first interface with fast response and minimal visual noise
+- Recovery from vague recollection ("rabbit-hole memory"), not only exact keyword matching
+- Lightweight metrics display (informative but secondary to search)
+
+Model-mode requirement for app UX:
+- **Nomic mode**: multimodal retrieval (text + images in shared latent space)
+- **Gemma mode**: high-precision text retrieval (no image embedding)
+- UI must make this capability boundary explicit so users understand when image recall is available
+
+### 2) Library Surface (Embeddable)
+
+The library remains headless and integration-first: ingest, retrieve, consolidate, and route memory for external tools without prescribing browser-extension UX patterns.
+
+Design implication:
+- Keep engine interfaces surface-agnostic
+- Keep app-shell concerns (extension permissions, search controls, metrics presentation) outside core memory contracts
 
 ## Core Architecture
 
@@ -468,6 +495,7 @@ All operations must complete on WASM fallback, albeit slower. The resident hotpa
 3. **Persistent Local State** — Survive browser restart with integrity checks
 4. **Idle Consolidation** — Background quality improvements, not expensive write-time computation
 5. **Sublinear Growth** — The resident hotpath index must never exceed H(t); all space-time tradeoff subsystems must target O(√(t log t)) scaling
+6. **Privacy-Safe Sharing** — Shared payloads must pass eligibility filtering so identity/PII-bearing nodes are not exported
 
 ## System Boundaries
 
@@ -476,11 +504,22 @@ All operations must complete on WASM fallback, albeit slower. The resident hotpa
 - Multi-backend vector compute (`webgpu`, `webgl`, `webnn`, `wasm`)
 - Signed graph entities with hash verification
 - Sparse Metroid-neighbor graph for coherence routing
+- Smart interest sharing: opt-in signed subgraph exchange over P2P with pre-share eligibility filtering
 
 ### Out of Scope for v1
 - Full production-grade distributed consensus
 - Cross-device key escrow or account systems
 - Large-scale multi-tenant synchronization services
+- Raw, unfiltered whole-graph export
+
+### Smart Sharing Guardrails (v1 Required)
+
+Smart sharing is a core capability, not a post-v1 extra. The v1 exchange path must:
+
+- Share only user-opted, public-interest graph sections (topic slices), not identity-bearing personal traces
+- Run an eligibility classifier pass before export to block PII/person-specific leakage
+- Preserve signatures and provenance on shared nodes so recipients can verify authenticity
+- Keep transport peer-to-peer and on-device, with no central telemetry dependency
 
 ## Terminology
 
@@ -533,7 +572,7 @@ A parallel class of constants governs the Williams Bound hotpath architecture. T
 
 ## Future Directions (Post-v1)
 
-- **P2P Memory Exchange** — Signed subgraph payloads over WebRTC
+- **Federated Sharing Optimization** — Better peer-ranking, deduplication, and prioritization for high-signal interest updates
 - **Advanced Consolidation** — More sophisticated LTP/LTD policies
 - **Query Reranking** — Optional second-pass reranking for quality
 - **Adaptive Chunking** — Context-aware page boundary detection

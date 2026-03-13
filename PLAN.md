@@ -217,6 +217,7 @@ This document tracks the implementation status of each major module in CORTEX. I
 - ❌ **Cannot ingest text** — No chunking or hierarchy builder
 - ❌ **Cannot query memories** — No ranking pipeline or TSP solver
 - ❌ **Cannot consolidate** — No Daydreamer loop
+- ❌ **Cannot share discovery updates safely** — No privacy-filtered interest-subgraph exchange path
 
 ---
 
@@ -293,9 +294,9 @@ This document tracks the implementation status of each major module in CORTEX. I
 
 ---
 
-### Phase 3: Background Consolidation & Community Quotas (Ship v1.0)
+### Phase 3: Background Consolidation, Community Quotas & Smart Sharing (Ship v1.0)
 
-**Goal:** Idle maintenance keeps memory healthy; community-aware hotpath coverage active.
+**Goal:** Idle maintenance keeps memory healthy, community-aware hotpath coverage stays diverse, and privacy-safe interest sharing is available.
 
 1. **Idle Scheduler** (`daydreamer/IdleScheduler.ts`)
    - Cooperative, interruptible loop
@@ -318,7 +319,13 @@ This document tracks the implementation status of each major module in CORTEX. I
    - Store community labels in `PageActivity.communityId`
    - Wire community IDs into `SalienceEngine` promotion/eviction
 
-**Exit Criteria:** System self-maintains over extended use; community-aware hotpath quotas enforced.
+6. **Smart Interest Sharing** (`sharing/*` planned)
+   - `sharing/EligibilityClassifier.ts` — classify candidate nodes for share eligibility; block identity/PII-bearing nodes
+   - `sharing/SubgraphExporter.ts` — export signed, topic-scoped graph slices from eligible nodes only
+   - `sharing/SubgraphImporter.ts` — verify signatures/provenance and merge imported slices into local discovery index
+   - `sharing/PeerExchange.ts` — opt-in peer transport for exchanging eligible graph slices
+
+**Exit Criteria:** System self-maintains over extended use; community-aware hotpath quotas enforced; privacy-safe smart sharing works end-to-end.
 
 ---
 
@@ -346,7 +353,23 @@ This document tracks the implementation status of each major module in CORTEX. I
    - Guard scripts in merge checks (model-derived + hotpath policy)
    - Benchmark baselines
 
-**Exit Criteria:** All tests pass; benchmarks recorded; docs complete; ready for public use.
+5. **Product Surface UX Contract**
+    - Define standalone browser-extension UX baseline:
+       - Passive capture of visited pages into the local ingest queue
+       - Search-first recall UI over pages the user has actually seen
+       - Lightweight metrics panel that supports, but does not dominate, retrieval UX
+    - Define model-mode UX contract for the standalone app:
+       - Nomic mode = multimodal retrieval (text + images in shared latent space)
+       - Gemma mode = high-precision text retrieval (no image embedding)
+       - Capability messaging in UI so users understand image-recall availability by mode
+    - Define library boundary contract:
+       - Keep extension shell concerns outside core ingest/query APIs
+       - Keep library docs and examples headless/integration-first
+    - Add acceptance checks for rabbit-hole recall UX:
+       - Vague text recollection recovers previously visited pages
+       - Vague visual recollection recovers previously seen images when multimodal mode is enabled
+
+**Exit Criteria:** All tests pass; benchmarks recorded; docs complete; product-surface UX contract documented; ready for public use.
 
 ---
 
@@ -363,6 +386,10 @@ This document tracks the implementation status of each major module in CORTEX. I
 ### Blocker 3: No HotpathPolicy or SalienceEngine
 **Impact:** Cannot enforce Williams Bound invariants; all subsequent phases depend on these.
 **Mitigation:** Phase 1 priority; implement before ingest/query orchestration.
+
+### Blocker 4: No Privacy-Safe Sharing Pipeline
+**Impact:** Core discovery-sharing value proposition is missing.
+**Mitigation:** Phase 3 required track; implement eligibility classifier + signed subgraph exchange as v1 scope.
 
 ### Risk 1: TSP Complexity
 Open TSP is NP-hard; heuristic may be slow on large subgraphs.

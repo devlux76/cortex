@@ -15,7 +15,34 @@ CORTEX changes that.
 
 It is a browser-native memory organism that runs 100% on-device — no servers, no cloud, no telemetry. Built from the ground up to feel like a real brain: fast associative encoding, coherent graph reasoning, and continuous background consolidation.
 
-Everything stays private. Everything stays fast. And the entire memory graph can be shared via P2P without ever leaving the browser.
+Everything stays private. Everything stays fast. And privacy-safe, interest-focused graph slices can be shared via P2P without ever leaving the browser.
+
+## Product Direction: App + Library
+
+CORTEX is intentionally built with two first-class surfaces:
+
+- **Standalone App (Browser Extension)**
+  A lightweight, search-first personal memory engine that passively tracks pages the user has actually visited and turns that history into a fast, clean, private recall interface.
+
+  The target experience is: "I went down a rabbit hole weeks ago and only remember a vague impression" -> one search query should still recover the path, the page, or the image.
+
+  The app UI should prioritize:
+  - Instant search results over visited web history
+  - Ontic retrieval (thing-level recollection), not only keyword or semantic matching
+  - Clear, low-noise metrics (like the current preview, but more polished and scannable)
+  - Opt-in discovery feed from privacy-filtered, signed peer graph slices (public-interest content only)
+
+- **Embeddable Library**
+  A headless TypeScript memory substrate for other tools and agents. Integrators should be able to ingest, route, query, and consolidate memory without inheriting browser-extension UX concerns.
+
+### Model Choice in the Standalone App
+
+The standalone UX should expose a user-selectable model mode:
+
+- **Nomic**: multimodal embeddings (text + images projected into one latent space). Best for visual recollection, e.g., recalling a previously seen image from a fuzzy prompt like "swirling dream-like scene."
+- **Gemma**: text-only embeddings with stronger fine-grained textual precision. Best for exact or nuanced text recall where image embedding is not required.
+
+The model toggle should clearly communicate capability trade-offs, especially that image recall is only available in multimodal mode.
 
 ## The Three Living Regions
 
