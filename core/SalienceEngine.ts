@@ -287,7 +287,7 @@ export async function runPromotionSweep(
         : 0;
       const communityCount = communitySizes.candidateCommunityCount;
 
-      if (communityCount >= communityBudget && capacityRemaining <= 0) {
+      if (communityCount >= communityBudget) {
         // Community is at quota — only promote if candidate beats weakest in community
         const weakestId = await selectEvictionTarget(tier, communityId, metadataStore);
         if (weakestId === undefined) continue;
