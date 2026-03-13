@@ -81,7 +81,7 @@ This document tracks the implementation status of each major module in CORTEX. I
 | Page Builder | ✅ Complete | `hippocampus/PageBuilder.ts` | Builds signed `Page` entities with `contentHash`, `vectorHash`, `prevPageId`/`nextPageId` linkage; covered by `tests/hippocampus/PageBuilder.test.ts` |
 | Ingest Orchestrator | 🟡 Partial | `hippocampus/Ingest.ts` | `ingestText()` implemented: chunk → embed → persist pages + PageActivity → create Book → run hotpath promotion sweep. **Missing:** hierarchy building (Volume/Shelf), semantic neighbor insertion. |
 | Hierarchy Builder | ❌ Missing | `hippocampus/HierarchyBuilder.ts` (planned) | Construct/update Books, Volumes, Shelves; attempt tier-quota hotpath admission for each level's medoid/prototype; Williams-derived fanout bounds; trigger split via ClusterStability when bounds exceeded |
-| Fast Semantic Neighbor Insert | ❌ Missing | `hippocampus/FastNeighborInsert.ts` (planned) | Incremental semantic neighbor graph update; max degree derived from HotpathPolicy (not hardcoded K); evict lowest-cosine-similarity neighbor on degree overflow; check new page for hotpath admission. **Note:** Not to be confused with Metroid construction, which is a CORTEX retrieval concern. |
+| Fast Semantic Neighbor Insert | ❌ Missing | `hippocampus/FastNeighborInsert.ts` (planned) | Cosine-nearest neighbors within Williams-cutoff distance (not fixed K). Degree overflow evicts lowest-cosine-similarity neighbor. Initial edges only at ingest; Daydreamer builds additional edges lazily. `SemanticNeighbor.cosineSimilarity` drives discovery + Bayesian updates; Hebbian weights (separate) drive TSP traversal. See DESIGN.md §Graph Structures for the full edge-role invariant. |
 
 **Hippocampus Status:** 2.5/5 complete (50%)
 
@@ -100,8 +100,8 @@ This document tracks the implementation status of each major module in CORTEX. I
 | Seed Selection | ❌ Missing | `cortex/SeedSelection.ts` (planned) | Threshold-based top-k page selection from ranking output |
 | Subgraph Expansion | 🟡 Partial | `storage/IndexedDbMetadataStore.ts` (`getInducedMetroidSubgraph` — to be renamed `getInducedNeighborSubgraph`) | BFS expansion implemented in storage layer; needs dynamic Williams bounds; needs orchestration wrapper |
 | Open TSP Solver | ❌ Missing | `cortex/OpenTSPSolver.ts` (planned) | Dummy-node open-path heuristic for coherent ordering |
-| Query Orchestrator | 🟡 Partial | `cortex/Query.ts` | `query()` implemented: hotpath-first scoring → warm/cold spill → PageActivity update → promotion sweep. **Missing:** MetroidBuilder, dialectical zone scoring, subgraph expansion, TSP coherence, query cost meter. |
-| Result DTO | 🟡 Partial | `cortex/QueryResult.ts` | Minimal DTO: `pages`, `scores`, `metadata`. **Missing:** `coherencePath`, `metroid`, `knowledgeGap`, `provenance` fields. |
+| Query Orchestrator | 🟡 Needs Rework | `cortex/Query.ts` | Flat top-K scoring implemented (hotpath-first → warm/cold spill → PageActivity update → promotion sweep). **Must be substantially reworked** to implement the full dialectical pipeline: replace flat scoring with hierarchical resident-first ranking, add MetroidBuilder, dialectical zone scoring (thesis/antithesis/synthesis), subgraph expansion with dynamic Williams bounds, TSP coherence path, and query cost meter. The existing implementation does not use Hebbian edges or cosine-similarity-bounded subgraph expansion; it is a functional placeholder only. |
+| Result DTO | 🟡 Needs Rework | `cortex/QueryResult.ts` | Minimal DTO (`pages`, `scores`, `metadata`). **Must be reworked** to add `coherencePath: Hash[]`, `metroid?: { m1, m2, centroid }`, `knowledgeGap?: KnowledgeGap`, and `provenance: { subgraphSize, hopCount, edgeWeights, vectorOpCost, earlyStop }`. |
 
 **Cortex Status:** 1.5/9 complete (17%)
 

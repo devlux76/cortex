@@ -308,11 +308,12 @@ These items add hierarchical routing and coherent path ordering. They transform 
 **Why:** Need a sparse semantic neighbor graph for coherent path tracing. This graph connects pages with high cosine similarity and is used for BFS subgraph expansion during retrieval. Degree must be bounded by `HotpathPolicy` to prevent unbounded graph mass growth. **This is not related to Metroid construction** — the semantic neighbor graph is a proximity concept, not a dialectical probe concept.
 
 - [ ] **P1-C1:** Implement `hippocampus/FastNeighborInsert.ts`
-  - For each new page, compute similarity to existing pages
-  - Derive max neighbors per page from `HotpathPolicy` constant (not hardcoded K)
-  - Insert forward edges (page → neighbors) as `SemanticNeighbor` records
-  - Insert reverse edges (neighbors → page), respecting max degree
+  - For each new page, find cosine-nearest neighbors within Williams-cutoff **distance** (not a fixed K); derive the cutoff radius from `HotpathPolicy` rather than a hardcoded constant
+  - Insert forward edges (page → neighbors) as `SemanticNeighbor` records, respecting max degree
+  - Insert reverse edges (neighbors → page), respecting max degree per direction
   - If a page is already at max degree, evict the neighbor with the lowest cosine similarity
+  - Insert only initial edges at ingest time; do not attempt full cross-edge reconnection — Daydreamer walks the graph during idle passes to build additional edges (avoids full graph recalc on every insert)
+  - **Edge role invariant:** `SemanticNeighbor.cosineSimilarity` is used for neighbor discovery and Bayesian belief updates. Hebbian edge weights (in `edges_hebbian`) are used for TSP tour traversal. These are separate edge types with separate roles; do not mix them.
   - Mark affected volumes as dirty for full Daydreamer recalc
   - After insertion, check new page for hotpath admission via `SalienceEngine`
 
@@ -321,10 +322,11 @@ These items add hierarchical routing and coherent path ordering. They transform 
 
 - [ ] **P1-C3:** Add semantic neighbor insert test coverage
   - `tests/hippocampus/FastNeighborInsert.test.ts`
-  - Test neighbor lists are bounded by the policy-derived max degree
+  - Test neighbor lists are bounded by Williams-cutoff distance (not a fixed K)
   - Test symmetry (if A→B, then B→A)
-  - Test that degree overflow evicts lowest-similarity neighbor, not a random one
+  - Test that degree overflow evicts lowest-cosine-similarity neighbor, not a random one
   - Test that new page is considered for hotpath admission after insertion
+  - Test that `edges_hebbian` records are NOT created by FastNeighborInsert (Hebbian is Daydreamer's concern)
 
 **Exit Criteria:** Semantic neighbor graph is maintained during ingest with policy-bounded degree.
 
@@ -420,19 +422,21 @@ These items add hierarchical routing and coherent path ordering. They transform 
 
 **Why:** This is the "aha" moment — return memories in natural narrative order through the resident hotpath via dialectical Metroid exploration, with dynamic, sublinear expansion bounds.
 
-- [ ] **P1-E1:** Upgrade `cortex/Query.ts` (full version)
+> **Note on scope:** The existing `cortex/Query.ts` is a flat top-K scorer that does not use MetroidBuilder, Hebbian edge traversal, or cosine-similarity-bounded subgraph expansion. It must be **substantially reworked** — not merely extended — to implement the dialectical pipeline described below. The same applies to `cortex/QueryResult.ts`. Do not attempt to preserve the flat-scoring code path; it is superseded entirely.
+
+- [ ] **P1-E1:** Rewrite `cortex/Query.ts` (full dialectical version)
   - Use resident-first hierarchical ranking to select topic medoid (m1)
   - Call `MetroidBuilder` to construct `{ m1, m2, c }`
   - If knowledge gap detected, include in result and continue with partial Metroid (m1 only)
   - Use centroid `c` as the primary scoring anchor for page selection
   - Derive dynamic subgraph bounds from `HotpathPolicy` (`maxSubgraphSize`, `maxHops`, `perHopBranching`)
-  - Call `MetadataStore.getInducedNeighborSubgraph(seedPages, maxHops)` using dynamic `maxHops`
+  - Call `MetadataStore.getInducedNeighborSubgraph(seedPages, maxHops)` using dynamic `maxHops`; traverse edges using Hebbian weights for tour distance (not cosine similarity)
   - Call `OpenTSPSolver.solve(subgraph)`
   - Return ordered page list via coherent path
   - **Query cost meter:** count vector operations; early-stop and return best-so-far if cost exceeds Williams-derived budget
   - Include provenance metadata (hop count, edge weights, subgraph size, cost, Metroid details)
 
-- [ ] **P1-E2:** Upgrade `cortex/QueryResult.ts`
+- [ ] **P1-E2:** Rewrite `cortex/QueryResult.ts`
   - Add `coherencePath: Hash[]` (ordered page IDs)
   - Add `metroid?: { m1: Hash; m2: Hash | null; centroid: Float32Array | null }` (Metroid used for this query)
   - Add `knowledgeGap?: KnowledgeGap` (if antithesis discovery failed)
@@ -847,7 +851,7 @@ If you're reading this and want to know "what do I work on right now?", here's t
 7. **P1-M1/M2:** Implement `cortex/MetroidBuilder.ts` with Matryoshka unwinding
 8. **P1-N1/N2:** Implement `cortex/KnowledgeGapDetector.ts`
 9. **P1-D1:** Implement `cortex/OpenTSPSolver.ts`
-10. **P1-E1:** Upgrade `cortex/Query.ts` to full dialectical orchestrator
+10. **P1-E1:** Rewrite `cortex/Query.ts` to full dialectical orchestrator (substantial rework; not backward-compatible with flat top-K version)
 
 ---
 

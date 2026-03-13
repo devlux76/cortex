@@ -434,11 +434,28 @@ Sparse radius-graph edge connecting pages with high cosine similarity. Used for 
 
 > **Note:** The current codebase names this type `MetroidNeighbor` — this is an architectural naming error introduced by early conceptual drift. The correct term is `SemanticNeighbor` (or equivalent). A code-level rename is tracked in the TODO. The edge is a proximity concept, not a Metroid concept.
 
+**Critical distinction — two edge types, two roles:**
+
+| Edge type | Storage | Role |
+|-----------|---------|------|
+| `SemanticNeighbor` | `neighbor_graph` IDB store | Neighbor discovery during ingest; Bayesian belief updates |
+| Hebbian edge (`Edge`) | `edges_hebbian` IDB store | TSP tour traversal distance; LTP/LTD strengthening/decay |
+
+`SemanticNeighbor.cosineSimilarity` drives:
+- Which pages become neighbors during `FastNeighborInsert` (Williams-cutoff distance, not a fixed K)
+- Bayesian belief score updates for the retrieved page set
+
+Hebbian `Edge.weight` drives:
+- The distance metric used by `OpenTSPSolver` when ordering pages into a coherent narrative path
+- Strength of connection for LTP/LTD during Daydreamer consolidation
+
+These two edge types must **never** be conflated or substituted for one another.
+
 ```typescript
 interface SemanticNeighbor {
   neighborPageId: Hash;
   cosineSimilarity: number;
-  distance: number;           // 1 - cosineSimilarity (TSP-ready)
+  distance: number;           // 1 - cosineSimilarity; used for subgraph edge weight
 }
 ```
 
@@ -450,6 +467,9 @@ Induced subgraph for BFS-based coherence path expansion.
 ```typescript
 interface SemanticNeighborSubgraph {
   nodes: Hash[];
+  // distance: 1 - cosineSimilarity; used for BFS expansion candidate selection.
+  // OpenTSPSolver uses Hebbian edge weights (from edges_hebbian) as the tour
+  // traversal distance to determine how far to walk — not these cosine distances.
   edges: { from: Hash; to: Hash; distance: number }[];
 }
 ```
@@ -556,7 +576,9 @@ Rather than returning nearest neighbors by similarity, Cortex traces a coherent 
 7. **Mark Dirty** — Flag volumes for full recalc by Daydreamer
 
 **Incremental Strategy:**
-Fast local semantic neighbor insertion keeps query-time latency low. Full neighborhood recalculation is deferred to idle Daydreamer passes. Hotpath admission runs at ingest time for new pages and hierarchy prototypes.
+Fast local semantic neighbor insertion keeps ingest-time latency low. At ingest time, only the initial forward and reverse edges are created — neighbors are selected by cosine similarity within Williams-cutoff **distance** (not a fixed K; the cutoff is derived from `HotpathPolicy`). On degree overflow, the lowest-cosine-similarity neighbor is evicted.
+
+Full cross-edge reconnection is intentionally deferred: Daydreamer walks the graph during idle passes to build additional edges, strengthening or pruning connections via LTP/LTD. This avoids a full graph recalculation on every insert while still converging to a well-connected graph over time. Hotpath admission runs at ingest time for new pages and hierarchy prototypes.
 
 ## Consolidation Design
 
