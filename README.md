@@ -49,6 +49,9 @@ The model toggle should clearly communicate capability trade-offs, especially th
 CORTEX is structured exactly like its biological namesakes:
 
 ### 🧠 Hippocampus — Fast Associative Encoding
+
+Hebbian Influenced Parametric Projection Over Clustered Autoassociative Memory Patterns to Unify Systems
+
 When new observations arrive, Hippocampus immediately:
 - Embeds them with a Matryoshka-capable model
 - Performs lightning-fast WebGPU multi-prototype lookups
