@@ -204,6 +204,45 @@ These items **must** be completed to have a usable system. Without them, users c
 
 ---
 
+### P0-X: Fix Architectural Naming Drift (BLOCKS: correct design implementation)
+
+**Why:** The codebase uses the term "Metroid" to name the sparse proximity/neighbor graph (`MetroidNeighbor`, `MetroidSubgraph`, `metroid_neighbors`, `getInducedMetroidSubgraph`, `FastMetroidInsert`, `FullMetroidRecalc`). This is architecturally incorrect. In CORTEX, a **Metroid** is a structured dialectical search probe `{ m1, m2, c }` — a concept that does not yet exist in the codebase at all. The proximity graph has nothing to do with Metroids. This naming collision will cause permanent confusion and make the MetroidBuilder impossible to implement cleanly without a rename.
+
+- [ ] **P0-X1:** Rename `MetroidNeighbor` → `SemanticNeighbor` in `core/types.ts`
+  - Update all references in `storage/IndexedDbMetadataStore.ts`
+  - Update all references in test files
+  - Update JSDoc and inline comments
+
+- [ ] **P0-X2:** Rename `MetroidSubgraph` → `SemanticNeighborSubgraph` in `core/types.ts`
+  - Update all references in `storage/IndexedDbMetadataStore.ts`
+  - Update all references in `cortex/Query.ts`
+  - Update JSDoc and inline comments
+
+- [ ] **P0-X3:** Rename `MetadataStore` proximity graph methods:
+  - `putMetroidNeighbors` → `putSemanticNeighbors`
+  - `getMetroidNeighbors` → `getSemanticNeighbors`
+  - `getInducedMetroidSubgraph` → `getInducedNeighborSubgraph`
+  - `needsMetroidRecalc` → `needsNeighborRecalc`
+  - `flagVolumeForMetroidRecalc` → `flagVolumeForNeighborRecalc`
+  - `clearMetroidRecalcFlag` → `clearNeighborRecalcFlag`
+  - Update all callers in `storage/IndexedDbMetadataStore.ts`, `cortex/Query.ts`, and test files
+
+- [ ] **P0-X4:** Rename planned Hippocampus file `hippocampus/FastMetroidInsert.ts` → `hippocampus/FastNeighborInsert.ts`
+  - Rename class/function to `FastNeighborInsert`/`insertSemanticNeighbors`
+
+- [ ] **P0-X5:** Rename planned Daydreamer file `daydreamer/FullMetroidRecalc.ts` → `daydreamer/FullNeighborRecalc.ts`
+  - Rename class/function to `FullNeighborRecalc`/`runNeighborRecalc`
+
+- [ ] **P0-X6:** Rename IndexedDB object store from `metroid_neighbors` → `neighbor_graph`
+  - Increment `DB_VERSION` in `storage/IndexedDbMetadataStore.ts`
+  - Add migration in `applyUpgrade` to copy data from old store to new store
+
+- [ ] **P0-X7:** Update all documentation strings and JSDoc that use "Metroid neighbor" to use "semantic neighbor"
+
+**Exit Criteria:** No source file uses "Metroid" to refer to the proximity graph. The term "Metroid" is reserved exclusively for the `{ m1, m2, c }` dialectical probe type implemented in `cortex/MetroidBuilder.ts`.
+
+---
+
 ## 🟡 High Priority — Ship v0.5 (Hierarchical + Coherent)
 
 These items add hierarchical routing and coherent path ordering. They transform CORTEX from a flat vector search into a biologically-inspired memory system.
@@ -264,30 +303,32 @@ These items add hierarchical routing and coherent path ordering. They transform 
 
 ---
 
-### P1-C: Fast Metroid Neighbor Insert (UNBLOCKS: graph coherence)
+### P1-C: Fast Semantic Neighbor Insert (UNBLOCKS: graph coherence)
 
-**Why:** Need sparse NN graph for coherent path tracing. Degree must be bounded by `HotpathPolicy` to prevent unbounded graph mass growth.
+**Why:** Need a sparse semantic neighbor graph for coherent path tracing. This graph connects pages with high cosine similarity and is used for BFS subgraph expansion during retrieval. Degree must be bounded by `HotpathPolicy` to prevent unbounded graph mass growth. **This is not related to Metroid construction** — the semantic neighbor graph is a proximity concept, not a dialectical probe concept.
 
-- [ ] **P1-C1:** Implement `hippocampus/FastMetroidInsert.ts`
-  - For each new page, compute similarity to existing pages
-  - Derive max neighbors per page from `HotpathPolicy` constant (not hardcoded K)
-  - Insert forward edges (page → neighbors)
-  - Insert reverse edges (neighbors → page), respecting max degree
-  - If a page is already at max degree, evict the neighbor with the lowest Hebbian edge weight
+- [ ] **P1-C1:** Implement `hippocampus/FastNeighborInsert.ts`
+  - For each new page, find cosine-nearest neighbors within Williams-cutoff **distance** (not a fixed K); derive the cutoff radius from `HotpathPolicy` rather than a hardcoded constant
+  - Insert forward edges (page → neighbors) as `SemanticNeighbor` records, respecting max degree
+  - Insert reverse edges (neighbors → page), respecting max degree per direction
+  - If a page is already at max degree, evict the neighbor with the lowest cosine similarity
+  - Insert only initial edges at ingest time; do not attempt full cross-edge reconnection — Daydreamer walks the graph during idle passes to build additional edges (avoids full graph recalc on every insert)
+  - **Edge role invariant:** `SemanticNeighbor.cosineSimilarity` is used for neighbor discovery and Bayesian belief updates. Hebbian edge weights (in `edges_hebbian`) are used for TSP tour traversal. These are separate edge types with separate roles; do not mix them.
   - Mark affected volumes as dirty for full Daydreamer recalc
   - After insertion, check new page for hotpath admission via `SalienceEngine`
 
 - [ ] **P1-C2:** Upgrade `hippocampus/Ingest.ts`
-  - After persisting pages, call `FastMetroidInsert`
+  - After persisting pages, call `FastNeighborInsert`
 
-- [ ] **P1-C3:** Add Metroid insert test coverage
-  - `tests/hippocampus/FastMetroidInsert.test.ts`
-  - Test neighbor lists are bounded by the policy-derived max degree
+- [ ] **P1-C3:** Add semantic neighbor insert test coverage
+  - `tests/hippocampus/FastNeighborInsert.test.ts`
+  - Test neighbor lists are bounded by Williams-cutoff distance (not a fixed K)
   - Test symmetry (if A→B, then B→A)
-  - Test that degree overflow evicts lowest-weight neighbor, not a random one
+  - Test that degree overflow evicts lowest-cosine-similarity neighbor, not a random one
   - Test that new page is considered for hotpath admission after insertion
+  - Test that `edges_hebbian` records are NOT created by FastNeighborInsert (Hebbian is Daydreamer's concern)
 
-**Exit Criteria:** Metroid neighbor graph is maintained during ingest with policy-bounded degree.
+**Exit Criteria:** Semantic neighbor graph is maintained during ingest with policy-bounded degree.
 
 ---
 
@@ -297,7 +338,7 @@ These items add hierarchical routing and coherent path ordering. They transform 
 
 - [ ] **P1-D1:** Implement `cortex/OpenTSPSolver.ts`
   - Dummy-node open-path heuristic (greedy nearest-neighbor)
-  - Input: `MetroidSubgraph` (nodes + edges with distances)
+  - Input: `SemanticNeighborSubgraph` (nodes + edges with distances; after P0-X2 rename)
   - Output: ordered path through all nodes
   - Deterministic for same input
 
@@ -311,46 +352,148 @@ These items add hierarchical routing and coherent path ordering. They transform 
 
 ---
 
-### P1-E: Full Query Orchestrator (DELIVERS: coherent retrieval)
+### P1-M: MetroidBuilder (DELIVERS: dialectical epistemology)
 
-**Why:** This is the "aha" moment — return memories in natural narrative order through the resident hotpath with dynamic, sublinear expansion bounds.
+**Why:** MetroidBuilder is the core of what makes CORTEX an _epistemic_ system rather than a vector search engine. Without it, the system merely returns nearest neighbors and cannot explore opposing perspectives, detect knowledge gaps, or trigger P2P curiosity requests. The Metroid loop converts conceptual opposition into navigable exploration steps.
 
-- [ ] **P1-E1:** Upgrade `cortex/Query.ts` (full version)
-  - Use resident-first hierarchical ranking to select seed pages
+- [ ] **P1-M1:** Implement `cortex/MetroidBuilder.ts`
+  - Accept a query embedding `q` and a list of resident medoids (shelf/volume/book representatives)
+  - **Thesis (select m1):** Find `m1` via medoid search — the medoid minimizing distance to `q`. A
+    medoid (not a centroid) is always an existing memory node; it ensures the search anchor is an
+    actual data point rather than an averaged phantom position. This keeps the search on the
+    correct conceptual road.
+  - Read `matryoshkaProtectedDim` from `ModelProfile` (e.g. 128 for embeddinggemma-300m, 64 for
+    nomic-embed-text-v1.5). If `undefined` on the current model (non-Matryoshka), return
+    `{ m1, m2: null, c: null, knowledgeGap: true }` immediately.
+  - **Freeze:** Lock all dimensions with index < `matryoshkaProtectedDim`.
+  - **Antithesis (find m2):** In the unfrozen upper dimensions (index >= `matryoshkaProtectedDim`):
+    1. Score every candidate medoid as `-cosine_similarity(candidate_free_dims, m1_free_dims)`.
+       The highest-scoring candidates are farthest from m1 in the free dimensions — maximal
+       conceptual divergence.
+    2. Find the **medoid of that cosine-opposite set** (the top-scoring candidates). This is `m2`.
+    3. `m2` must be an existing memory node (not a computed position). The medoid operation
+       ensures this. This is distinct from simply finding the node with the lowest cosine
+       similarity to m1.
+  - **Synthesis (freeze centroid):** Compute `c` once and freeze it:
+    - Protected dims (< `matryoshkaProtectedDim`): copy from m1 (domain invariant).
+    - Free dims (>= `matryoshkaProtectedDim`): `c[i] = (m1[i] + m2[i]) / 2`.
+    - This frozen `c` is never recalculated. All future candidates in the Matryoshka unwind are
+      evaluated relative to this frozen platform.
+  - Return `Metroid { m1, m2, c }`; if no valid m2 found, return
+    `{ m1, m2: null, c: null, knowledgeGap: true }`
+
+- [ ] **P1-M2:** Implement Matryoshka dimensional unwinding in `cortex/MetroidBuilder.ts`
+  - After the initial Metroid construction, progressively expand the antithesis search into deeper
+    embedding layers by shifting the protected dimension boundary outward one Matryoshka tier at a
+    time.
+  - At each new tier, find a new `m2` candidate via cosine-opposite medoid search in the expanded
+    free dimensions.
+  - Evaluate each candidate against the **frozen** `c` (not a recomputed centroid). If close
+    enough to `c`, accept and freeze this step; take the next conceptual leap. If not,
+    continue unwinding.
+  - Stop when the protected dimension floor is reached or a satisfactory `m2` is accepted.
+  - If no satisfactory `m2` is found at any layer, return `knowledgeGap: true`.
+
+- [ ] **P1-M3:** Add MetroidBuilder test coverage
+  - `tests/cortex/MetroidBuilder.test.ts`
+  - Test m1 selection: the medoid minimising distance to q is chosen (not the centroid)
+  - Test m2 selection: medoid of cosine-opposite set — not merely nearest semantically-opposing node
+  - Test centroid computation: protected dims copied from m1; free dims averaged element-wise
+  - Test centroid is frozen: subsequent unwinding steps do not recompute c
+  - Test dimensional unwinding: search expands progressively through Matryoshka layers
+  - Test knowledge gap: when no valid m2 exists in any layer, returns `knowledgeGap: true`
+  - Test protected dimensions are never searched for antithesis
+  - Test determinism: same inputs always produce same Metroid
+
+**Exit Criteria:** MetroidBuilder constructs valid Metroids (m1 via medoid search, m2 via
+cosine-opposite medoid of the top-scoring candidates, c computed once and never recomputed during
+Matryoshka unwinding) and correctly detects knowledge gaps.
+
+---
+
+### P1-N: Knowledge Gap Detection & Curiosity Probe (DELIVERS: epistemic honesty)
+
+**Why:** When MetroidBuilder cannot find m2, the system must acknowledge its knowledge boundary rather than hallucinating. The curiosity probe mechanism enables distributed learning by broadcasting the gap to peers.
+
+- [ ] **P1-N1:** Implement `cortex/KnowledgeGapDetector.ts`
+  - Accept MetroidBuilder result; if `knowledgeGap: true`, emit a `KnowledgeGap` DTO
+  - `KnowledgeGap { topicMedoidId: Hash, queryEmbedding: Float32Array, dimensionalBoundary: number, timestamp: string }`
+  - This DTO is returned to the caller as part of `QueryResult`
+
+- [ ] **P1-N2:** Implement curiosity probe construction in `cortex/KnowledgeGapDetector.ts`
+  - Build `CuriosityProbe { m1, partialMetroid, queryContext, knowledgeBoundary, mimeType, modelUrn }`
+    - `mimeType`: MIME type of embedded content (e.g. `text/plain`). Enables receiving peers to validate content-type compatibility before comparing graph sections.
+    - `modelUrn`: URN of the embedding model (e.g. `urn:model:onnx-community/embeddinggemma-300m-ONNX:v1`) sourced from the active `ModelProfile.modelId`. Peers **must** reject probes whose `modelUrn` does not match a model they support — accepting fragments from a different embedding model would produce incommensurable similarity scores at Matryoshka layer boundaries.
+  - Store probe locally for broadcast via P2P layer (see P2-G)
+  - Do not broadcast immediately — queue for the P2P sharing layer
+
+- [ ] **P1-N3:** Upgrade `cortex/QueryResult.ts`
+  - Add `knowledgeGap?: KnowledgeGap` field — present when MetroidBuilder failed to find m2
+  - Document that callers must check this field before treating results as epistemically complete
+
+- [ ] **P1-N4:** Add knowledge gap test coverage
+  - `tests/cortex/KnowledgeGapDetector.test.ts`
+  - Test that a KnowledgeGap DTO is produced when MetroidBuilder returns `knowledgeGap: true`
+  - Test that a CuriosityProbe is constructed with correct fields including `mimeType` and `modelUrn`
+  - Test that `modelUrn` is derived from `ModelProfile.modelId` (not hardcoded)
+  - Test that QueryResult includes the KnowledgeGap when present
+  - Test that queries against a rich corpus do NOT produce false-positive knowledge gaps
+
+**Exit Criteria:** System correctly signals knowledge boundaries; callers can distinguish epistemically complete from incomplete results.
+
+---
+
+### P1-E: Full Query Orchestrator (DELIVERS: dialectical retrieval)
+
+**Why:** This is the "aha" moment — return memories in natural narrative order through the resident hotpath via dialectical Metroid exploration, with dynamic, sublinear expansion bounds.
+
+> **Note on scope:** The existing `cortex/Query.ts` is a flat top-K scorer that does not use MetroidBuilder, Hebbian edge traversal, or cosine-similarity-bounded subgraph expansion. It must be **substantially reworked** — not merely extended — to implement the dialectical pipeline described below. The same applies to `cortex/QueryResult.ts`. Do not attempt to preserve the flat-scoring code path; it is superseded entirely.
+
+- [ ] **P1-E1:** Rewrite `cortex/Query.ts` (full dialectical version)
+  - Use resident-first hierarchical ranking to select topic medoid (m1)
+  - Call `MetroidBuilder` to construct `{ m1, m2, c }`
+  - If knowledge gap detected, include in result and continue with partial Metroid (m1 only)
+  - Use centroid `c` as the primary scoring anchor for page selection
   - Derive dynamic subgraph bounds from `HotpathPolicy` (`maxSubgraphSize`, `maxHops`, `perHopBranching`)
-  - Call `MetadataStore.getInducedMetroidSubgraph(seedPages, maxHops)` using dynamic `maxHops`
+  - Call `MetadataStore.getInducedNeighborSubgraph(seedPages, maxHops)` using dynamic `maxHops`; traverse edges using Hebbian weights for tour distance (not cosine similarity)
   - Call `OpenTSPSolver.solve(subgraph)`
   - Return ordered page list via coherent path
   - **Query cost meter:** count vector operations; early-stop and return best-so-far if cost exceeds Williams-derived budget
-  - Include provenance metadata (hop count, edge weights, subgraph size, cost)
+  - Include provenance metadata (hop count, edge weights, subgraph size, cost, Metroid details)
 
-- [ ] **P1-E2:** Upgrade `cortex/QueryResult.ts`
+- [ ] **P1-E2:** Rewrite `cortex/QueryResult.ts`
   - Add `coherencePath: Hash[]` (ordered page IDs)
+  - Add `metroid?: { m1: Hash; m2: Hash | null; centroid: Float32Array | null }` (Metroid used for this query)
+  - Add `knowledgeGap?: KnowledgeGap` (if antithesis discovery failed)
   - Add `provenance: { subgraphSize: number; hopCount: number; edgeWeights: number[]; vectorOpCost: number; earlyStop: boolean }`
 
 - [ ] **P1-E3:** Add full query test coverage
   - `tests/cortex/Query.test.ts` (upgrade)
   - Test subgraph expansion stays within `maxSubgraphSize`
   - Test TSP ordering
+  - Test Metroid is built and included in provenance
+  - Test knowledge gap is returned when antithesis not found
   - Test provenance metadata
   - Test early-stop fires when cost budget exceeded
 
-**Exit Criteria:** Queries return coherent ordered context chains through the resident hotpath; dynamic bounds and cost meter active.
+**Exit Criteria:** Queries return dialectically balanced, coherent context chains through the resident hotpath; MetroidBuilder active; knowledge gaps surfaced.
 
 ---
 
-### P1-F: Integration Test (Hierarchical + Coherent)
+### P1-F: Integration Test (Hierarchical + Dialectical)
 
-**Why:** Validate v0.5 completeness including resident-first routing and dynamic subgraph bounds.
+**Why:** Validate v0.5 completeness including resident-first routing, MetroidBuilder, and dialectical subgraph bounds.
 
 - [ ] **P1-F1:** Upgrade `tests/integration/IngestQuery.test.ts`
   - Verify hierarchical structures exist after ingest
   - Verify hotpath entries exist for hierarchy prototypes after ingest
+  - Verify queries build a valid Metroid `{ m1, m2, c }`
   - Verify queries return coherent paths through resident hotpath
   - Verify dynamic subgraph bounds honoured (no expansion beyond `maxSubgraphSize`)
-  - Compare coherent path vs flat ranking (show narrative flow improvement)
+  - Verify knowledge gap is correctly signalled when corpus is sparse
+  - Compare dialectical retrieval vs flat ranking (show epistemic breadth improvement)
 
-**Exit Criteria:** Integration test demonstrates coherent retrieval with resident-first routing.
+**Exit Criteria:** Integration test demonstrates dialectically balanced retrieval with resident-first routing and knowledge gap detection.
 
 ---
 
@@ -401,20 +544,20 @@ These items add idle background maintenance and privacy-safe interest sharing. T
 
 ---
 
-### P2-C: Full Metroid Recalc (DELIVERS: graph maintenance)
+### P2-C: Full Neighbor Graph Recalc (DELIVERS: graph maintenance)
 
-**Why:** Incremental fast insert is approximate; need periodic full recalc. Recalc batch size must be bounded by H(t)-derived maintenance budget to avoid blocking the idle loop.
+**Why:** Incremental fast semantic neighbor insert is approximate; need periodic full recalc. Recalc batch size must be bounded by H(t)-derived maintenance budget to avoid blocking the idle loop.
 
-- [ ] **P2-C1:** Implement `daydreamer/FullMetroidRecalc.ts`
-  - Query `MetadataStore.needsMetroidRecalc(volumeId)` for dirty volumes; prioritise dirtiest first
+- [ ] **P2-C1:** Implement `daydreamer/FullNeighborRecalc.ts`
+  - Query `MetadataStore.needsNeighborRecalc(volumeId)` for dirty volumes; prioritise dirtiest first
   - Load all pages in volume; compute pairwise similarities
   - Bound batch: process at most `HotpathPolicy.computeCapacity(graphMass)` pairwise comparisons per idle cycle (O(√(t log t)))
-  - Select policy-derived max neighbors for each page; update `MetadataStore.putMetroidNeighbors`
-  - Clear dirty flag via `MetadataStore.clearMetroidRecalcFlag`
+  - Select policy-derived max neighbors for each page; update `MetadataStore.putSemanticNeighbors`
+  - Clear dirty flag via `MetadataStore.clearNeighborRecalcFlag`
   - Recompute σ(v) for affected nodes via `SalienceEngine.batchComputeSalience`; run promotion sweep
 
-- [ ] **P2-C2:** Add Metroid recalc test coverage
-  - `tests/daydreamer/FullMetroidRecalc.test.ts`
+- [ ] **P2-C2:** Add neighbor graph recalc test coverage
+  - `tests/daydreamer/FullNeighborRecalc.test.ts`
   - Test dirty flag cleared after recalc
   - Test neighbor quality improved vs fast insert
   - Test batch size respects O(√(t log t)) limit per cycle
@@ -467,7 +610,7 @@ These items add idle background maintenance and privacy-safe interest sharing. T
 **Why:** Without community detection, a single dense topic can fill the entire page-tier quota, crowding out unrelated memories. Community quotas ensure the hotpath is both hot (high salience) and diverse (topic-representative).
 
 - [ ] **P2-F1:** Add community detection to `daydreamer/ClusterStability.ts`
-  - Implement lightweight label propagation on the Metroid neighbor graph
+  - Implement lightweight label propagation on the semantic neighbor graph
   - Run during idle passes when dirty-volume flags indicate meaningful structural change
   - Store community labels in `PageActivity.communityId` via `MetadataStore.putPageActivity`
   - Rerun when graph topology changes significantly (post-split, post-merge, post-full-recalc)
@@ -490,9 +633,16 @@ These items add idle background maintenance and privacy-safe interest sharing. T
 
 ---
 
-### P2-G: Smart Interest Sharing & PII Guardrail (DELIVERS: discovery without identity leakage)
+### P2-G: Curiosity Broadcasting & Smart Interest Sharing (DELIVERS: distributed learning without hallucination)
 
-**Why:** Interest sharing is core product value for both app and library surfaces. v1 must share public-interest graph sections while preventing personal data leakage.
+**Why:** When knowledge gaps are detected, CORTEX must be able to broadcast the incomplete Metroid as a curiosity probe to connected peers. Peers respond with relevant fragments, enabling collaborative learning. Additionally, interest sharing is a core product value for both app and library surfaces. v1 must share public-interest graph sections while preventing personal data leakage.
+
+- [ ] **P2-G0:** Implement `sharing/CuriosityBroadcaster.ts`
+  - Consume pending `CuriosityProbe` objects queued by `KnowledgeGapDetector`
+  - Serialize and broadcast to connected peers via P2P transport
+  - Handle responses: deserialize incoming graph fragments; pass to `SubgraphImporter` for integration
+  - Rate-limit broadcasts to prevent spam
+  - Include `knowledgeBoundary` field in probe so peers can target search precisely
 
 - [ ] **P2-G1:** Implement `sharing/EligibilityClassifier.ts`
   - Classify candidate nodes as share-eligible vs blocked before export
@@ -501,6 +651,7 @@ These items add idle background maintenance and privacy-safe interest sharing. T
 
 - [ ] **P2-G2:** Implement `sharing/SubgraphExporter.ts`
   - Build topic-scoped graph slices from eligible nodes only
+  - For curiosity responses: select graph fragment relevant to the received probe's `knowledgeBoundary`
   - Preserve node/edge signatures and provenance
   - Strip or coarsen personal metadata fields that are not needed for discovery
 
@@ -508,13 +659,16 @@ These items add idle background maintenance and privacy-safe interest sharing. T
   - Opt-in peer exchange over P2P transport
   - Verify signatures and schema on import; reject invalid or tampered payloads
   - Merge imported slices into discovery pathways without exposing sender identity metadata
+  - After import, retry MetroidBuilder for any pending knowledge gaps that may be resolved by new data
 
 - [ ] **P2-G4:** Add sharing safety and discovery tests
   - `tests/sharing/EligibilityClassifier.test.ts`
+  - `tests/sharing/CuriosityBroadcaster.test.ts`
   - `tests/sharing/SubgraphExchange.test.ts`
-  - Assert blocked nodes are never exported; assert imported AI-interest updates are discoverable via query
+  - Assert blocked nodes are never exported; assert imported fragments are discoverable via query
+  - Assert that after receiving a response to a curiosity probe, MetroidBuilder can now construct m2 for the previously-gapped topic
 
-**Exit Criteria:** v1 can exchange signed public-interest slices over P2P, and share-blocking reliably prevents PII/identity leakage.
+**Exit Criteria:** v1 can broadcast curiosity probes for knowledge gaps, receive graph fragments from peers, retry MetroidBuilder with new data, and exchange signed public-interest slices with PII blocking.
 
 ---
 
@@ -695,37 +849,44 @@ These items improve quality, performance, and developer experience. Not blockers
 
 | Phase | Items | Status | Blocking |
 |-------|-------|--------|----------|
-| v0.1 (Minimal Viable) | 23 tasks (P0-A through P0-G + P0-E) | 🟡 In Progress (P0-A complete) | User cannot use system |
-| v0.5 (Hierarchical + Coherent) | 14 tasks (P1-A through P1-F) | ❌ Not started | Blocked by v0.1 |
-| v1.0 (Background Consolidation + Smart Sharing) | 18 tasks (P2-A through P2-G) | ❌ Not started | Blocked by v0.5 |
+| v0.1 (Minimal Viable) | 30 tasks (P0-A through P0-G + P0-E + P0-X) | 🟡 In Progress (P0-A, P0-F, P0-G complete; P0-X architectural rename pending) | User cannot use system correctly; P0-X blocks MetroidBuilder |
+| v0.5 (Hierarchical + Dialectical) | 20 tasks (P1-A through P1-F + P1-M + P1-N) | ❌ Not started | Blocked by v0.1 |
+| v1.0 (Background Consolidation + Smart Sharing) | 20 tasks (P2-A through P2-G) | ❌ Not started | Blocked by v0.5 |
 | Polish & Ship | 21 tasks (P3-A through P3-G) | ❌ Not started | Not blocking v1.0 |
 
-**Total:** ~76 actionable tasks
+**Total:** ~91 actionable tasks
 
 ---
 
-## Quick Reference: Next 7 Tasks to Unblock Everything
+## Quick Reference: Next Tasks to Unblock Everything
 
 If you're reading this and want to know "what do I work on right now?", here's the answer:
 
-1. **P0-F1:** Implement `core/HotpathPolicy.ts`
-2. **P0-F3:** Extend `core/types.ts` (PageActivity, HotpathEntry, TierQuotas)
-3. **P0-F4:** Extend `storage/IndexedDbMetadataStore.ts` (hotpath stores)
-4. **P0-G1/G2:** Implement `core/SalienceEngine.ts`
-5. **P0-B1:** Implement `hippocampus/Chunker.ts`
-6. **P0-C1/C2:** Implement `hippocampus/PageBuilder.ts` and `hippocampus/Ingest.ts`
-7. **P0-D1:** Implement `cortex/Query.ts`
+**Immediate (unblock MetroidBuilder):**
+1. **P0-X1–X7:** Fix architectural naming drift (`MetroidNeighbor` → `SemanticNeighbor` and related renames)
 
-Items 1–4 (Williams Bound foundation) should be done first — they are small, independently testable, and unlock correct behaviour in everything that follows.
+**After P0-X (complete v0.1):**
+2. **P0-B1:** Implement `hippocampus/Chunker.ts`
+3. **P0-C1/C2:** Implement `hippocampus/PageBuilder.ts` and `hippocampus/Ingest.ts`
+4. **P0-D1:** Implement `cortex/Query.ts` (minimal)
+
+**After v0.1 (start v0.5):**
+5. **P1-A1:** Implement `hippocampus/HierarchyBuilder.ts`
+6. **P1-C1:** Implement `hippocampus/FastNeighborInsert.ts`
+7. **P1-M1/M2:** Implement `cortex/MetroidBuilder.ts` with Matryoshka unwinding
+8. **P1-N1/N2:** Implement `cortex/KnowledgeGapDetector.ts`
+9. **P1-D1:** Implement `cortex/OpenTSPSolver.ts`
+10. **P1-E1:** Rewrite `cortex/Query.ts` to full dialectical orchestrator (substantial rework; not backward-compatible with flat top-K version)
 
 ---
 
 ## Notes
 
-- **Dependencies:** Items are ordered so that completing tasks in sequence minimises blocked work. P0-F and P0-G (Williams Bound foundation) must precede all hotpath-aware modules.
+- **Dependencies:** Items are ordered so that completing tasks in sequence minimises blocked work. P0-X (naming drift fix) must precede MetroidBuilder. P0-F and P0-G (Williams Bound foundation) must precede all hotpath-aware modules.
 - **Estimates:** Each P0/P1/P2 task is roughly 1-4 hours for an experienced developer familiar with the codebase.
 - **Testing:** Every implementation task should be accompanied by test coverage (explicitly called out).
 - **TDD Approach:** Write failing tests first, then implement to green.
 - **Documentation Sync:** Update PLAN.md module status as tasks complete.
 - **Williams Bound Invariant:** The resident count must never exceed H(t). Every test that touches the hotpath should assert this.
 - **Policy constants:** Never hardcode hotpath constants outside `core/HotpathPolicy.ts`. P3-E3 will add a guard to enforce this automatically; until then, enforce by convention.
+- **Metroid vs medoid vs semantic neighbor graph:** These are three distinct concepts. `Metroid` = dialectical probe `{ m1, m2, c }` (ephemeral, query-time). `medoid` = cluster representative node. Semantic neighbor graph = sparse proximity edges used for BFS subgraph expansion. Do not conflate them. See P0-X for the code rename tasks that fix the current conflation.
