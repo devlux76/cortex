@@ -112,12 +112,12 @@ export function deriveTierQuotas(
 ): TierQuotas {
   const tiers: (keyof TierQuotas)[] = ["shelf", "volume", "book", "page"];
 
-  // Normalise ratios so they sum to 1
+  // Normalize ratios so they sum to 1
   const rawTotal = tiers.reduce((sum, t) => sum + ratios[t], 0);
-  const normalised = tiers.map((t) => (rawTotal > 0 ? ratios[t] / rawTotal : 0.25));
+  const normalized = tiers.map((t) => (rawTotal > 0 ? ratios[t] / rawTotal : 0.25));
 
   const cap = Math.max(0, Math.floor(capacity));
-  const idealShares = normalised.map((r) => r * cap);
+  const idealShares = normalized.map((r) => r * cap);
   const floors = idealShares.map((s) => Math.floor(s));
   let remaining = cap - floors.reduce((a, b) => a + b, 0);
 
