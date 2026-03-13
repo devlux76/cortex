@@ -104,7 +104,10 @@ Metroid = { m1, m2, c }
 Where:
 - **m1** — thesis medoid: the cluster representative most relevant to the query topic
 - **m2** — antithesis medoid: a cluster representative discovered through constrained Matryoshka search to represent semantic opposition to m1
-- **c** — centroid: the geometric midpoint between m1 and m2, used as the balanced search origin
+- **c** — centroid: the synthetic center of mass between m1 and m2.
+  `c` is a "Kansas space" position — typically empty; no real node lives at the centroid.
+  Its value is as a neutral vantage point: from `c`, distances to both poles and all
+  candidates can be measured without anchoring bias toward either m1 or m2.
 
 The Metroid is constructed at query time by the `MetroidBuilder`. It is **not** a persistent graph structure. It is a transient epistemological instrument.
 
@@ -115,11 +118,23 @@ The Metroid is constructed at query time by the `MetroidBuilder`. It is **not** 
 1. **Select m1** — Identify the topic medoid most relevant to the query embedding.
 2. **Freeze protected dimensions** — Lock the lower Matryoshka embedding dimensions that encode invariant semantic context (domain, language register, topic class). These dimensions are never searched for antithesis.
 3. **Search for m2** — Within the remaining (unfrozen) upper dimensions, search for the nearest medoid that represents semantic opposition to m1.
-4. **Compute centroid** — Compute `c` as follows:
+4. **Compute centroid** — Compute `c` as a center of mass between m1 and m2:
    - Protected dimensions (index < `matryoshkaProtectedDim`): copy directly from m1. These dimensions are invariant; averaging them would dilute the domain anchor that makes the antithesis search meaningful.
    - Unfrozen dimensions (index >= `matryoshkaProtectedDim`): compute the element-wise average of m1 and m2 — `c[i] = (m1[i] + m2[i]) / 2`.
    - The result is a full-dimensional vector that can be used directly as a scoring anchor.
-5. **Prefer centroid as search origin** — Use `c` as the primary starting point for subgraph expansion. This prevents semantic drift toward either pole.
+
+   **Important:** `c` is a synthetic position — a "Kansas space". In most cases nothing actually
+   exists at the centroid; it is an empty field in embedding space, equidistant from both poles.
+   Its value is as a neutral vantage point. Standing at `c`, you can immediately measure whether
+   any candidate is closer to m1 (thesis), closer to m2 (antithesis), or equidistant from both
+   (genuinely synthetic). Scoring by proximity to `c` produces unbiased, balanced retrieval.
+   Scoring from m1 or m2 would pull all results toward one pole.
+5. **Use centroid as scoring vantage point** — Weight candidates by their distance to `c`, not to m1 or m2.
+   - Near `c`: synthesis territory — balanced between both poles.
+   - Much closer to m1 than to `c`: thesis-supporting.
+   - Much closer to m2 than to `c`: antithesis-supporting.
+   - Far from `c`, m1, and m2 simultaneously: a third conceptual region not captured by either pole — signal for further Matryoshka unwinding or a knowledge gap.
+   Scoring from `c` avoids anchoring bias; see the Dialectical Search section for the full zone model.
 6. **Unwind Matryoshka layers** — Progressively free deeper embedding dimensions and repeat from step 3. Each unwinding broadens the antithesis search.
 7. **Stop at the protected dimension** — The protected lower dimensions are never unwound. This preserves semantic invariants throughout all levels of search.
 
@@ -148,13 +163,15 @@ This produces progressively wider dialectical exploration while maintaining sema
 
 ### Dialectical Search
 
-Every Metroid-driven query explores three zones:
+Every Metroid-driven query explores three zones, with all scoring anchored at the centroid `c`:
 
 | Zone | Pole | Meaning |
 |------|------|---------|
-| Thesis zone | around m1 | Supporting ideas, corroborating evidence |
-| Antithesis zone | around m2 | Opposing ideas, counterevidence, alternative perspectives |
-| Synthesis zone | around c | Conceptually balanced territory between both poles |
+| Thesis zone | closer to m1 than to c | Supporting ideas, corroborating evidence |
+| Antithesis zone | closer to m2 than to c | Opposing ideas, counterevidence, alternative perspectives |
+| Synthesis zone | near c, equidistant from m1 and m2 | Conceptually balanced territory between both poles |
+
+**Scoring from the centroid vantage point:** candidates are ranked by their distance to `c`. A candidate significantly closer to m1 than to `c` is thesis-supporting; significantly closer to m2 is antithesis-supporting; near `c` is synthesis-zone content. Candidates far from all three (`c`, m1, m2) indicate a third conceptual region — either an undiscovered knowledge area or a signal to unwind another Matryoshka layer. Scoring from m1 or m2 instead of `c` would anchor all results toward one pole, introducing confirmation bias.
 
 This three-zone exploration prevents **confirmation bias**: a system that only retrieves nearest neighbors to m1 returns documents that confirm the query's premise. By also exploring m2 and c, CORTEX surfaces contradictions, alternatives, and knowledge gaps.
 
@@ -705,7 +722,12 @@ Smart sharing is a core capability, not a post-v1 extra. The v1 exchange path mu
 
 **Medoid** (mathematical term): The existing memory node selected as the statistical representative of a cluster. Selected by minimising the sum of distances to all other nodes in the cluster. Used throughout algorithmic descriptions and internal implementation comments.
 
-**Centroid** (mathematical term): In MetroidBuilder, the centroid `c` is a full-dimensional vector where protected dimensions are copied from m1 (domain invariant) and unfrozen dimensions are the element-wise average of m1 and m2. Used as the balanced search origin in dialectical scoring.
+**Centroid** (mathematical term): In MetroidBuilder, the centroid `c` is a full-dimensional vector
+where protected dimensions are copied from m1 (domain invariant) and unfrozen dimensions are the
+element-wise average of m1 and m2. `c` is a synthetic "Kansas space" position — a center of mass
+where nothing in the memory graph typically exists. Its value is as a neutral vantage point:
+scoring candidates by distance to `c` gives equal weight to both poles. A candidate closer to m1
+is thesis-supporting; closer to m2 is antithesis-supporting; near `c` is genuinely balanced.
 
 **Metroid** (CORTEX architectural term): A structured dialectical search probe constructed at query time: `{ m1, m2, c }`, where m1 is the thesis medoid, m2 is the antithesis medoid, and c is the centroid (protected dims from m1; unfrozen dims averaged). **A Metroid is never stored as a persistent graph structure.** It is an ephemeral instrument used by the CORTEX retrieval subsystem.
 

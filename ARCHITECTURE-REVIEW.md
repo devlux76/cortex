@@ -255,11 +255,16 @@ The following components are correctly implemented (or partially implemented in 
 - `hippocampus/Chunker.ts` — Text chunking; **implemented and correct**
 - `hippocampus/PageBuilder.ts` — Page entity construction; **implemented and correct**
 - `hippocampus/Ingest.ts` — Minimal ingest path; **partially implemented** (chunk→embed→persist→Book→hotpath); correct direction, hierarchy and neighbor insertion deferred
-- `cortex/Query.ts` — Minimal query path; **partially implemented** (hotpath-first flat scoring); correct direction, MetroidBuilder deferred
-- `cortex/QueryResult.ts` — Minimal result DTO; **partially implemented**; correct direction, provenance fields deferred
+- `cortex/Query.ts` — Minimal query path; **partially implemented** (hotpath-first flat scoring); **must be substantially rewritten** for the dialectical pipeline (P1-E)
+- `cortex/QueryResult.ts` — Minimal result DTO; **partially implemented**; **must be rewritten** to add coherencePath, metroid, knowledgeGap, provenance fields (P1-E2)
 - All `VectorBackend` implementations — correct
 
-> **Note:** PLAN.md v1.2 has been updated to reflect the actual implementation status of all Hippocampus and Cortex modules. The initial v1.1 plan incorrectly marked `Chunker.ts`, `PageBuilder.ts`, `Ingest.ts`, `Query.ts`, and `QueryResult.ts` as missing; this has been corrected.
+> **Important caveat on "zero drift":**
+>
+> - **What it means:** No architectural logic in these files conflicts with the corrected design. They do not need to be deleted or redesigned from scratch.
+> - **What it does not mean:** Unaffected by future work. The "roughed in" implementations (`Ingest.ts`, `Query.ts`, `QueryResult.ts`) were scaffolded before the MetroidBuilder design was fully specified.
+> - **Impact:** `Query.ts` and `QueryResult.ts` must be substantially rewritten (P1-E); `Ingest.ts` must gain hierarchy building and neighbor insertion (P1-B, P1-C). Each is a correct stub in the right direction, but not a complete implementation.
+> - **Authoritative status:** Refer to **PLAN.md**, not this section, when assessing whether a file needs additional work.
 
 ---
 
@@ -268,5 +273,5 @@ The following components are correctly implemented (or partially implemented in 
 1. **P0-X1–X7** — Fix naming drift in `core/types.ts`, `storage/IndexedDbMetadataStore.ts`, `cortex/Query.ts`, and planned file names. This unblocks MetroidBuilder without risking collision.
 2. **P1-M1–M3** — Add `Metroid` and `KnowledgeGap` types; implement `MetroidBuilder`.
 3. **P1-N1–N4** — Implement `KnowledgeGapDetector`.
-4. **P1-E1–E3** — Upgrade `cortex/Query.ts` to full dialectical orchestrator.
+4. **P1-E1–E3** — Rewrite `cortex/Query.ts` to full dialectical orchestrator (not backward-compatible with existing flat top-K code).
 5. **P1-C1–C3** — Implement `FastNeighborInsert` (correctly named after P0-X).

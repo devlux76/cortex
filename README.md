@@ -62,19 +62,20 @@ When new observations arrive, Hippocampus immediately:
 This is the rapid, multi-path "write" system that turns raw experience into structured memory scaffolding.
 
 ### 🧩 Cortex — Intelligent Routing & Coherence
-When you ask a question, Cortex does **not** return a bag of similar vectors.
+Cortex does **not** return a bag of similar vectors.
 
-**Planned target behavior (v0.5+):**
-- Constructs a **Metroid** `{ m1, m2, c }` for the query — a structured dialectical search probe pairing the thesis medoid (m1) with an antithesis medoid (m2) and a balanced centroid (c)
-- Performs Matryoshka dimensional unwinding to discover semantically opposing knowledge
-- Performs parallel WebGPU "scoops" across the entire active universe (sub-millisecond)
-- Pulls relevant sub-graphs from IndexedDB
-- Traces closed-loop paths through Hebbian connections
-- Returns only self-consistent, coherent context chains
-- Detects **knowledge gaps** when no antithesis medoid exists within dimensional constraints
-- Broadcasts P2P curiosity probes (with `mimeType` + `modelUrn` for commensurability) to discover missing knowledge from peers
+**Required behavior (v0.5+ engineering target):**
+- Must construct a **Metroid** `{ m1, m2, c }` for every query — a structured dialectical search probe pairing the thesis medoid (m1) with an antithesis medoid (m2) and a balanced centroid (c)
+  - The centroid `c` is a synthetic "Kansas space" vantage point (no real node lives there); scoring from `c` must give equal weight to both poles
+- Must perform Matryoshka dimensional unwinding to discover semantically opposing knowledge
+- Must perform parallel WebGPU "scoops" across the entire active universe (sub-millisecond)
+- Must pull relevant sub-graphs from IndexedDB
+- Must trace closed-loop paths through Hebbian connections
+- Must return only self-consistent, coherent context chains
+- Must detect **knowledge gaps** when no antithesis medoid exists within dimensional constraints
+- Must broadcast P2P curiosity probes (with `mimeType` + `modelUrn` for commensurability) to discover missing knowledge from peers
 
-**Current behavior (v0.1):**
+**Current behavior (v0.1 — placeholder):**
 - Flat top-K similarity scoring against the hotpath resident index with warm/cold spill
 - No MetroidBuilder, no dialectical pipeline, no knowledge gap detection yet
 
