@@ -95,7 +95,7 @@ This is the "dreaming" phase that prevents catastrophic forgetting and forces ab
 
 - **Biological Scarcity** — Only a fixed number of active prototypes live in memory. Everything else is gracefully demoted to disk.
 - **Sublinear Growth (Williams Bound)** — The resident hotpath index is bounded to H(t) = ⌈c·√(t·log₂(1+t))⌉ where t = total graph mass (pages + edges). Memory scales sublinearly as the graph grows, trading time for space at a mathematically principled rate. See [`DESIGN.md`](DESIGN.md) for the full theorem mapping.
-- **Three-Zone Memory** — HOT (resident in-memory index, capacity H(t)), WARM (indexed in IndexedDB, reachable via nearest-neighbour search), COLD (metadata in IndexedDB + raw vectors in OPFS, but semantically isolated from the search path — no strong nearest neighbours in vector space at insertion time; only discoverable by a deliberate random walk). All data is retained locally forever; zones control lookup cost and discoverability, not data lifetime.
+- **Three-Zone Memory** — HOT (resident in-memory index, capacity H(t)), WARM (indexed in IndexedDB, reachable via nearest-neighbor search), COLD (metadata in IndexedDB + raw vectors in OPFS, but semantically isolated from the search path — no strong nearest neighbors in vector space at insertion time; only discoverable by a deliberate random walk). All data is retained locally forever; zones control lookup cost and discoverability, not data lifetime.
 - **Hierarchical & Sparse** — Progressive dimensionality reduction + medoid clustering keeps memory efficient at any scale, with Williams-derived fanout bounds preventing any single tier from monopolising the index.
 - **Hebbian & Dynamic** — Connections strengthen and weaken naturally. Node salience (σ = α·H_in + β·R + γ·Q) drives promotion into and eviction from the resident hotpath.
 - **Zero-Copy & Persistent** — OPFS + IndexedDB with cryptographic signing.
@@ -116,7 +116,6 @@ bun run dev:harness # start the browser runtime harness at http://127.0.0.1:4173
 | [`DESIGN.md`](DESIGN.md) | Architecture specification and core design principles |
 | [`PLAN.md`](PLAN.md) | Module-by-module implementation status and development phases |
 | [`TODO.md`](TODO.md) | Prioritized actionable tasks to ship v1.0 |
-| [`ARCHITECTURE-REVIEW.md`](ARCHITECTURE-REVIEW.md) | Repository-wide architectural drift report and correction tasks |
 | [`docs/api.md`](docs/api.md) | API reference for developers integrating with CORTEX |
 | [`docs/development.md`](docs/development.md) | Build, test, debug, and Docker workflow |
 

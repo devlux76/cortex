@@ -64,7 +64,7 @@ export interface Edge {
 }
 
 // ---------------------------------------------------------------------------
-// Semantic nearest-neighbour graph
+// Semantic nearest-neighbor graph
 // ---------------------------------------------------------------------------
 
 export interface SemanticNeighbor {

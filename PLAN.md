@@ -98,7 +98,7 @@ This document tracks the implementation status of each major module in CORTEX. I
 | Dialectical Search Pipeline | ❌ Missing | `cortex/DialecticalSearch.ts` (planned) | Orchestrates thesis/antithesis/synthesis zone exploration using a Metroid; prevents confirmation bias |
 | Knowledge Gap Detector | ❌ Missing | `cortex/KnowledgeGapDetector.ts` (planned) | Determines when MetroidBuilder cannot find m2; emits curiosity probe |
 | Seed Selection | ❌ Missing | `cortex/SeedSelection.ts` (planned) | Threshold-based top-k page selection from ranking output |
-| Subgraph Expansion | 🟡 Partial | `storage/IndexedDbMetadataStore.ts` (`getInducedMetroidSubgraph` — to be renamed `getInducedNeighborSubgraph`) | BFS expansion implemented in storage layer; needs dynamic Williams bounds; needs orchestration wrapper |
+| Subgraph Expansion | 🟡 Partial | `storage/IndexedDbMetadataStore.ts` (`getInducedNeighborSubgraph`) | BFS expansion implemented in storage layer; needs dynamic Williams bounds; needs orchestration wrapper |
 | Open TSP Solver | ❌ Missing | `cortex/OpenTSPSolver.ts` (planned) | Dummy-node open-path heuristic for coherent ordering |
 | Query Orchestrator | 🟡 Needs Rework | `cortex/Query.ts` | Flat top-K scoring implemented (hotpath-first → warm/cold spill → PageActivity update → promotion sweep). **Must be substantially reworked** to implement the full dialectical pipeline: replace flat scoring with hierarchical resident-first ranking, add MetroidBuilder, dialectical zone scoring (thesis/antithesis/synthesis), subgraph expansion with dynamic Williams bounds, TSP coherence path, and query cost meter. The existing implementation does not use Hebbian edges or cosine-similarity-bounded subgraph expansion; it is a functional placeholder only. |
 | Result DTO | 🟡 Needs Rework | `cortex/QueryResult.ts` | Minimal DTO (`pages`, `scores`, `metadata`). **Must be reworked** to add `coherencePath: Hash[]`, `metroid?: { m1, m2, centroid }`, `knowledgeGap?: KnowledgeGap`, and `provenance: { subgraphSize, hopCount, edgeWeights, vectorOpCost, earlyStop }`. |
@@ -116,7 +116,7 @@ This document tracks the implementation status of each major module in CORTEX. I
 | Idle Scheduler | ❌ Missing | `daydreamer/IdleScheduler.ts` (planned) | Cooperative background loop; interruptible; respects CPU budget |
 | Hebbian Updates | ❌ Missing | `daydreamer/HebbianUpdater.ts` (planned) | LTP (strengthen), LTD (decay), prune below threshold; recompute σ(v) for changed nodes; run promotion/eviction sweep |
 | Prototype Recomputation | ❌ Missing | `daydreamer/PrototypeRecomputer.ts` (planned) | Recalculate volume/shelf medoids and centroids; recompute salience for affected entries; run tier-quota promotion/eviction |
-| Full Neighbor Graph Recalc | ❌ Missing | `daydreamer/FullNeighborRecalc.ts` (planned) | Rebuild bounded neighbor lists for dirty volumes; batch size bounded by O(√(t log t)) per idle cycle; recompute salience after recalc. **Note:** Currently planned as `FullMetroidRecalc` — this is a naming error; see TODO P0-X. |
+| Full Neighbor Graph Recalc | ❌ Missing | `daydreamer/FullNeighborRecalc.ts` (planned) | Rebuild bounded neighbor lists for dirty volumes; batch size bounded by O(√(t log t)) per idle cycle; recompute salience after recalc. |
 | Experience Replay | ❌ Missing | `daydreamer/ExperienceReplay.ts` (planned) | Simulate queries to reinforce connections |
 | Cluster Stability | ❌ Missing | `daydreamer/ClusterStability.ts` (planned) | Detect/trigger split/merge for unstable clusters; run lightweight label propagation for community detection; store community labels in PageActivity |
 
@@ -400,9 +400,9 @@ This document tracks the implementation status of each major module in CORTEX. I
 **Impact:** Core discovery-sharing value proposition is missing; knowledge gaps cannot be resolved via P2P.
 **Mitigation:** Phase 3 required track; implement eligibility classifier + curiosity broadcaster + signed subgraph exchange as v1 scope. CuriosityProbe must include `mimeType` and `modelUrn` to prevent incommensurable graph merges.
 
-### Blocker 4: Naming Drift (P0-X)
-**Impact:** The term "Metroid" is currently used for the proximity graph in all code. MetroidBuilder cannot be introduced without a rename collision.
-**Mitigation:** P0-X tasks (rename `MetroidNeighbor` → `SemanticNeighbor`, etc.) must be completed before MetroidBuilder is implemented.
+### Blocker 4: Naming Drift (P0-X) — RESOLVED
+**Impact:** The term "Metroid" was used for the proximity graph in all code. MetroidBuilder cannot be introduced without a rename collision.
+**Resolution:** P0-X rename completed. `SemanticNeighbor`, `SemanticNeighborSubgraph`, and all `*SemanticNeighbors`/`*NeighborRecalc` method names are now in place throughout `core/types.ts`, `storage/IndexedDbMetadataStore.ts`, `cortex/Query.ts`, and all test files. The IDB object store is `neighbor_graph` (DB_VERSION=3).
 
 ### Risk 1: TSP Complexity
 Open TSP is NP-hard; heuristic may be slow on large subgraphs.
@@ -485,7 +485,7 @@ After every implementation pass:
 
 ## Notes
 
-- **Metroid vs medoid vs semantic neighbor graph:** These are three distinct concepts. `Metroid` refers only to the dialectical search probe `{ m1, m2, c }` constructed by `MetroidBuilder` at query time. `medoid` refers to a cluster representative node. The sparse proximity/neighbor graph (used for BFS subgraph expansion) is the **semantic neighbor graph** — it is currently misnamed `MetroidNeighbor`/`MetroidSubgraph` in code (see TODO P0-X for the rename task).
+- **Metroid vs medoid vs semantic neighbor graph:** These are three distinct concepts. `Metroid` refers only to the dialectical search probe `{ m1, m2, c }` constructed by `MetroidBuilder` at query time. `medoid` refers to a cluster representative node. The sparse proximity/neighbor graph (used for BFS subgraph expansion) is the **semantic neighbor graph** — represented by `SemanticNeighbor` / `SemanticNeighborSubgraph` in `core/types.ts` and stored in the `neighbor_graph` IDB object store.
 - **Model-derived numerics:** Never hardcode; always source from `core/` model profile modules.
 - **Policy-derived constants:** Never hardcode; always source from `core/HotpathPolicy.ts`.
 - **Test philosophy:** TDD (Red → Green → Refactor) for all new slices.
