@@ -42,7 +42,7 @@ function recencyScore(isoTimestamp: string | undefined, now: number): number {
 
 /**
  * Fetch PageActivity and incident Hebbian edges for a single page,
- * then compute σ via HotpathPolicy.
+ * then compute salience via HotpathPolicy.
  */
 export async function computeNodeSalience(
   pageId: Hash,

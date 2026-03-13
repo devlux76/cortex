@@ -266,8 +266,8 @@ describe("SalienceEngine", () => {
       ]));
 
       const salience = await computeNodeSalience("page-1", store, DEFAULT_HOTPATH_POLICY, NOW);
-      // hebbianIn = 0.8 + 0.6 = 1.4; α=0.5 → contribution = 0.7
-      // No activity → recency=0, queryHits=0
+      // hebbianIn = 0.8 + 0.6 = 1.4; alpha=0.5 -> contribution = 0.7
+      // No activity -> recency=0, queryHits=0
       expect(salience).toBeCloseTo(0.7, 6);
     });
 
@@ -275,7 +275,7 @@ describe("SalienceEngine", () => {
       await store.putPageActivity(makeActivity("page-1", 5, new Date(NOW).toISOString()));
 
       const salience = await computeNodeSalience("page-1", store, DEFAULT_HOTPATH_POLICY, NOW);
-      // hebbianIn=0, recency≈1 (just now), queryHits=5
+      // hebbianIn=0, recency~=1 (just now), queryHits=5
       // 0 + 0.3*1 + 0.2*5 = 0.3 + 1.0 = 1.3
       expect(salience).toBeCloseTo(1.3, 1);
     });
@@ -285,7 +285,7 @@ describe("SalienceEngine", () => {
       await store.putPageActivity(makeActivity("page-1", 0, oneWeekAgo));
 
       const salience = await computeNodeSalience("page-1", store, DEFAULT_HOTPATH_POLICY, NOW);
-      // After 7 days (half-life), recency ≈ 0.5; β=0.3 → contribution ≈ 0.15
+      // After 7 days (half-life), recency ~= 0.5; beta=0.3 -> contribution ~= 0.15
       expect(salience).toBeCloseTo(0.15, 1);
     });
   });
@@ -454,7 +454,7 @@ describe("SalienceEngine lifecycle", () => {
       // to test steady-state behavior
       const policy: HotpathPolicy = {
         ...DEFAULT_HOTPATH_POLICY,
-        c: 0.01, // very small → capacity will be small
+        c: 0.01, // very small -> capacity will be small
       };
 
       // With c=0.01 and graphMass=2, capacity will likely be 1
@@ -476,7 +476,7 @@ describe("SalienceEngine lifecycle", () => {
         salience: 100.0,
       });
 
-      // Weak candidate (no edges, no activity → salience = 0)
+      // Weak candidate (no edges, no activity -> salience = 0)
       const policy: HotpathPolicy = {
         ...DEFAULT_HOTPATH_POLICY,
         c: 0.01,
@@ -541,7 +541,7 @@ describe("SalienceEngine lifecycle", () => {
         makeActivity("small-candidate", 100, new Date(NOW).toISOString(), "small"),
       );
 
-      // c=0.01 → very small capacity, page tier is full
+      // c=0.01 -> very small capacity, page tier is full
       const policy: HotpathPolicy = { ...DEFAULT_HOTPATH_POLICY, c: 0.01 };
 
       await runPromotionSweep(["small-candidate"], store, policy, NOW);
@@ -571,7 +571,7 @@ describe("SalienceEngine lifecycle", () => {
         });
       }
 
-      // Weak candidate (no edges, no activity → salience = 0)
+      // Weak candidate (no edges, no activity -> salience = 0)
       await runPromotionSweep(["weak-candidate"], store, policy, NOW);
 
       const entries = await store.getHotpathEntries("page");

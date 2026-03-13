@@ -50,40 +50,6 @@ function promisifyTransaction(tx: IDBTransaction): Promise<void> {
 // Schema upgrade
 // ---------------------------------------------------------------------------
 
-function applyUpgrade(db: IDBDatabase, oldVersion: number): void {
-  if (oldVersion < 1) {
-    // Primary entity stores
-    db.createObjectStore(STORE.pages, { keyPath: "pageId" });
-    db.createObjectStore(STORE.books, { keyPath: "bookId" });
-    db.createObjectStore(STORE.volumes, { keyPath: "volumeId" });
-    db.createObjectStore(STORE.shelves, { keyPath: "shelfId" });
-
-    // Hebbian edges: compound primary key + index on fromPageId
-    const edgeStore = db.createObjectStore(STORE.edges, {
-      keyPath: ["fromPageId", "toPageId"],
-    });
-    edgeStore.createIndex("by-from", "fromPageId");
-
-    // Metroid NN neighbors (pageId → MetroidNeighbor[])
-    db.createObjectStore(STORE.metroidNeighbors, { keyPath: "pageId" });
-
-    // Dirty-recalc flags (volumeId → { volumeId, needsRecalc })
-    db.createObjectStore(STORE.flags, { keyPath: "volumeId" });
-
-    // Reverse-index stores
-    db.createObjectStore(STORE.pageToBook, { keyPath: "pageId" });
-    db.createObjectStore(STORE.bookToVolume, { keyPath: "bookId" });
-    db.createObjectStore(STORE.volumeToShelf, { keyPath: "volumeId" });
-  }
-
-  if (oldVersion < 2) {
-    // Hotpath index keyed by entityId; secondary index on tier
-    const hotpathStore = db.createObjectStore(STORE.hotpathIndex, {
-      keyPath: "entityId",
-    });
-    hotpathStore.createIndex("by-tier", "tier");
-
-    // Page activity keyed by pageId
 function applyUpgrade(db: IDBDatabase): void {
   // v1 stores
   if (!db.objectStoreNames.contains(STORE.pages)) {
@@ -159,7 +125,7 @@ export class IndexedDbMetadataStore implements MetadataStore {
       const req = indexedDB.open(dbName, DB_VERSION);
 
       req.onupgradeneeded = (event) => {
-        applyUpgrade((event.target as IDBOpenDBRequest).result, event.oldVersion);
+        applyUpgrade((event.target as IDBOpenDBRequest).result);
       };
 
       req.onsuccess = () => resolve(new IndexedDbMetadataStore(req.result));
@@ -193,7 +159,7 @@ export class IndexedDbMetadataStore implements MetadataStore {
       // Store the book itself
       tx.objectStore(STORE.books).put(book);
 
-      // Update page→book reverse index for every page in this book
+      // Update page->book reverse index for every page in this book
       const idxStore = tx.objectStore(STORE.pageToBook);
       for (const pageId of book.pageIds) {
         const getReq = idxStore.get(pageId);
@@ -474,6 +440,7 @@ export class IndexedDbMetadataStore implements MetadataStore {
 
     if (filtered.length === 0) return;
 
+    // Deterministic: break ties by entityId (smallest wins)
     let weakest = filtered[0];
     for (let i = 1; i < filtered.length; i++) {
       const e = filtered[i];
@@ -489,55 +456,6 @@ export class IndexedDbMetadataStore implements MetadataStore {
   }
 
   async getResidentCount(): Promise<number> {
-  getHotpathEntries(tier?: HotpathEntry["tier"]): Promise<HotpathEntry[]> {
-    return new Promise((resolve, reject) => {
-      const tx = this.db.transaction(STORE.hotpathIndex, "readonly");
-      const store = tx.objectStore(STORE.hotpathIndex);
-
-      if (tier !== undefined) {
-        const idx = store.index("by-tier");
-        const req = idx.getAll(IDBKeyRange.only(tier));
-        req.onsuccess = () => resolve(req.result as HotpathEntry[]);
-        req.onerror = () => reject(req.error);
-      } else {
-        const req = store.getAll();
-        req.onsuccess = () => resolve(req.result as HotpathEntry[]);
-        req.onerror = () => reject(req.error);
-      }
-    });
-  }
-
-  evictWeakest(tier: HotpathEntry["tier"], communityId?: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const tx = this.db.transaction(STORE.hotpathIndex, "readwrite");
-      const store = tx.objectStore(STORE.hotpathIndex);
-      const idx = store.index("by-tier");
-      const req = idx.getAll(IDBKeyRange.only(tier));
-
-      req.onsuccess = () => {
-        let entries = req.result as HotpathEntry[];
-        if (communityId !== undefined) {
-          entries = entries.filter((e) => e.communityId === communityId);
-        }
-        if (entries.length === 0) {
-          resolve();
-          return;
-        }
-        // Find the entry with the lowest salience
-        let weakest = entries[0];
-        for (let i = 1; i < entries.length; i++) {
-          if (entries[i].salience < weakest.salience) {
-            weakest = entries[i];
-          }
-        }
-        store.delete(weakest.entityId);
-        promisifyTransaction(tx).then(resolve).catch(reject);
-      };
-      req.onerror = () => reject(req.error);
-    });
-  }
-
-  getResidentCount(): Promise<number> {
     return new Promise((resolve, reject) => {
       const tx = this.db.transaction(STORE.hotpathIndex, "readonly");
       const req = tx.objectStore(STORE.hotpathIndex).count();

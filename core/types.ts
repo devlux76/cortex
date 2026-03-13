@@ -70,7 +70,7 @@ export interface Edge {
 export interface MetroidNeighbor {
   neighborPageId: Hash;
   cosineSimilarity: number;   // threshold is defined by runtime policy
-  distance: number;           // 1 – cosineSimilarity (ready for TSP)
+  distance: number;           // 1 - cosineSimilarity (ready for TSP)
 }
 
 export interface MetroidSubgraph {
@@ -79,7 +79,7 @@ export interface MetroidSubgraph {
 }
 
 // ---------------------------------------------------------------------------
-// Hotpath entities
+// Hotpath / Williams Bound types
 // ---------------------------------------------------------------------------
 
 /** Lightweight per-page activity metadata for salience computation. */
@@ -94,28 +94,11 @@ export interface PageActivity {
 export interface HotpathEntry {
   entityId: Hash;             // pageId, bookId, volumeId, or shelfId
   tier: "shelf" | "volume" | "book" | "page";
-  salience: number;           // σ value at last computation
+  salience: number;           // salience value at last computation
   communityId?: string;       // community this entry counts against
 }
 
 /** Per-tier slot budgets derived from H(t). */
-// Hotpath / Williams Bound types
-// ---------------------------------------------------------------------------
-
-export interface PageActivity {
-  pageId: Hash;
-  queryHitCount: number;
-  lastQueryAt: string;
-  communityId?: string;
-}
-
-export interface HotpathEntry {
-  entityId: Hash;
-  tier: "shelf" | "volume" | "book" | "page";
-  salience: number;
-  communityId?: string;
-}
-
 export interface TierQuotas {
   shelf: number;
   volume: number;
@@ -131,7 +114,7 @@ export interface TierQuotaRatios {
   page: number;
 }
 
-/** Tunable weights for the salience formula σ = α·H_in + β·R + γ·Q. */
+/** Tunable weights for the salience formula: sigma = alpha*H_in + beta*R + gamma*Q. */
 export interface SalienceWeights {
   alpha: number; // weight for Hebbian connectivity
   beta: number;  // weight for recency
@@ -213,8 +196,6 @@ export interface MetadataStore {
   getResidentCount(): Promise<number>;
 
   // --- Page activity ---
-  evictWeakest(tier: HotpathEntry["tier"], communityId?: string): Promise<void>;
-  getResidentCount(): Promise<number>;
   putPageActivity(activity: PageActivity): Promise<void>;
   getPageActivity(pageId: Hash): Promise<PageActivity | undefined>;
 }
