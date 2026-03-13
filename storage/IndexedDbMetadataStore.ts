@@ -145,7 +145,8 @@ export class IndexedDbMetadataStore implements MetadataStore {
     return this._get<Page>(STORE.pages, pageId);
   }
 
-  /** Returns all pages in the store. Used for warm/cold fallbacks in query.
+  /**
+   * Returns all pages in the store. Used for warm/cold fallbacks in query.
    * TODO: Replace with a paginated or indexed scan before production use —
    * loading every page into memory is expensive for large corpora.
    */
