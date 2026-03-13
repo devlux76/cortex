@@ -176,3 +176,151 @@ At the end of every implementation pass, update documents in this order:
 4. **GitHub Issues** — close completed tasks, create new ones as needed via `gh` CLI or the web UI.
 
 > Numeric examples in design docs are illustrative unless explicitly sourced from model metadata.
+
+---
+
+## Hotpath Policy Constants Guard
+
+To prevent hardcoded hotpath policy numeric literals (salience weights, tier
+quota ratios, Williams Bound constant) from leaking outside
+`core/HotpathPolicy.ts`, run:
+
+```sh
+node scripts/guard-hotpath-policy.mjs
+```
+
+Or with the npm script alias:
+
+```sh
+npm run guard:hotpath-policy
+```
+
+Any line that assigns a raw numeric literal to a field named `alpha`, `beta`,
+`gamma`, `salienceWeights`, or `tierQuotaRatios` outside
+`core/HotpathPolicy.ts` will be flagged as a violation.
+
+To explicitly allow an exception (e.g. in a test helper), add the inline
+suppression comment `// hotpath-policy-ok` to the line:
+
+```typescript
+const w = { alpha: 0.5, beta: 0.3, gamma: 0.2 }; // hotpath-policy-ok
+```
+
+---
+
+## Troubleshooting
+
+### Build fails: "Cannot find module 'fake-indexeddb'"
+
+Ensure all dev dependencies are installed:
+
+```sh
+npm install       # or: bun install
+```
+
+### TypeScript error: "Type 'X' is not assignable to type 'Y'"
+
+Run the full type-check to see all errors at once:
+
+```sh
+npm run build
+```
+
+Do not silence errors with `// @ts-ignore` or `as any` — fix the root cause.
+
+### Unit tests fail with IndexedDB errors
+
+All IndexedDB tests use `fake-indexeddb` via in-test setup. Ensure that:
+
+1. Your test file imports `IDBFactory` and `IDBKeyRange` from `fake-indexeddb`.
+2. You assign them to `globalThis.indexedDB` and `globalThis.IDBKeyRange` in
+   a `beforeEach` block (or equivalent).
+
+Example:
+
+```typescript
+import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
+
+beforeEach(() => {
+  (globalThis as any).indexedDB = new IDBFactory();
+  (globalThis as any).IDBKeyRange = IDBKeyRange;
+});
+```
+
+### Electron smoke test crashes with SIGSEGV
+
+Use the Docker debug lane (see [Docker Debug Lane](#docker-debug-lane) above).
+The host-shell Electron path can produce `SIGSEGV` in some sandbox environments;
+the Docker container is the source of truth for debugger stability.
+
+### guard:model-derived flags a legitimate test constant
+
+Add the inline suppression comment `// model-derived-ok` to the line:
+
+```typescript
+const backend = new DeterministicDummyEmbeddingBackend({ dimension: 32 }); // model-derived-ok
+```
+
+---
+
+## Performance Tuning
+
+### Embedding throughput
+
+- Use `"webgpu"` or `"webnn"` device for `TransformersJsEmbeddingBackend`
+  when available — they are significantly faster than `"wasm"` for batched
+  inference.
+- Use `OrtWebglEmbeddingBackend` as a fallback on systems with WebGL but
+  without WebGPU/WebNN.
+- Increase batch sizes in `EmbeddingRunner` to amortise pipeline overhead.
+
+### Query latency
+
+- The hotpath (resident set) is scored first; most queries are served from
+  there without touching the full corpus.
+- Keep `topK` as small as is useful — smaller values reduce the cold-path
+  scan when the hotpath is insufficient.
+- For large corpora, run `ExperienceReplay` regularly during idle time to
+  keep frequently-queried pages in the hotpath.
+
+### Hotpath capacity (Williams Bound)
+
+- The resident set capacity H(t) = ceil(0.5 * sqrt(t * log2(1+t))) grows
+  sublinearly. For a 10 000-page corpus, the hotpath holds roughly 99 pages.
+- Increase the scaling factor `c` in `DEFAULT_HOTPATH_POLICY` (in
+  `core/HotpathPolicy.ts`) to allow a larger hotpath at the cost of more
+  memory. The default value is `c = 0.5`.
+- Adjust `tierQuotaRatios` to redistribute the hotpath budget between the
+  shelf, volume, book, and page tiers.
+
+### Storage
+
+- `MemoryVectorStore` is for testing only — it holds all vectors in RAM.
+- `OPFSVectorStore` is the production backend; it uses the Origin Private
+  File System for zero-copy append writes and mmap-style reads.
+- Avoid calling `getAllPages()` in hot paths — it scans the entire IndexedDB
+  store. Use the hotpath index (`getHotpathEntries`) for latency-sensitive
+  lookups.
+
+---
+
+## Running Benchmarks
+
+```sh
+# Dummy embedder throughput
+npm run benchmark:dummy
+
+# Query latency vs corpus size
+npm run benchmark:query-latency
+
+# Storage overhead vs page count
+npm run benchmark:storage-overhead
+
+# Hotpath scaling and Williams Bound invariants
+npm run benchmark:hotpath-scaling
+
+# All benchmarks
+npm run benchmark:all
+```
+
+Baseline measurements are recorded in [`benchmarks/BASELINES.md`](../benchmarks/BASELINES.md).

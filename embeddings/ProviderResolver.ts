@@ -4,6 +4,10 @@ import {
 } from "./DeterministicDummyEmbeddingBackend";
 import type { EmbeddingBackend } from "./EmbeddingBackend";
 import {
+  OrtWebglEmbeddingBackend,
+  type OrtWebglEmbeddingBackendOptions,
+} from "./OrtWebglEmbeddingBackend";
+import {
   TransformersJsEmbeddingBackend,
   type TransformersJsDevice,
   type TransformersJsEmbeddingBackendOptions,
@@ -311,4 +315,34 @@ export function createTransformersJsProviderCandidates(
     createBackend: () =>
       new TransformersJsEmbeddingBackend({ ...options, device }),
   }));
+}
+
+/**
+ * Returns an `EmbeddingProviderCandidate` for the WebGL ONNX execution
+ * provider via `OrtWebglEmbeddingBackend`.
+ *
+ * This candidate is supported when `WebGL2RenderingContext` is available in
+ * the global scope, providing a hardware-accelerated fallback for systems
+ * that have WebGL but lack WebGPU or WebNN.
+ *
+ * @example
+ * ```ts
+ * const runner = EmbeddingRunner.fromResolverOptions({
+ *   candidates: [
+ *     ...createTransformersJsProviderCandidates(),
+ *     createWebglProviderCandidate(),
+ *     createDummyProviderCandidate(),
+ *   ],
+ * });
+ * ```
+ */
+export function createWebglProviderCandidate(
+  options: OrtWebglEmbeddingBackendOptions = {},
+): EmbeddingProviderCandidate {
+  return {
+    kind: "webgl",
+    isSupported: () =>
+      typeof globalThis.WebGL2RenderingContext !== "undefined",
+    createBackend: () => new OrtWebglEmbeddingBackend(options),
+  };
 }
