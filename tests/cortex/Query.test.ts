@@ -9,11 +9,13 @@ import { generateKeyPair } from "../../core/crypto/sign";
 import { ingestText } from "../../hippocampus/Ingest";
 import { query } from "../../cortex/Query";
 import { topKByScore } from "../../TopK";
+import type { BackendKind } from "../../BackendKind";
 import type { ModelProfile } from "../../core/ModelProfile";
 import type { VectorBackend } from "../../VectorBackend";
 
 class TestVectorBackend implements VectorBackend {
   readonly kind = "wasm" as const;
+  readonly kind: BackendKind = "wasm";
 
   async dotMany(
     query: Float32Array,

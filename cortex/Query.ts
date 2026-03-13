@@ -45,7 +45,8 @@ async function scorePages(
 ): Promise<Array<{ page: Page; score: number }>> {
   if (pages.length === 0) return [];
 
-  const dim = pages[0].embeddingDim;
+  const [firstPage] = pages;
+  const dim = firstPage.embeddingDim;
   const offsets = pages.map((p) => p.embeddingOffset);
 
   // If all pages share the same embedding dimension and it matches the query,
