@@ -7,7 +7,7 @@
     "build": "tsc -p tsconfig.json --noEmit",
     "typecheck": "bun run build",
     "lint": "eslint .",
-    "test": "vitest run tests/*.test.ts tests/**/*.test.ts",
+    "test": "bun run lint && bun run build && vitest run tests/*.test.ts tests/**/*.test.ts",
     "test:unit": "vitest run tests/*.test.ts tests/**/*.test.ts",
     "test:watch": "vitest tests/*.test.ts tests/**/*.test.ts",
     "dev:harness": "bun scripts/runtime-harness-server.mjs",
