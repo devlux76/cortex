@@ -14,7 +14,6 @@ import type { ModelProfile } from "../../core/ModelProfile";
 import type { VectorBackend } from "../../VectorBackend";
 
 class TestVectorBackend implements VectorBackend {
-  readonly kind = "wasm" as const;
   readonly kind: BackendKind = "wasm";
 
   async dotMany(
