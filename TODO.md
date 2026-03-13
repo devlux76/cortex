@@ -190,13 +190,13 @@ These items **must** be completed to have a usable system. Without them, users c
 
 **Why:** Prove the system works soup-to-nuts.
 
-- [ ] **P0-E1:** Implement `tests/integration/IngestQuery.test.ts`
+- [x] **P0-E1:** Implement `tests/integration/IngestQuery.test.ts`
   - Ingest sample text corpus (e.g., Wikipedia articles)
   - Query for specific topics
   - Verify expected pages returned
   - Verify persistence (restart session, query again)
 
-- [ ] **P0-E2:** Run integration test in browser harness
+- [x] **P0-E2:** Run integration test in browser harness
   - Ensure real IndexedDB and OPFS work correctly
   - Verify WebGPU/WebGL/WASM backends function
 
