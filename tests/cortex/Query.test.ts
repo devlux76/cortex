@@ -215,4 +215,54 @@ describe("cortex query (minimal)", () => {
       expect(result.scores[i]).toBeLessThanOrEqual(result.scores[i - 1]);
     }
   });
+
+  it("respects the topK parameter", async () => {
+    const metadataStore = await IndexedDbMetadataStore.open(freshDbName());
+    const vectorStore = new MemoryVectorStore();
+    const keyPair = await generateKeyPair();
+
+    const backend = new DeterministicDummyEmbeddingBackend({ dimension: 4 });
+    const vectorBackend = new TestVectorBackend();
+
+    const runner = new EmbeddingRunner(async () => ({
+      backend,
+      selectedKind: "dummy" as const,
+      reason: "forced" as const,
+      supportedKinds: ["dummy" as const],
+      measurements: [],
+    }));
+
+    const profile: ModelProfile = {
+      modelId: "test-model",
+      embeddingDimension: 4,
+      contextWindowTokens: 64,
+      truncationTokens: 48,
+      maxChunkTokens: 5,
+      source: "metadata",
+    };
+
+    const text = "One two three four five six seven eight nine ten.";
+    const ingestResult = await ingestText(text, {
+      modelProfile: profile,
+      embeddingRunner: runner,
+      vectorStore,
+      metadataStore,
+      keyPair,
+    });
+
+    expect(ingestResult.pages.length).toBeGreaterThanOrEqual(2);
+
+    const result = await query("one", {
+      modelProfile: profile,
+      embeddingRunner: runner,
+      vectorStore,
+      metadataStore,
+      vectorBackend,
+      topK: 2,
+    });
+
+    expect(result.pages.length).toBe(2);
+    expect(result.scores.length).toBe(2);
+    expect(result.metadata.returned).toBe(2);
+  });
 });
