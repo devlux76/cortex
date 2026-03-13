@@ -20,9 +20,9 @@ This guide covers building, testing, debugging, and contributing to CORTEX.
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org/) 18 or later (LTS recommended)
-- [npm](https://www.npmjs.com/)
-- [Playwright](https://playwright.dev/) browsers (installed automatically via `npm install`)
+- [Bun](https://bun.sh/) 1.2 or later (**recommended** — used in CI)
+- [Node.js](https://nodejs.org/) 18 or later (LTS) — still supported if you prefer npm
+- [Playwright](https://playwright.dev/) browsers (installed automatically via `bun install` / `npm install`)
 - [Electron](https://www.electronjs.org/) (installed as an optional dev dependency)
 - [Docker](https://www.docker.com/) — required only for the containerised Electron debug lane
 
@@ -31,6 +31,10 @@ This guide covers building, testing, debugging, and contributing to CORTEX.
 ## Installation
 
 ```sh
+# Recommended (Bun — faster installs, used in CI)
+bun install
+
+# Alternatively (npm)
 npm install
 ```
 
