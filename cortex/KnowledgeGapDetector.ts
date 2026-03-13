@@ -29,6 +29,7 @@ export async function detectKnowledgeGap(
   queryText: string,
   queryEmbedding: Float32Array,
   metroid: Metroid,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- reserved for future model-aware gap categorisation
   _modelProfile: ModelProfile,
 ): Promise<KnowledgeGap | null> {
   if (!metroid.knowledgeGap) return null;
