@@ -587,7 +587,7 @@ describe("SalienceEngine lifecycle", () => {
       const graphMass = entries.length + 2; // + candidates
       const capacity = computeCapacity(graphMass, policy.c);
       const tierQuotas = deriveTierQuotas(capacity, policy.tierQuotaRatios);
-      expect(entries.length).toBeLessThanOrEqual(Math.max(tierQuotas.page, entries.length));
+      expect(entries.length).toBeLessThanOrEqual(tierQuotas.page);
       // "big" didn't consume everything
       expect(bigCount).toBeLessThan(entries.length);
     });
