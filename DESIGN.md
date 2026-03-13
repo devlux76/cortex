@@ -118,11 +118,20 @@ Within each tier, entries are ranked by salience; the highest-salience represent
 
 ### Graph-Community Coverage Quotas
 
-Within each tier's budget, slots are allocated proportionally across detected graph communities to prevent a single dense topic from consuming all capacity:
+Within each tier's budget, slots are allocated proportionally across detected graph communities to prevent a single dense topic from consuming all capacity. The allocation uses the **largest-remainder method** to guarantee the quotas sum exactly to `tier_budget`:
 
-```
-community_quota(Cᵢ) = max(1, ⌈tier_budget · nᵢ / N⌉)
-```
+1. Compute the ideal fractional share for each community:
+   ```
+   share(Cᵢ) = tier_budget · nᵢ / N
+   ```
+2. Floor each share to get a base allocation:
+   ```
+   base(Cᵢ) = ⌊share(Cᵢ)⌋
+   ```
+3. Distribute the remaining `tier_budget − Σ base(Cᵢ)` slots one-by-one to the communities with the largest fractional remainders (`share(Cᵢ) − base(Cᵢ)`), breaking ties by community size (larger community wins).
+4. Communities that receive a base of 0 and are not selected in step 3 are **excluded** from this tier (no slot). This is intentional: sparse communities are not promoted until they grow.
+
+The resulting quotas sum to exactly `tier_budget` regardless of the number or sizes of communities, even when there are more communities than `tier_budget`.
 
 where `nᵢ` is the number of pages in community Cᵢ and N is the total page count. Community detection runs via lightweight label propagation on the Metroid neighbor graph during Daydreamer idle passes.
 
