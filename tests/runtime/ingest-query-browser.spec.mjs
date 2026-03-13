@@ -5,13 +5,13 @@ import { test, expect } from "@playwright/test";
  *
  * These tests validate that real browser storage and compute backends
  * function correctly for CORTEX's requirements:
- *   - IndexedDB supports the CRUD and indexing patterns used by
- *     IndexedDbMetadataStore (write, read, reopen, index query).
+ *   - IndexedDB supports the CRUD, indexing, and persistence patterns used by
+ *     IndexedDbMetadataStore (write, read, index creation, index lookup, reopen).
  *   - OPFS is accessible (navigator.storage.getDirectory).
  *   - At least one vector compute backend (WebGPU/WebGL/WASM) is available.
  */
 
-test("IndexedDB supports CORTEX CRUD and persistence patterns", async ({ page }) => {
+test("IndexedDB supports CORTEX CRUD, index lookup, and persistence patterns", async ({ page }) => {
   await page.goto("/");
   await page.waitForFunction(() => globalThis.__cortexHarnessReady === true);
 
@@ -19,7 +19,7 @@ test("IndexedDB supports CORTEX CRUD and persistence patterns", async ({ page })
     const DB_NAME = "cortex-e2e-browser-test";
     const DB_VERSION = 1;
 
-    // Helper to open the database and create object stores
+    // Helper to open the database and create object stores with indexes
     function openDb() {
       return new Promise((resolve, reject) => {
         const request = globalThis.indexedDB.open(DB_NAME, DB_VERSION);
@@ -32,29 +32,50 @@ test("IndexedDB supports CORTEX CRUD and persistence patterns", async ({ page })
           if (!db.objectStoreNames.contains("books")) {
             db.createObjectStore("books", { keyPath: "bookId" });
           }
+          if (!db.objectStoreNames.contains("hotpath_index")) {
+            const hp = db.createObjectStore("hotpath_index", { keyPath: "entityId" });
+            hp.createIndex("by-tier", "tier");
+          }
         };
         request.onsuccess = () => resolve(request.result);
       });
     }
 
-    // Helper to perform a transaction operation
+    // Transaction-safe put: resolves after the transaction commits
     function txPut(db, storeName, record) {
       return new Promise((resolve, reject) => {
         const tx = db.transaction(storeName, "readwrite");
-        const store = tx.objectStore(storeName);
-        const request = store.put(record);
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
+        tx.objectStore(storeName).put(record);
+        tx.oncomplete = () => resolve(undefined);
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error ?? new Error("Transaction aborted"));
       });
     }
 
+    // Transaction-safe get: captures result then waits for tx commit
     function txGet(db, storeName, key) {
       return new Promise((resolve, reject) => {
         const tx = db.transaction(storeName, "readonly");
-        const store = tx.objectStore(storeName);
-        const request = store.get(key);
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
+        const request = tx.objectStore(storeName).get(key);
+        let result;
+        request.onsuccess = () => { result = request.result; };
+        tx.oncomplete = () => resolve(result);
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error ?? new Error("Transaction aborted"));
+      });
+    }
+
+    // Index lookup via getAll on a named index
+    function txIndexGetAll(db, storeName, indexName, key) {
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, "readonly");
+        const index = tx.objectStore(storeName).index(indexName);
+        const request = index.getAll(key);
+        let result;
+        request.onsuccess = () => { result = request.result; };
+        tx.oncomplete = () => resolve(result);
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error ?? new Error("Transaction aborted"));
       });
     }
 
@@ -77,18 +98,31 @@ test("IndexedDB supports CORTEX CRUD and persistence patterns", async ({ page })
       meta: {},
     };
 
+    const hotpathEntry1 = { entityId: "page-001", tier: "page", salience: 0.8 };
+    const hotpathEntry2 = { entityId: "book-001", tier: "book", salience: 0.5 };
+    const hotpathEntry3 = { entityId: "page-002", tier: "page", salience: 0.6 };
+
     await txPut(db1, "pages", testPage);
     await txPut(db1, "books", testBook);
+    await txPut(db1, "hotpath_index", hotpathEntry1);
+    await txPut(db1, "hotpath_index", hotpathEntry2);
+    await txPut(db1, "hotpath_index", hotpathEntry3);
 
     // Verify read-back in same session
     const readPage = await txGet(db1, "pages", "page-browser-test-001");
     const readBook = await txGet(db1, "books", "book-browser-test-001");
+
+    // Verify index lookup: query by-tier index for "page" entries
+    const pageEntries = await txIndexGetAll(db1, "hotpath_index", "by-tier", "page");
+    const bookEntries = await txIndexGetAll(db1, "hotpath_index", "by-tier", "book");
+
     db1.close();
 
     // Session 2: Reopen and verify persistence
     const db2 = await openDb();
     const persistedPage = await txGet(db2, "pages", "page-browser-test-001");
     const persistedBook = await txGet(db2, "books", "book-browser-test-001");
+    const persistedPageEntries = await txIndexGetAll(db2, "hotpath_index", "by-tier", "page");
     db2.close();
 
     // Cleanup
@@ -101,15 +135,21 @@ test("IndexedDB supports CORTEX CRUD and persistence patterns", async ({ page })
     return {
       sameSessionPageOk: readPage?.pageId === testPage.pageId && readPage?.content === testPage.content,
       sameSessionBookOk: readBook?.bookId === testBook.bookId,
+      indexLookupPageCount: pageEntries?.length,
+      indexLookupBookCount: bookEntries?.length,
       persistedPageOk: persistedPage?.pageId === testPage.pageId && persistedPage?.content === testPage.content,
       persistedBookOk: persistedBook?.bookId === testBook.bookId && persistedBook?.pageIds?.length === 1,
+      persistedIndexOk: persistedPageEntries?.length === 2,
     };
   });
 
   expect(result.sameSessionPageOk).toBe(true);
   expect(result.sameSessionBookOk).toBe(true);
+  expect(result.indexLookupPageCount).toBe(2);
+  expect(result.indexLookupBookCount).toBe(1);
   expect(result.persistedPageOk).toBe(true);
   expect(result.persistedBookOk).toBe(true);
+  expect(result.persistedIndexOk).toBe(true);
 });
 
 test("OPFS is accessible for vector storage", async ({ page }) => {

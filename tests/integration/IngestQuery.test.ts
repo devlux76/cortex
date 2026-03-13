@@ -253,8 +253,12 @@ describe("integration: ingest and query", () => {
     }
   });
 
-  it("persists data across sessions (reopen metadata store)", async () => {
+  it("persists metadata across sessions (reopen IndexedDB store)", async () => {
     const dbName = freshDbName();
+    // Note: MemoryVectorStore is intentionally shared across "sessions" here
+    // because it has no persistence layer — this test validates that *metadata*
+    // (pages, books, activity) survives an IndexedDB reopen. Vector persistence
+    // is validated separately by the browser harness tests using real OPFS.
     const vectorStore = new MemoryVectorStore();
     const keyPair = await generateKeyPair();
     const profile = makeProfile();
