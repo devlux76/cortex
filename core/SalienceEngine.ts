@@ -228,6 +228,10 @@ export async function bootstrapHotpath(
  * Steady-state promotion sweep: for each candidate, promote if its
  * salience exceeds the weakest resident in the same tier/community
  * bucket. On promotion, evict the weakest.
+ *
+ * Tier quotas and community quotas are enforced regardless of whether
+ * overall capacity is full, preventing any single tier or community
+ * from monopolizing the hotpath during ramp-up.
  */
 export async function runPromotionSweep(
   candidateIds: Hash[],
@@ -260,22 +264,25 @@ export async function runPromotionSweep(
     return diff !== 0 ? diff : a.localeCompare(b);
   });
 
-  const tier: HotpathEntry["tier"] = "page";
-  let allEntries = await metadataStore.getHotpathEntries();
-  let tierEntries = allEntries.filter((e) => e.tier === tier);
-  let currentCount = allEntries.length;
+  // Load initial state into an in-memory cache to avoid repeated store reads
+  let cachedEntries = await metadataStore.getHotpathEntries();
 
   for (const candidateId of sorted) {
     const candidateSalience = salienceMap.get(candidateId) ?? 0;
     const communityId = communityMap.get(candidateId);
+    const tier: HotpathEntry["tier"] = "page";
 
+    // Derive capacity and quotas from current state
+    const currentCount = cachedEntries.length;
     const graphMass = currentCount + candidateIds.length;
     const capacity = computeCapacity(graphMass, policy.c);
     const capacityRemaining = capacity - currentCount;
     const tierQuotas = deriveTierQuotas(capacity, policy.tierQuotaRatios);
+    const tierEntries = cachedEntries.filter((e) => e.tier === tier);
+    const tierFull = tierEntries.length >= tierQuotas[tier];
 
-    // Check community quota within tier
-    if (communityId !== undefined) {
+    // --- Community quota check (enforced regardless of capacityRemaining) ---
+    if (communityId !== undefined && tierFull) {
       const communitySizes = getCommunityDistribution(tierEntries, communityId);
       const communityQuotas = deriveCommunityQuotas(
         tierQuotas[tier],
@@ -287,84 +294,62 @@ export async function runPromotionSweep(
         : 0;
       const communityCount = communitySizes.candidateCommunityCount;
 
-      if (communityCount >= communityBudget) {
+      if (communityCount >= communityBudget && communityCount > 0) {
         // Community is at quota — only promote if candidate beats weakest in community
-        const weakestId = await selectEvictionTarget(tier, communityId, metadataStore);
+        const weakestId = findWeakestIn(tierEntries, communityId);
         if (weakestId === undefined) continue;
 
-        const weakestEntry = tierEntries.find((e) => e.entityId === weakestId);
-        const weakestSalience = weakestEntry?.salience ?? 0;
+        const weakestSalience = tierEntries.find((e) => e.entityId === weakestId)?.salience ?? 0;
 
         if (candidateSalience > weakestSalience) {
           await metadataStore.removeHotpathEntry(weakestId);
-          allEntries = allEntries.filter((e) => e.entityId !== weakestId);
-          tierEntries = tierEntries.filter((e) => e.entityId !== weakestId);
-          currentCount -= 1;
-
-          const promotedEntry = {
+          const newEntry: HotpathEntry = {
             entityId: candidateId,
             tier,
             salience: candidateSalience,
             communityId,
-          } as HotpathEntry;
-
-          await metadataStore.putHotpathEntry(promotedEntry);
-          allEntries.push(promotedEntry);
-          tierEntries.push(promotedEntry);
-          currentCount += 1;
+          };
+          await metadataStore.putHotpathEntry(newEntry);
+          cachedEntries = cachedEntries.filter((e) => e.entityId !== weakestId);
+          cachedEntries.push(newEntry);
         }
         continue;
       }
     }
 
-    // Check tier quota and overall capacity
-    if (tierEntries.length >= tierQuotas[tier]) {
-      // Tier is at or above quota — promote only if beats weakest in tier
-      const weakestId = await selectEvictionTarget(tier, communityId, metadataStore);
+    // --- Tier quota check (enforced regardless of capacityRemaining) ---
+    if (tierFull) {
+      // Tier is at quota — evict the weakest in the entire tier (not scoped
+      // to candidate's community, so new communities can displace weak entries)
+      const weakestId = findWeakestIn(tierEntries, undefined);
       if (weakestId === undefined) continue;
 
-      const weakestEntry = tierEntries.find((e) => e.entityId === weakestId);
-      const weakestSalience = weakestEntry?.salience ?? 0;
+      const weakestSalience = tierEntries.find((e) => e.entityId === weakestId)?.salience ?? 0;
 
-      if (!shouldPromote(candidateSalience, weakestSalience, capacityRemaining)) {
-        continue;
-      }
+      if (candidateSalience <= weakestSalience) continue;
 
       await metadataStore.removeHotpathEntry(weakestId);
-      await metadataStore.putHotpathEntry({
+      const newEntry: HotpathEntry = {
         entityId: candidateId,
         tier,
         salience: candidateSalience,
         communityId,
-      });
+      };
+      await metadataStore.putHotpathEntry(newEntry);
+      cachedEntries = cachedEntries.filter((e) => e.entityId !== weakestId);
+      cachedEntries.push(newEntry);
     } else if (capacityRemaining > 0) {
-      // Tier has room under quota and global capacity available — just admit
-      await metadataStore.putHotpathEntry({
+      // Both tier and overall capacity available — admit directly
+      const newEntry: HotpathEntry = {
         entityId: candidateId,
         tier,
         salience: candidateSalience,
         communityId,
-      });
-    } else {
-      // Tier has room under quota but no global capacity — admit only via replacement
-      const weakestId = await selectEvictionTarget(tier, communityId, metadataStore);
-      if (weakestId === undefined) continue;
-
-      const weakestEntry = tierEntries.find((e) => e.entityId === weakestId);
-      const weakestSalience = weakestEntry?.salience ?? 0;
-
-      if (!shouldPromote(candidateSalience, weakestSalience, capacityRemaining)) {
-        continue;
-      }
-
-      await metadataStore.removeHotpathEntry(weakestId);
-      await metadataStore.putHotpathEntry({
-        entityId: candidateId,
-        tier,
-        salience: candidateSalience,
-        communityId,
-      });
+      };
+      await metadataStore.putHotpathEntry(newEntry);
+      cachedEntries.push(newEntry);
     }
+    // else: tier has room but overall capacity is full — skip
   }
 }
 
@@ -375,6 +360,10 @@ export async function runPromotionSweep(
 /**
  * Compute community distribution within a set of tier entries,
  * including the candidate's community.
+ *
+ * The candidate's community is counted as having at least size 1 for
+ * quota derivation, so that a brand-new community can receive its
+ * first slot via the largest-remainder method.
  */
 function getCommunityDistribution(
   tierEntries: HotpathEntry[],
@@ -391,22 +380,41 @@ function getCommunityDistribution(
     communityCountMap.set(cid, (communityCountMap.get(cid) ?? 0) + 1);
   }
 
-  // Ensure candidate's community is represented
-  if (!communityCountMap.has(candidateCommunityId)) {
-    communityCountMap.set(candidateCommunityId, 0);
-  }
+  // Ensure candidate's community is represented with at least size 1
+  // so that deriveCommunityQuotas can allocate it a slot
+  const actualCount = communityCountMap.get(candidateCommunityId) ?? 0;
+  communityCountMap.set(candidateCommunityId, Math.max(1, actualCount));
 
   const communities = [...communityCountMap.keys()].sort();
-  const sizes = communities.map((c) => {
-    const count = communityCountMap.get(c) ?? 0;
-    // Treat the candidate community as having at least size 1 for quota derivation
-    if (c === candidateCommunityId && count === 0) {
-      return 1;
-    }
-    return count;
-  });
+  const sizes = communities.map((c) => communityCountMap.get(c) ?? 0);
   const communityIndex = communities.indexOf(candidateCommunityId);
-  const candidateCommunityCount = communityCountMap.get(candidateCommunityId) ?? 0;
 
-  return { sizes, communityIndex, candidateCommunityCount };
+  return { sizes, communityIndex, candidateCommunityCount: actualCount };
+}
+
+/**
+ * Find the weakest entry in a list, optionally filtered by communityId.
+ * Deterministic: breaks ties by entityId (smallest wins).
+ */
+function findWeakestIn(
+  entries: HotpathEntry[],
+  communityId: string | undefined,
+): Hash | undefined {
+  const filtered = communityId !== undefined
+    ? entries.filter((e) => e.communityId === communityId)
+    : entries;
+
+  if (filtered.length === 0) return undefined;
+
+  let weakest = filtered[0];
+  for (let i = 1; i < filtered.length; i++) {
+    const e = filtered[i];
+    if (
+      e.salience < weakest.salience ||
+      (e.salience === weakest.salience && e.entityId < weakest.entityId)
+    ) {
+      weakest = e;
+    }
+  }
+  return weakest.entityId;
 }

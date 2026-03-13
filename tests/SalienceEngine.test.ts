@@ -530,66 +530,62 @@ describe("SalienceEngine lifecycle", () => {
 
   describe("community quotas", () => {
     it("prevent a single community from consuming all page-tier slots", async () => {
-      // Set up a scenario where community "big" already has entries and
-      // a candidate from "small" can be admitted while "big" is at quota.
+      // Pre-fill 3 page entries from community "big" with low salience
+      await store.putHotpathEntry({ entityId: "big-0", tier: "page", salience: 0.1, communityId: "big" });
+      await store.putHotpathEntry({ entityId: "big-1", tier: "page", salience: 0.2, communityId: "big" });
+      await store.putHotpathEntry({ entityId: "big-2", tier: "page", salience: 0.3, communityId: "big" });
 
-      // Use a policy with c that gives capacity = ~5 for graphMass ~20
-      const policy: HotpathPolicy = {
-        ...DEFAULT_HOTPATH_POLICY,
-        c: 0.5,
-      };
-
-      // Pre-fill with entries from community "big" at varied salience
-      const bigEntries = 3;
-      for (let i = 0; i < bigEntries; i++) {
-        await store.putHotpathEntry({
-          entityId: `big-${i}`,
-          tier: "page",
-          salience: 1.0 + i * 0.1,
-          communityId: "big",
-        });
-      }
-
-      // Add one entry from community "small"
-      await store.putHotpathEntry({
-        entityId: "small-0",
-        tier: "page",
-        salience: 2.0,
-        communityId: "small",
-      });
-
-      // Add a very strong candidate from "big"
-      await store.putEdges(makeEdges("big-candidate", [{ toId: "x", weight: 50.0 }]));
+      // A strong candidate from a brand-new community "small"
+      await store.putEdges(makeEdges("small-candidate", [{ toId: "x", weight: 50.0 }]));
       await store.putPageActivity(
-        makeActivity("big-candidate", 100, new Date(NOW).toISOString(), "big"),
+        makeActivity("small-candidate", 100, new Date(NOW).toISOString(), "small"),
       );
 
-      // Also add a candidate from "small"
-      await store.putEdges(makeEdges("small-candidate", [{ toId: "x", weight: 40.0 }]));
-      await store.putPageActivity(
-        makeActivity("small-candidate", 80, new Date(NOW).toISOString(), "small"),
-      );
+      // c=0.01 → very small capacity, page tier is full
+      const policy: HotpathPolicy = { ...DEFAULT_HOTPATH_POLICY, c: 0.01 };
 
-      await runPromotionSweep(
-        ["big-candidate", "small-candidate"],
-        store,
-        policy,
-        NOW,
-      );
+      await runPromotionSweep(["small-candidate"], store, policy, NOW);
 
       const entries = await store.getHotpathEntries("page");
       const bigCount = entries.filter((e) => e.communityId === "big").length;
       const smallCount = entries.filter((e) => e.communityId === "small").length;
 
-      // Both communities should have representation — "big" shouldn't take all slots
+      // The new community was admitted by displacing the weakest "big" entry
       expect(smallCount).toBeGreaterThanOrEqual(1);
-      // Total should not exceed tier quota
-      const graphMass = entries.length + 2; // + candidates
-      const capacity = computeCapacity(graphMass, policy.c);
-      const tierQuotas = deriveTierQuotas(capacity, policy.tierQuotaRatios);
-      expect(entries.length).toBeLessThanOrEqual(tierQuotas.page);
-      // "big" didn't consume everything
-      expect(bigCount).toBeLessThan(entries.length);
+      // "big" lost one slot
+      expect(bigCount).toBeLessThan(3);
+    });
+
+    it("enforces tier quotas even when overall capacity is not full", async () => {
+      // With c=2.0 and 4 page entries + 1 candidate:
+      //   graphMass = 5, capacity = 8, pageBudget = 4
+      //   tierFull = true (4 >= 4), capacityRemaining = 4 > 0
+      // A weak candidate should NOT be admitted despite overall capacity.
+      const policy: HotpathPolicy = { ...DEFAULT_HOTPATH_POLICY, c: 2.0 };
+
+      for (let i = 0; i < 4; i++) {
+        await store.putHotpathEntry({
+          entityId: `p-${i}`,
+          tier: "page",
+          salience: 0.5 + i * 0.1,
+        });
+      }
+
+      // Weak candidate (no edges, no activity → salience = 0)
+      await runPromotionSweep(["weak-candidate"], store, policy, NOW);
+
+      const entries = await store.getHotpathEntries("page");
+      const sweepGraphMass = 4 + 1;
+      const sweepCapacity = computeCapacity(sweepGraphMass, policy.c);
+      const sweepPageQuota = deriveTierQuotas(sweepCapacity, policy.tierQuotaRatios).page;
+
+      // Page tier must not exceed its quota
+      expect(entries.length).toBeLessThanOrEqual(sweepPageQuota);
+      // Weak candidate was not admitted
+      expect(entries.map((e) => e.entityId)).not.toContain("weak-candidate");
+      // Verify our capacity assumptions
+      expect(sweepCapacity).toBeGreaterThan(4); // overall capacity has room
+      expect(sweepPageQuota).toBe(4);            // but page tier is exactly full
     });
   });
 
