@@ -677,10 +677,4 @@ export class ClusterStability {
   ) {
     return metadataStore.getAllShelves();
   }
-
-  private async collectAllVolumes(
-    metadataStore: MetadataStore,
-  ): Promise<Volume[]> {
-    return metadataStore.getAllVolumes();
-  }
 }
