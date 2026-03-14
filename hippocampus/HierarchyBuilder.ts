@@ -1,13 +1,16 @@
 import type { Book, Hash, MetadataStore, SemanticNeighbor, Shelf, Volume, VectorStore } from "../core/types";
 import type { ModelProfile } from "../core/ModelProfile";
 import type { HotpathPolicy } from "../core/HotpathPolicy";
+import { computeFanoutLimit, DEFAULT_HOTPATH_POLICY } from "../core/HotpathPolicy";
 import { hashText } from "../core/crypto/hash";
 import { runPromotionSweep } from "../core/SalienceEngine";
 
 // Clustering fan-out targets — policy constants, not model-derived.
-// 8 pages/book keeps books coarse enough for medoid selection to be meaningful
-// without O(n²) pair-wise cost blowing up. 4 books/volume and 4 volumes/shelf
-// mirror a balanced 4-ary hierarchy consistent with Williams Bound routing.
+// These are chosen to be consistent with the Williams Bound fanout limit:
+//   computeFanoutLimit(N) ≈ ceil(0.5 * sqrt(N * log2(1+N)))
+// At typical early-corpus sizes these constants (4-8) sit comfortably within
+// the Williams-derived quota.  ClusterStability handles splits at runtime if
+// volumes grow beyond their quota after the initial hierarchy build.
 const PAGES_PER_BOOK = 8;
 const BOOKS_PER_VOLUME = 4;
 const VOLUMES_PER_SHELF = 4;
@@ -260,6 +263,142 @@ export async function buildHierarchy(
   }
 
   await runPromotionSweep(shelves.map((s) => s.shelfId), metadataStore, policy);
+
+  // -------------------------------------------------------------------------
+  // Williams fanout quota enforcement
+  // -------------------------------------------------------------------------
+  // Per DESIGN.md "Sublinear Fanout Bounds": when a node's child count exceeds
+  // its Williams-derived limit, HierarchyBuilder triggers a split.
+  //
+  // The split threshold is max(STATIC_CONSTANT, computeFanoutLimit(nodeSize)):
+  // - For freshly built nodes (size ≤ STATIC_CONSTANT), the Williams formula
+  //   may return a smaller value, so we use the static constant as a floor to
+  //   prevent splitting a structure that was just constructed correctly.
+  // - For nodes that have grown organically past the static constant, the
+  //   Williams limit takes over and drives the split.
+  const policyC = policy?.c ?? DEFAULT_HOTPATH_POLICY.c;
+
+  // ---- Volumes ----
+  for (const volume of [...volumes]) {
+    const nodeLimit = Math.max(BOOKS_PER_VOLUME, computeFanoutLimit(volume.bookIds.length, policyC));
+    if (volume.bookIds.length <= nodeLimit) continue;
+
+    const subChunks = chunkArray(volume.bookIds, nodeLimit);
+    const subVolumes: Volume[] = [];
+
+    for (const sub of subChunks) {
+      const sortedSub = [...sub].sort();
+      const subVolumeId = await hashText(`split-vol:${volume.volumeId}:${sortedSub.join("|")}`);
+
+      const subBooks = (
+        await Promise.all(sub.map((id) => metadataStore.getBook(id)))
+      ).filter((b): b is Book => b !== undefined);
+
+      // Compute sub-volume variance from actual medoid vectors.
+      const medoidVecs = subBooks
+        .map((b) => pageVectorMap.get(b.medoidPageId))
+        .filter((v): v is Float32Array => v !== undefined);
+      const centroid = medoidVecs.length > 0 ? computeCentroid(medoidVecs) : new Float32Array(dim);
+      const protoOffset = await vectorStore.appendVector(centroid);
+
+      let subVariance = 0;
+      for (const v of medoidVecs) {
+        const d = cosineDistance(v, centroid);
+        subVariance += d * d;
+      }
+      if (medoidVecs.length > 0) subVariance /= medoidVecs.length;
+
+      const subVol: Volume = {
+        volumeId: subVolumeId,
+        bookIds: sub,
+        prototypeOffsets: [protoOffset],
+        prototypeDim: dim,
+        variance: subVariance,
+      };
+      await metadataStore.putVolume(subVol);
+      subVolumes.push(subVol);
+    }
+
+    // Replace the oversized volume in every shelf that references it.
+    for (const shelf of shelves) {
+      const idx = shelf.volumeIds.indexOf(volume.volumeId);
+      if (idx === -1) continue;
+      const newVolumeIds = [
+        ...shelf.volumeIds.slice(0, idx),
+        ...subVolumes.map((v) => v.volumeId),
+        ...shelf.volumeIds.slice(idx + 1),
+      ];
+      const updated: Shelf = { ...shelf, volumeIds: newVolumeIds };
+      await metadataStore.putShelf(updated);
+      Object.assign(shelf, updated);
+    }
+
+    // Delete the original oversized volume (and its reverse-index entries).
+    await metadataStore.deleteVolume(volume.volumeId);
+    volumes.splice(volumes.indexOf(volume), 1, ...subVolumes);
+  }
+
+  // ---- Shelves ----
+  for (const shelf of [...shelves]) {
+    const nodeLimit = Math.max(VOLUMES_PER_SHELF, computeFanoutLimit(shelf.volumeIds.length, policyC));
+    if (shelf.volumeIds.length <= nodeLimit) continue;
+
+    const subChunks = chunkArray(shelf.volumeIds, nodeLimit);
+
+    // Update the existing shelf record to hold only the FIRST sub-chunk's
+    // volumes.  All remaining sub-chunks get fresh shelf records.
+    // Note: volumes that move to new shelves keep a stale volumeToShelf entry
+    // pointing at this shelf's ID; that entry will be cleaned up by a future
+    // Daydreamer ClusterStability pass (deleteShelf is not yet on the interface).
+    const newShelves: Shelf[] = [];
+    for (let ci = 0; ci < subChunks.length; ci++) {
+      const sub = subChunks[ci];
+      const sortedSub = [...sub].sort();
+
+      if (ci === 0) {
+        // Re-use the original shelfId for the first sub-chunk.
+        const subShelfVols = (
+          await Promise.all(sub.map((id) => metadataStore.getVolume(id)))
+        ).filter((v): v is Volume => v !== undefined);
+        const protoVecs = await Promise.all(
+          subShelfVols.map((v) => vectorStore.readVector(v.prototypeOffsets[0], dim)),
+        );
+        const centroid = protoVecs.length > 0 ? computeCentroid(protoVecs) : new Float32Array(dim);
+        const routingOffset = await vectorStore.appendVector(centroid);
+
+        const updated: Shelf = {
+          shelfId: shelf.shelfId,
+          volumeIds: sub,
+          routingPrototypeOffsets: [routingOffset],
+          routingDim: dim,
+        };
+        await metadataStore.putShelf(updated);
+        Object.assign(shelf, updated);
+        newShelves.push(updated);
+      } else {
+        const subShelfId = await hashText(`split-shelf:${shelf.shelfId}:${sortedSub.join("|")}`);
+        const subShelfVols = (
+          await Promise.all(sub.map((id) => metadataStore.getVolume(id)))
+        ).filter((v): v is Volume => v !== undefined);
+        const protoVecs = await Promise.all(
+          subShelfVols.map((v) => vectorStore.readVector(v.prototypeOffsets[0], dim)),
+        );
+        const centroid = protoVecs.length > 0 ? computeCentroid(protoVecs) : new Float32Array(dim);
+        const routingOffset = await vectorStore.appendVector(centroid);
+
+        const newShelf: Shelf = {
+          shelfId: subShelfId,
+          volumeIds: sub,
+          routingPrototypeOffsets: [routingOffset],
+          routingDim: dim,
+        };
+        await metadataStore.putShelf(newShelf);
+        newShelves.push(newShelf);
+      }
+    }
+
+    shelves.splice(shelves.indexOf(shelf), 1, ...newShelves);
+  }
 
   return { books, volumes, shelves };
 }

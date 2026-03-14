@@ -11,7 +11,7 @@
 // ---------------------------------------------------------------------------
 
 import { randomUUID } from "../core/crypto/uuid";
-import type { Edge, Hash, MetadataStore, MetroidNeighbor, Page } from "../core/types";
+import type { Edge, Hash, MetadataStore, SemanticNeighbor, Page } from "../core/types";
 import { filterEligible } from "./EligibilityClassifier";
 import type { CuriosityProbe, SubgraphSlice } from "./types";
 
@@ -84,7 +84,7 @@ async function expandSeeds(
       if (collectedPages.length >= maxNodes) break;
 
       // Expand via Metroid (semantic) neighbors
-      const metroidNeighbors: MetroidNeighbor[] = await metadataStore.getMetroidNeighbors(pageId);
+      const metroidNeighbors: SemanticNeighbor[] = await metadataStore.getSemanticNeighbors(pageId);
       for (const n of metroidNeighbors) {
         if (!visited.has(n.neighborPageId) && collectedPages.length < maxNodes) {
           visited.add(n.neighborPageId);

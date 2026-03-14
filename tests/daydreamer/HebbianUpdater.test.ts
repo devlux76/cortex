@@ -13,8 +13,8 @@ import type {
   Hash,
   HotpathEntry,
   MetadataStore,
-  MetroidNeighbor,
-  MetroidSubgraph,
+  SemanticNeighbor,
+  SemanticNeighborSubgraph,
   Page,
   PageActivity,
   Shelf,
@@ -58,7 +58,7 @@ class FullMockMetadataStore implements MetadataStore {
   private edgeMap = new Map<string, Edge>();
   private activities = new Map<Hash, PageActivity>();
   private hotpath = new Map<Hash, HotpathEntry>();
-  private metroidNeighbors = new Map<Hash, MetroidNeighbor[]>();
+  private metroidNeighbors = new Map<Hash, SemanticNeighbor[]>();
   private dirtyFlags = new Map<Hash, boolean>();
 
   async putPage(page: Page) { this.pages.set(page.pageId, page); }
@@ -71,6 +71,7 @@ class FullMockMetadataStore implements MetadataStore {
   async putVolume(v: Volume) { this.volumes.set(v.volumeId, v); }
   async getVolume(id: Hash) { return this.volumes.get(id); }
   async getAllVolumes() { return [...this.volumes.values()]; }
+  async deleteVolume(id: Hash) { this.volumes.delete(id); }
 
   async putShelf(s: Shelf) { this.shelves.set(s.shelfId, s); }
   async getShelf(id: Hash) { return this.shelves.get(id); }
@@ -92,17 +93,17 @@ class FullMockMetadataStore implements MetadataStore {
   async getVolumesByBook() { return []; }
   async getShelvesByVolume() { return []; }
 
-  async putMetroidNeighbors(pageId: Hash, neighbors: MetroidNeighbor[]) {
+  async putSemanticNeighbors(pageId: Hash, neighbors: SemanticNeighbor[]) {
     this.metroidNeighbors.set(pageId, neighbors);
   }
-  async getMetroidNeighbors(pageId: Hash) {
+  async getSemanticNeighbors(pageId: Hash) {
     return this.metroidNeighbors.get(pageId) ?? [];
   }
-  async getInducedMetroidSubgraph(): Promise<MetroidSubgraph> { return { nodes: [], edges: [] }; }
+  async getInducedNeighborSubgraph(): Promise<SemanticNeighborSubgraph> { return { nodes: [], edges: [] }; }
 
-  async needsMetroidRecalc(id: Hash) { return this.dirtyFlags.get(id) === true; }
-  async flagVolumeForMetroidRecalc(id: Hash) { this.dirtyFlags.set(id, true); }
-  async clearMetroidRecalcFlag(id: Hash) { this.dirtyFlags.set(id, false); }
+  async needsNeighborRecalc(id: Hash) { return this.dirtyFlags.get(id) === true; }
+  async flagVolumeForNeighborRecalc(id: Hash) { this.dirtyFlags.set(id, true); }
+  async clearNeighborRecalcFlag(id: Hash) { this.dirtyFlags.set(id, false); }
 
   async putHotpathEntry(entry: HotpathEntry) { this.hotpath.set(entry.entityId, { ...entry }); }
   async getHotpathEntries(tier?: HotpathEntry["tier"]) {

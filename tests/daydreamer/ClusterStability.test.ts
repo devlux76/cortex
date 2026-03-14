@@ -7,8 +7,6 @@
 
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { beforeEach, describe, expect, it } from "vitest";
-
 import { ClusterStability } from "../../daydreamer/ClusterStability";
 import type {
   Book,
@@ -16,8 +14,6 @@ import type {
   Hash,
   HotpathEntry,
   MetadataStore,
-  MetroidNeighbor,
-  MetroidSubgraph,
   SemanticNeighbor,
   SemanticNeighborSubgraph,
   Page,
@@ -51,7 +47,7 @@ function makePage(pageId: Hash): Page {
   };
 }
 
-class MockMetadataStore implements MetadataStore {
+class LabelPropMockStore implements MetadataStore {
   private pages = new Map<Hash, Page>();
   private books = new Map<Hash, Book>();
   private volumes = new Map<Hash, Volume>();
@@ -59,7 +55,7 @@ class MockMetadataStore implements MetadataStore {
   private edgeMap = new Map<string, Edge>();
   private activities = new Map<Hash, PageActivity>();
   private hotpath = new Map<Hash, HotpathEntry>();
-  private metroidNeighbors = new Map<Hash, MetroidNeighbor[]>();
+  private semanticNeighbors = new Map<Hash, SemanticNeighbor[]>();
   private dirtyFlags = new Map<Hash, boolean>();
 
   async putPage(page: Page) { this.pages.set(page.pageId, page); }
@@ -72,6 +68,7 @@ class MockMetadataStore implements MetadataStore {
   async putVolume(v: Volume) { this.volumes.set(v.volumeId, v); }
   async getVolume(id: Hash) { return this.volumes.get(id); }
   async getAllVolumes() { return [...this.volumes.values()]; }
+  async deleteVolume(id: Hash) { this.volumes.delete(id); }
 
   async putShelf(s: Shelf) { this.shelves.set(s.shelfId, s); }
   async getShelf(id: Hash) { return this.shelves.get(id); }
@@ -87,15 +84,15 @@ class MockMetadataStore implements MetadataStore {
   async getVolumesByBook() { return []; }
   async getShelvesByVolume() { return []; }
 
-  async putMetroidNeighbors(pageId: Hash, neighbors: MetroidNeighbor[]) {
-    this.metroidNeighbors.set(pageId, [...neighbors]);
+  async putSemanticNeighbors(pageId: Hash, neighbors: SemanticNeighbor[]) {
+    this.semanticNeighbors.set(pageId, [...neighbors]);
   }
-  async getMetroidNeighbors(pageId: Hash) { return this.metroidNeighbors.get(pageId) ?? []; }
-  async getInducedMetroidSubgraph(): Promise<MetroidSubgraph> { return { nodes: [], edges: [] }; }
+  async getSemanticNeighbors(pageId: Hash) { return this.semanticNeighbors.get(pageId) ?? []; }
+  async getInducedNeighborSubgraph(): Promise<SemanticNeighborSubgraph> { return { nodes: [], edges: [] }; }
 
-  async needsMetroidRecalc(id: Hash) { return this.dirtyFlags.get(id) === true; }
-  async flagVolumeForMetroidRecalc(id: Hash) { this.dirtyFlags.set(id, true); }
-  async clearMetroidRecalcFlag(id: Hash) { this.dirtyFlags.set(id, false); }
+  async needsNeighborRecalc(id: Hash) { return this.dirtyFlags.get(id) === true; }
+  async flagVolumeForNeighborRecalc(id: Hash) { this.dirtyFlags.set(id, true); }
+  async clearNeighborRecalcFlag(id: Hash) { this.dirtyFlags.set(id, false); }
 
   async putHotpathEntry(entry: HotpathEntry) { this.hotpath.set(entry.entityId, { ...entry }); }
   async getHotpathEntries(tier?: HotpathEntry["tier"]) {
@@ -122,16 +119,16 @@ class MockMetadataStore implements MetadataStore {
 // ---------------------------------------------------------------------------
 
 function addNeighbors(
-  store: MockMetadataStore,
+  store: LabelPropMockStore,
   pageId: Hash,
   neighborIds: Hash[],
 ): void {
-  const neighbors: MetroidNeighbor[] = neighborIds.map((id) => ({
+  const neighbors: SemanticNeighbor[] = neighborIds.map((id) => ({
     neighborPageId: id,
     cosineSimilarity: 0.9,
     distance: 0.1,
   }));
-  void store.putMetroidNeighbors(pageId, neighbors);
+  void store.putSemanticNeighbors(pageId, neighbors);
 }
 
 // ---------------------------------------------------------------------------
@@ -139,10 +136,10 @@ function addNeighbors(
 // ---------------------------------------------------------------------------
 
 describe("runLabelPropagation", () => {
-  let store: MockMetadataStore;
+  let store: LabelPropMockStore;
 
   beforeEach(() => {
-    store = new MockMetadataStore();
+    store = new LabelPropMockStore();
   });
 
   it("returns empty communityMap for empty store", async () => {
@@ -299,6 +296,8 @@ describe("detectEmptyCommunities", () => {
     const known = new Set(["c1", "c2"]);
     const empty = detectEmptyCommunities(known, new Set());
     expect(empty).toEqual(new Set(["c1", "c2"]));
+  });
+});
 
 // ---------------------------------------------------------------------------
 // In-memory MetadataStore mock
@@ -325,14 +324,17 @@ class MockMetadataStore implements MetadataStore {
   // Volumes
   async putVolume(volume: Volume): Promise<void> { this.volumes.set(volume.volumeId, { ...volume }); }
   async getVolume(id: Hash): Promise<Volume | undefined> { return this.volumes.get(id); }
+  async getAllVolumes(): Promise<Volume[]> { return [...this.volumes.values()]; }
   async deleteVolume(volumeId: Hash): Promise<void> { this.volumes.delete(volumeId); }
 
   // Shelves
   async putShelf(shelf: Shelf): Promise<void> { this.shelves.set(shelf.shelfId, { ...shelf }); }
   async getShelf(id: Hash): Promise<Shelf | undefined> { return this.shelves.get(id); }
+  async getAllShelves(): Promise<Shelf[]> { return [...this.shelves.values()]; }
 
   // Edges
   async putEdges(edges: Edge[]): Promise<void> { this.edges.push(...edges); }
+  async deleteEdge(from: Hash, to: Hash): Promise<void> { this.edges = this.edges.filter((e) => !(e.fromPageId === from && e.toPageId === to)); }
   async getNeighbors(pageId: Hash): Promise<Edge[]> {
     return this.edges.filter((e) => e.fromPageId === pageId);
   }

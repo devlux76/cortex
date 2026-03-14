@@ -194,3 +194,112 @@ export function deriveCommunityQuotas(
   for (let i = 0; i < n; i++) quotas[i] += floors[i];
   return quotas;
 }
+
+// ---------------------------------------------------------------------------
+// Semantic neighbor degree limit — Williams-bound derived
+// ---------------------------------------------------------------------------
+
+// Bootstrap floor for Williams-bound log formulas: ensures t_eff ≥ 2 so that
+// log₂(t_eff) > 0 and log₂(log₂(1+t_eff)) is defined and positive.
+const MIN_GRAPH_MASS_FOR_LOGS = 2;
+
+/**
+ * Compute the Williams-bound-derived maximum degree for the semantic neighbor
+ * graph given a corpus of `graphMass` total pages.
+ *
+ * The degree limit uses the same H(t) formula as the hotpath capacity but is
+ * bounded by a hard cap to keep the graph sparse.  At small corpora the
+ * Williams formula naturally returns small values (e.g. 1–5 for t < 10);
+ * at large corpora the `hardCap` clamps growth to prevent the graph becoming
+ * too dense.
+ *
+ * @param graphMass  Total number of pages in the corpus.
+ * @param c          Williams Bound scaling constant (default from policy).
+ * @param hardCap    Maximum degree regardless of formula result.  Default: 32.
+ */
+export function computeNeighborMaxDegree(
+  graphMass: number,
+  c: number = DEFAULT_HOTPATH_POLICY.c,
+  hardCap = 32,
+): number {
+  const derived = computeCapacity(graphMass, c);
+  return Math.min(hardCap, Math.max(1, derived));
+}
+
+// ---------------------------------------------------------------------------
+// Dynamic subgraph expansion bounds — Williams-bound derived
+// ---------------------------------------------------------------------------
+
+export interface SubgraphBounds {
+  /** Maximum number of nodes to include in the induced subgraph. */
+  maxSubgraphSize: number;
+  /** Maximum BFS hops from seed nodes. */
+  maxHops: number;
+  /** Maximum fanout per hop (branching factor). */
+  perHopBranching: number;
+}
+
+/**
+ * Compute dynamic Williams-derived bounds for subgraph expansion (step 9 of
+ * the Cortex query path).
+ *
+ * Formulas from DESIGN.md "Dynamic Subgraph Expansion Bounds":
+ *
+ *   t_eff            = max(t, 2)
+ *   maxSubgraphSize  = min(30, ⌊√(t_eff · log₂(1+t_eff)) / log₂(t_eff)⌋)
+ *   maxHops          = max(1, ⌈log₂(log₂(1 + t_eff))⌉)
+ *   perHopBranching  = max(1, ⌊maxSubgraphSize ^ (1/maxHops)⌋)
+ *
+ * The bootstrap floor `t_eff = max(t, 2)` eliminates division-by-zero for
+ * t ≤ 1 and ensures a safe minimum of `maxSubgraphSize=1, maxHops=1`.
+ *
+ * @param graphMass  Total number of pages in the corpus.
+ */
+export function computeSubgraphBounds(graphMass: number): SubgraphBounds {
+  const tEff = Math.max(graphMass, MIN_GRAPH_MASS_FOR_LOGS);
+  const log2tEff = Math.log2(tEff);
+
+  const maxSubgraphSize = Math.min(
+    30,
+    Math.floor(Math.sqrt(tEff * Math.log2(1 + tEff)) / log2tEff),
+  );
+
+  const maxHops = Math.max(1, Math.ceil(Math.log2(Math.log2(1 + tEff))));
+
+  const perHopBranching = Math.max(
+    1,
+    Math.floor(Math.pow(maxSubgraphSize, 1 / maxHops)),
+  );
+
+  return {
+    maxSubgraphSize: Math.max(1, maxSubgraphSize),
+    maxHops,
+    perHopBranching,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Williams-derived hierarchy fanout limit
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute the Williams-derived fanout limit for a hierarchy node that
+ * currently has `childCount` children.
+ *
+ * Per DESIGN.md "Sublinear Fanout Bounds":
+ *   Max children = O(√(childCount · log childCount))
+ *
+ * The formula is evaluated with a bootstrap floor of t_eff = max(t, 2) to
+ * avoid log(0) and returns at least 1 child.
+ *
+ * @param childCount  Current number of children for the parent node.
+ * @param c           Williams Bound scaling constant.
+ */
+export function computeFanoutLimit(
+  childCount: number,
+  c: number = DEFAULT_HOTPATH_POLICY.c,
+): number {
+  const tEff = Math.max(childCount, MIN_GRAPH_MASS_FOR_LOGS);
+  const raw = c * Math.sqrt(tEff * Math.log2(1 + tEff));
+  return Math.max(1, Math.ceil(raw));
+}

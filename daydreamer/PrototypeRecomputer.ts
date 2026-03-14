@@ -12,7 +12,7 @@
 
 import type { Hash, HotpathEntry, MetadataStore, Shelf, Volume, VectorStore } from "../core/types";
 import { DEFAULT_HOTPATH_POLICY, type HotpathPolicy } from "../core/HotpathPolicy";
-import { batchComputeSalience, runPromotionSweep } from "../core/SalienceEngine";
+import { runPromotionSweep } from "../core/SalienceEngine";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -104,14 +104,18 @@ export interface RecomputeResult {
 // ---------------------------------------------------------------------------
 
 /**
- * Recompute medoid and centroid prototypes for all volumes.
+ * Recompute centroid prototypes for all volumes.
  *
  * For each volume:
  * 1. Load all page embeddings for every book in the volume.
- * 2. Select the medoid page (minimises average distance to all others).
- * 3. Compute the centroid embedding across all pages.
- * 4. Append updated vectors to VectorStore; update volume metadata.
- * 5. Refresh salience and run promotion sweep for the volume tier.
+ * 2. Compute the centroid embedding across all pages.
+ * 3. Append updated centroid vector to VectorStore; update volume metadata.
+ *
+ * Note: Medoid selection and salience/promotion sweeps are intentionally
+ * omitted here.  SalienceEngine methods currently assume page-tier entities;
+ * running them with volume IDs would produce incorrect tier assignments.
+ * Volume-tier salience should be wired up once SalienceEngine supports
+ * non-page tiers.
  */
 async function recomputeVolumePrototypes(
   options: PrototypeRecomputerOptions,
@@ -119,8 +123,6 @@ async function recomputeVolumePrototypes(
   const {
     metadataStore,
     vectorStore,
-    policy = DEFAULT_HOTPATH_POLICY,
-    now = Date.now(),
   } = options;
 
   const allVolumes = await metadataStore.getAllVolumes();
@@ -144,8 +146,6 @@ async function recomputeVolumePrototypes(
     if (pageEntries.length === 0) continue;
 
     const vectors = pageEntries.map((e) => e.vector);
-    const medoidIdx = selectMedoidIndex(vectors);
-    const medoidPageId = pageEntries[medoidIdx].pageId;
     const centroidVec = computeCentroid(vectors);
 
     // Append centroid to vector store

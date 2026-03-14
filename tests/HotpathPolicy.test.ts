@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   computeCapacity,
+  computeFanoutLimit,
+  computeNeighborMaxDegree,
   computeSalience,
+  computeSubgraphBounds,
   deriveCommunityQuotas,
   deriveTierQuotas,
   DEFAULT_HOTPATH_POLICY,
@@ -212,5 +215,113 @@ describe("DEFAULT_HOTPATH_POLICY", () => {
     expect(DEFAULT_HOTPATH_POLICY.tierQuotaRatios.volume).toBe(0.20);
     expect(DEFAULT_HOTPATH_POLICY.tierQuotaRatios.book).toBe(0.20);
     expect(DEFAULT_HOTPATH_POLICY.tierQuotaRatios.page).toBe(0.50);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeNeighborMaxDegree — P1-C: Williams-derived max degree for neighbor graph
+// ---------------------------------------------------------------------------
+
+describe("computeNeighborMaxDegree", () => {
+  it("returns at least 1 for any corpus size", () => {
+    for (const t of [0, 1, 2, 10, 100, 1_000]) {
+      expect(computeNeighborMaxDegree(t)).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it("never exceeds hardCap (32 by default)", () => {
+    for (const t of [10, 100, 1_000, 100_000]) {
+      expect(computeNeighborMaxDegree(t)).toBeLessThanOrEqual(32);
+    }
+  });
+
+  it("grows sublinearly (degree/t decreases as t increases)", () => {
+    const ratio10k = computeNeighborMaxDegree(10_000) / 10_000;
+    const ratio1k = computeNeighborMaxDegree(1_000) / 1_000;
+    expect(ratio10k).toBeLessThanOrEqual(ratio1k);
+  });
+
+  it("respects custom hardCap", () => {
+    expect(computeNeighborMaxDegree(10_000, 0.5, 5)).toBeLessThanOrEqual(5);
+  });
+
+  it("returns a finite positive integer for t = 0", () => {
+    const r = computeNeighborMaxDegree(0);
+    expect(Number.isFinite(r)).toBe(true);
+    expect(Number.isInteger(r)).toBe(true);
+    expect(r).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeSubgraphBounds — P1-E: Dynamic Williams-derived expansion bounds
+// ---------------------------------------------------------------------------
+
+describe("computeSubgraphBounds", () => {
+  it("returns maxHops >= 1 for any corpus size", () => {
+    for (const t of [0, 1, 2, 10, 100, 10_000]) {
+      expect(computeSubgraphBounds(t).maxHops).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it("returns maxSubgraphSize >= 1 for any corpus size", () => {
+    for (const t of [0, 1, 2, 10, 100, 10_000]) {
+      expect(computeSubgraphBounds(t).maxSubgraphSize).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it("maxSubgraphSize is bounded by 30", () => {
+    for (const t of [100, 10_000, 1_000_000]) {
+      expect(computeSubgraphBounds(t).maxSubgraphSize).toBeLessThanOrEqual(30);
+    }
+  });
+
+  it("perHopBranching >= 1 and <= maxSubgraphSize", () => {
+    const t = 1_000;
+    const bounds = computeSubgraphBounds(t);
+    expect(bounds.perHopBranching).toBeGreaterThanOrEqual(1);
+    expect(bounds.perHopBranching).toBeLessThanOrEqual(bounds.maxSubgraphSize);
+  });
+
+  it("all fields are finite positive integers", () => {
+    const bounds = computeSubgraphBounds(100);
+    for (const key of ["maxSubgraphSize", "maxHops", "perHopBranching"] as const) {
+      expect(Number.isFinite(bounds[key])).toBe(true);
+      expect(Number.isInteger(bounds[key])).toBe(true);
+      expect(bounds[key]).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it("maxHops grows logarithmically with corpus size", () => {
+    const smallHops = computeSubgraphBounds(10).maxHops;
+    const largeHops = computeSubgraphBounds(1_000_000).maxHops;
+    expect(largeHops).toBeGreaterThanOrEqual(smallHops);
+    // Logarithmic growth: even 1 billion pages should give maxHops ≤ 10
+    expect(computeSubgraphBounds(1_000_000_000).maxHops).toBeLessThanOrEqual(10);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeFanoutLimit — P1-A: Williams-derived hierarchy fanout limit
+// ---------------------------------------------------------------------------
+
+describe("computeFanoutLimit", () => {
+  it("returns at least 1 for any node count", () => {
+    for (const n of [0, 1, 2, 10, 100]) {
+      expect(computeFanoutLimit(n)).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it("grows sublinearly: limit/n decreases as n increases", () => {
+    const ratio100 = computeFanoutLimit(100) / 100;
+    const ratio10 = computeFanoutLimit(10) / 10;
+    expect(ratio100).toBeLessThan(ratio10);
+  });
+
+  it("returns a finite positive integer", () => {
+    const r = computeFanoutLimit(50);
+    expect(Number.isFinite(r)).toBe(true);
+    expect(Number.isInteger(r)).toBe(true);
+    expect(r).toBeGreaterThanOrEqual(1);
   });
 });

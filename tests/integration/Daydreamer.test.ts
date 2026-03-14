@@ -158,13 +158,13 @@ describe("Daydreamer integration", () => {
       prototypeDim: EMBEDDING_DIM,
       variance: 0,
     });
-    await metadataStore.flagVolumeForMetroidRecalc(volumeId);
+    await metadataStore.flagVolumeForNeighborRecalc(volumeId);
 
-    expect(await metadataStore.needsMetroidRecalc(volumeId)).toBe(true);
+    expect(await metadataStore.needsNeighborRecalc(volumeId)).toBe(true);
 
     await runFullNeighborRecalc({ metadataStore, vectorStore, now });
 
-    expect(await metadataStore.needsMetroidRecalc(volumeId)).toBe(false);
+    expect(await metadataStore.needsNeighborRecalc(volumeId)).toBe(false);
   });
 
   it("prototypes are updated after recompute", async () => {

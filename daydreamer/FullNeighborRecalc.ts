@@ -7,13 +7,21 @@
 // bounded by the Williams-Bound-derived maintenance budget so the idle loop
 // is not starved.
 //
-// Per idle cycle, the scheduler processes at most computeCapacity(graphMass)
-// pairwise comparisons (O(sqrt(t * log(1+t))) growth).
+// Per idle cycle, the scheduler processes at most max(MIN_RECALC_PAIR_BUDGET,
+// computeCapacity(graphMass)) pairwise comparisons.  The minimum floor ensures
+// forward progress for small corpora where the Williams formula may return a
+// value smaller than a single typical volume's pair count.
 // ---------------------------------------------------------------------------
 
-import type { Hash, MetadataStore, MetroidNeighbor, Page, VectorStore } from "../core/types";
+import type { Hash, MetadataStore, SemanticNeighbor, Page, VectorStore } from "../core/types";
 import { computeCapacity, DEFAULT_HOTPATH_POLICY, type HotpathPolicy } from "../core/HotpathPolicy";
 import { batchComputeSalience, runPromotionSweep } from "../core/SalienceEngine";
+
+// Minimum pair budget per idle recalc cycle.
+// Sized to cover the theoretical maximum for a single well-formed volume
+// (BOOKS_PER_VOLUME=4 books × PAGES_PER_BOOK=8 pages = 32 pages,
+//  32 × 31 = 992 pairs).  Using 2048 gives a comfortable margin.
+export const MIN_RECALC_PAIR_BUDGET = 2048;
 
 // ---------------------------------------------------------------------------
 // Options
@@ -61,7 +69,7 @@ function cosineSimilarity(a: Float32Array, b: Float32Array): number {
 /**
  * Run one cycle of full neighbor graph recalculation.
  *
- * Finds all volumes flagged as dirty (via `needsMetroidRecalc`), loads
+ * Finds all volumes flagged as dirty (via `needsNeighborRecalc`), loads
  * their pages, computes pairwise cosine similarities, and updates the
  * Metroid neighbor index. Processing is bounded by the Williams-Bound-derived
  * maintenance budget to avoid blocking the idle loop.
@@ -86,7 +94,7 @@ export async function runFullNeighborRecalc(
     await Promise.all(
       allVolumes.map(async (v) => ({
         volume: v,
-        dirty: await metadataStore.needsMetroidRecalc(v.volumeId),
+        dirty: await metadataStore.needsNeighborRecalc(v.volumeId),
       })),
     )
   )
@@ -97,9 +105,10 @@ export async function runFullNeighborRecalc(
     return { volumesProcessed: 0, pagesProcessed: 0, pairsComputed: 0 };
   }
 
-  // Compute per-cycle pair budget: O(sqrt(t * log(1+t)))
+  // Compute per-cycle pair budget: max of Williams-derived capacity and
+  // the minimum floor so even small corpora make forward progress.
   const totalGraphMass = (await metadataStore.getAllPages()).length;
-  const pairBudget = Math.max(1, computeCapacity(totalGraphMass, policy.c));
+  const pairBudget = Math.max(MIN_RECALC_PAIR_BUDGET, computeCapacity(totalGraphMass, policy.c));
 
   let totalVolumesProcessed = 0;
   let totalPagesProcessed = 0;
@@ -122,7 +131,7 @@ export async function runFullNeighborRecalc(
     }
 
     if (volumePages.length === 0) {
-      await metadataStore.clearMetroidRecalcFlag(volume.volumeId);
+      await metadataStore.clearNeighborRecalcFlag(volume.volumeId);
       totalVolumesProcessed++;
       continue;
     }
@@ -137,8 +146,8 @@ export async function runFullNeighborRecalc(
     // Compute pairwise similarities and build neighbor lists
     const pairsInVolume = volumePages.length * (volumePages.length - 1);
     const remainingBudget = pairBudget - totalPairsComputed;
-    if (pairsInVolume > remainingBudget) {
-      // Budget exhausted — leave this volume dirty for next cycle
+    const budgetExhausted = pairsInVolume > remainingBudget;
+    if (budgetExhausted) {
       break;
     }
 
@@ -146,7 +155,7 @@ export async function runFullNeighborRecalc(
       const page = volumePages[i];
       const vecI = vectors[i];
 
-      const neighbors: MetroidNeighbor[] = [];
+      const neighbors: SemanticNeighbor[] = [];
 
       for (let j = 0; j < volumePages.length; j++) {
         if (i === j) continue;
@@ -167,12 +176,12 @@ export async function runFullNeighborRecalc(
       );
       const topNeighbors = neighbors.slice(0, maxNeighbors);
 
-      await metadataStore.putMetroidNeighbors(page.pageId, topNeighbors);
+      await metadataStore.putSemanticNeighbors(page.pageId, topNeighbors);
       affectedPageIds.add(page.pageId);
     }
 
     // Clear the dirty flag
-    await metadataStore.clearMetroidRecalcFlag(volume.volumeId);
+    await metadataStore.clearNeighborRecalcFlag(volume.volumeId);
     totalVolumesProcessed++;
     totalPagesProcessed += volumePages.length;
   }

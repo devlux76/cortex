@@ -2,6 +2,7 @@ import type { ModelProfile } from "../core/ModelProfile";
 import type { Hash, MetadataStore, Page, VectorStore } from "../core/types";
 import type { EmbeddingRunner } from "../embeddings/EmbeddingRunner";
 import { runPromotionSweep } from "../core/SalienceEngine";
+import { computeSubgraphBounds } from "../core/HotpathPolicy";
 import type { QueryResult } from "./QueryResult";
 import { rankPages, spillToWarm } from "./Ranking";
 import { buildMetroid } from "./MetroidBuilder";
@@ -14,9 +15,13 @@ export interface QueryOptions {
   vectorStore: VectorStore;
   metadataStore: MetadataStore;
   topK?: number;
-  /** BFS depth for semantic neighbor subgraph expansion. 2 hops covers direct
-   *  neighbors and their neighbors, which is the minimum needed to surface
-   *  bridge nodes without exploding the graph size. */
+  /**
+   * Maximum BFS depth for semantic neighbor subgraph expansion.
+   *
+   * When omitted, a dynamic Williams-derived value is computed from the
+   * corpus size via `computeSubgraphBounds(t)`.  Providing an explicit value
+   * overrides the dynamic bound (useful for tests and controlled experiments).
+   */
   maxHops?: number;
 }
 
@@ -30,7 +35,6 @@ export async function query(
     vectorStore,
     metadataStore,
     topK = 10,
-    maxHops = 2,
   } = options;
   const nowIso = new Date().toISOString();
 
@@ -116,8 +120,19 @@ export async function query(
   );
 
   // --- Subgraph expansion ---
+  // Use dynamic Williams-derived bounds unless the caller has pinned an
+  // explicit maxHops value.  Only load all pages when we actually need to
+  // compute bounds — skip the full-page scan on the hot path when maxHops is
+  // already known.
   const topPageIds = topPages.map((p) => p.pageId);
-  const subgraph = await metadataStore.getInducedNeighborSubgraph(topPageIds, maxHops);
+  let effectiveMaxHops: number;
+  if (options.maxHops !== undefined) {
+    effectiveMaxHops = options.maxHops;
+  } else {
+    const allPages = await metadataStore.getAllPages();
+    effectiveMaxHops = computeSubgraphBounds(allPages.length).maxHops;
+  }
+  const subgraph = await metadataStore.getInducedNeighborSubgraph(topPageIds, effectiveMaxHops);
 
   // --- TSP coherence path ---
   const coherencePath = solveOpenTSP(subgraph);

@@ -1,12 +1,16 @@
 import type { Hash, MetadataStore, SemanticNeighbor, VectorStore } from "../core/types";
 import type { ModelProfile } from "../core/ModelProfile";
 import type { HotpathPolicy } from "../core/HotpathPolicy";
+import { computeNeighborMaxDegree, DEFAULT_HOTPATH_POLICY } from "../core/HotpathPolicy";
 import { runPromotionSweep } from "../core/SalienceEngine";
 
-// Policy constants, not model-derived.
-// 16 neighbors keeps the graph sparse while giving enough connectivity for BFS.
-// 0.5 cosine distance (≥0.5 similarity) filters noise without losing near-duplicates.
-const DEFAULT_MAX_DEGREE = 16;
+// Absolute upper cap for the semantic neighbor degree.  The Williams formula
+// can produce larger values for very large corpora; this hard cap keeps the
+// neighbor graph manageable even at scale.
+const NEIGHBOR_DEGREE_HARD_CAP = 32;
+
+// Default cosine-distance cutoff when no policy hint is available.
+// Cosine distance 0.5 ≡ cosine similarity 0.5 (≥ 0.5 similarity passes).
 const DEFAULT_CUTOFF_DISTANCE = 0.5;
 
 export interface FastNeighborInsertOptions {
@@ -81,9 +85,21 @@ export async function insertSemanticNeighbors(
     vectorStore,
     metadataStore,
     policy,
-    maxDegree = DEFAULT_MAX_DEGREE,
     cutoffDistance = DEFAULT_CUTOFF_DISTANCE,
   } = options;
+
+  // Derive maxDegree from the Williams bound, scaled by corpus size.
+  // When a policy is provided, use its scaling constant; otherwise fall back
+  // to the default constant so that corpus-proportional scaling applies in
+  // all cases (not just when a policy object is explicitly threaded through).
+  // An explicit options.maxDegree always wins.
+  let maxDegree: number;
+  if (options.maxDegree !== undefined) {
+    maxDegree = options.maxDegree;
+  } else {
+    const c = policy?.c ?? DEFAULT_HOTPATH_POLICY.c;
+    maxDegree = computeNeighborMaxDegree(allPageIds.length, c, NEIGHBOR_DEGREE_HARD_CAP);
+  }
 
   if (newPageIds.length === 0) return;
 
