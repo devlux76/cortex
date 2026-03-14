@@ -234,6 +234,55 @@ export class IndexedDbMetadataStore implements MetadataStore {
     return this._get<Volume>(STORE.volumes, volumeId);
   }
 
+  /**
+   * Delete a volume and clean up its reverse-index entries:
+   * - Removes the volume from the `bookToVolume` index for each of its books.
+   * - Deletes the `volumeToShelf` index entry for this volume.
+   * - Deletes the volume record itself.
+   *
+   * Callers should update or remove the volume from any shelf's `volumeIds`
+   * list before calling this method.
+   */
+  async deleteVolume(volumeId: Hash): Promise<void> {
+    const volume = await this.getVolume(volumeId);
+
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(
+        [STORE.volumes, STORE.bookToVolume, STORE.volumeToShelf],
+        "readwrite",
+      );
+
+      // Remove from bookToVolume reverse index for each book the volume owned
+      if (volume) {
+        const bookToVolumeStore = tx.objectStore(STORE.bookToVolume);
+        for (const bookId of volume.bookIds) {
+          const getReq = bookToVolumeStore.get(bookId);
+          getReq.onsuccess = () => {
+            const existing: { bookId: Hash; volumeIds: Hash[] } | undefined =
+              getReq.result;
+            if (!existing) return;
+            const updatedVolumeIds = existing.volumeIds.filter(
+              (id) => id !== volumeId,
+            );
+            if (updatedVolumeIds.length === 0) {
+              bookToVolumeStore.delete(bookId);
+            } else {
+              bookToVolumeStore.put({ bookId, volumeIds: updatedVolumeIds });
+            }
+          };
+        }
+      }
+
+      // Remove volumeToShelf reverse index entry
+      tx.objectStore(STORE.volumeToShelf).delete(volumeId);
+
+      // Delete the volume record itself
+      tx.objectStore(STORE.volumes).delete(volumeId);
+
+      promisifyTransaction(tx).then(resolve).catch(reject);
+    });
+  }
+
   // -------------------------------------------------------------------------
   // Shelf CRUD + reverse index
   // -------------------------------------------------------------------------

@@ -164,6 +164,13 @@ export interface MetadataStore {
 
   putVolume(volume: Volume): Promise<void>;
   getVolume(volumeId: Hash): Promise<Volume | undefined>;
+  /**
+   * Delete a volume record and clean up all reverse-index entries
+   * (`bookToVolume` for each book in the volume, and the `volumeToShelf` entry).
+   * Callers are responsible for removing the volume from any shelf's `volumeIds`
+   * list before calling this method.
+   */
+  deleteVolume(volumeId: Hash): Promise<void>;
 
   putShelf(shelf: Shelf): Promise<void>;
   getShelf(shelfId: Hash): Promise<Shelf | undefined>;

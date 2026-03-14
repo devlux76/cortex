@@ -110,6 +110,7 @@ class MockMetadataStore implements MetadataStore {
   async getBook(): Promise<undefined> { return undefined; }
   async putVolume(): Promise<void> { /* stub */ }
   async getVolume(): Promise<undefined> { return undefined; }
+  async deleteVolume(): Promise<void> { /* stub */ }
   async putShelf(): Promise<void> { /* stub */ }
   async getShelf(): Promise<undefined> { return undefined; }
   async getBooksByPage(): Promise<never[]> { return []; }
