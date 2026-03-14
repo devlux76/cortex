@@ -23,6 +23,11 @@ import { strengthenEdges, decayAndPrune } from "../../daydreamer/HebbianUpdater"
 import { runFullNeighborRecalc } from "../../daydreamer/FullNeighborRecalc";
 import { recomputePrototypes } from "../../daydreamer/PrototypeRecomputer";
 import { runLabelPropagation } from "../../daydreamer/ClusterStability";
+import { CuriosityBroadcaster } from "../../sharing/CuriosityBroadcaster";
+import type { P2PTransport } from "../../sharing/CuriosityBroadcaster";
+import { filterEligible } from "../../sharing/EligibilityClassifier";
+import { importFragment } from "../../sharing/SubgraphImporter";
+import type { GraphFragment, PeerMessage } from "../../sharing/types";
 import type { ModelProfile } from "../../core/ModelProfile";
 
 // ---------------------------------------------------------------------------
@@ -236,6 +241,136 @@ describe("Daydreamer integration", () => {
       const capacity = computeCapacity(allPageIds.length);
       expect(residentCount).toBeLessThanOrEqual(capacity);
     }
+  });
+
+  it("curiosity broadcasting filters out PII pages from eligible content", async () => {
+    const metadataStore = await IndexedDbMetadataStore.open(freshDbName());
+    const vectorStore = new MemoryVectorStore();
+    const runner = makeRunner();
+    const profile = makeProfile();
+    const keyPair = await generateKeyPair();
+    const now = Date.now();
+
+    // Ingest eligible (public-interest) content
+    const eligibleRes = await ingestText(CORPUS[0], {
+      modelProfile: profile,
+      embeddingRunner: runner,
+      vectorStore,
+      metadataStore,
+      keyPair,
+      now,
+    });
+
+    // Ingest PII-bearing content (contains an email address and credential)
+    const piiRes = await ingestText(
+      "Please contact admin@example.com for the API key password=secret123 to access the private dashboard.",
+      {
+        modelProfile: profile,
+        embeddingRunner: runner,
+        vectorStore,
+        metadataStore,
+        keyPair,
+        now,
+      },
+    );
+
+    // Set up a mock P2P transport and CuriosityBroadcaster
+    const broadcastLog: PeerMessage[] = [];
+    const transport: P2PTransport = {
+      broadcast: async (msg) => { broadcastLog.push(msg); },
+      onMessage: (_handler) => {
+        // Intentionally not wiring inbound messages for this integration test
+      },
+    };
+
+    const broadcaster = new CuriosityBroadcaster({
+      transport,
+      nodeId: "test-node",
+      rateLimitMs: 0,
+    });
+
+    // Enqueue a curiosity probe referencing a valid page
+    const eligiblePageId = eligibleRes.pages[0].pageId;
+    broadcaster.enqueueProbe({
+      m1: eligiblePageId,
+      partialMetroid: { m1: eligiblePageId },
+      queryContextB64: "AAAA",
+      knowledgeBoundary: profile.embeddingDimension,
+      mimeType: "text/plain",
+      modelUrn: "urn:model:test:v1",
+      timestamp: new Date(now).toISOString(),
+    });
+
+    // Flush broadcasts the probe
+    const sent = await broadcaster.flush(now);
+    expect(sent).toBe(1);
+    expect(broadcastLog).toHaveLength(1);
+    expect(broadcastLog[0].kind).toBe("curiosity_probe");
+
+    // Verify that PII pages are blocked by the eligibility classifier
+    const piiPageIds = piiRes.pages.map((p) => p.pageId);
+    const eligiblePageIds = eligibleRes.pages.map((p) => p.pageId);
+
+    const allPages = await metadataStore.getAllPages();
+    const eligible = filterEligible(allPages);
+    const eligibleIds = new Set(eligible.map((p) => p.pageId));
+
+    // PII pages must be excluded from eligible set
+    for (const piiId of piiPageIds) {
+      expect(eligibleIds.has(piiId)).toBe(false);
+    }
+
+    // Public-interest pages must be included in eligible set
+    for (const id of eligiblePageIds) {
+      expect(eligibleIds.has(id)).toBe(true);
+    }
+  });
+
+  it("imported graph fragment pages are discoverable via MetadataStore", async () => {
+    const metadataStore = await IndexedDbMetadataStore.open(freshDbName());
+    const vectorStore = new MemoryVectorStore();
+    const now = Date.now();
+
+    // Simulate receiving a graph fragment from a peer
+    const fragment: GraphFragment = {
+      fragmentId: "frag-integration-1",
+      probeId: "probe-1",
+      nodes: [
+        {
+          pageId: "imported-page-1",
+          content: "Peer-shared knowledge about distributed consensus algorithms and their applications.",
+          embeddingOffset: 0,
+          embeddingDim: EMBEDDING_DIM,
+          contentHash: "hash1",
+          vectorHash: "vhash1",
+          creatorPubKey: "peer-pub-key",
+          signature: "peer-sig",
+          createdAt: new Date(now).toISOString(),
+        },
+      ],
+      edges: [],
+      signatures: {},
+      timestamp: new Date(now).toISOString(),
+    };
+
+    const result = await importFragment(fragment, {
+      metadataStore,
+      vectorStore,
+      verifyContentHashes: false,
+    });
+
+    // Nodes should be imported
+    expect(result.nodesImported).toBe(1);
+    expect(result.rejected).toHaveLength(0);
+
+    // Imported page should be discoverable
+    const imported = await metadataStore.getPage("imported-page-1");
+    expect(imported).toBeDefined();
+    expect(imported?.content).toContain("distributed consensus");
+
+    // Sender identity must be stripped
+    expect(imported?.creatorPubKey).toBe("");
+    expect(imported?.signature).toBe("");
   });
 
   it("community labels are assigned to pages after label propagation", async () => {

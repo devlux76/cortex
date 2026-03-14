@@ -675,45 +675,6 @@ export class ClusterStability {
   private async collectAllShelves(
     metadataStore: MetadataStore,
   ) {
-    // MetadataStore does not expose a `getAllShelves()` helper, so we iterate
-    // over all volumes and collect the shelves that reference them.
-    // We use the reverse-index helper to get shelves for each volume.
-    const allVolumes = await this.collectAllVolumes(metadataStore);
-    const shelfMap = new Map<Hash, Awaited<ReturnType<MetadataStore["getShelf"]>>>();
-
-    for (const volume of allVolumes) {
-      const shelves = await metadataStore.getShelvesByVolume(volume.volumeId);
-      for (const shelf of shelves) {
-        if (!shelfMap.has(shelf.shelfId)) {
-          shelfMap.set(shelf.shelfId, shelf);
-        }
-      }
-    }
-
-    return [...shelfMap.values()].filter(
-      (s): s is NonNullable<typeof s> => s !== undefined,
-    );
-  }
-
-  private async collectAllVolumes(
-    metadataStore: MetadataStore,
-  ): Promise<Volume[]> {
-    const allPages = await metadataStore.getAllPages();
-    const volumeIds = new Set<Hash>();
-
-    for (const page of allPages) {
-      const books = await metadataStore.getBooksByPage(page.pageId);
-      for (const book of books) {
-        const volumes = await metadataStore.getVolumesByBook(book.bookId);
-        for (const volume of volumes) {
-          volumeIds.add(volume.volumeId);
-        }
-      }
-    }
-
-    const volumes = await Promise.all(
-      [...volumeIds].map((id) => metadataStore.getVolume(id)),
-    );
-    return volumes.filter((v): v is Volume => v !== undefined);
+    return metadataStore.getAllShelves();
   }
 }
