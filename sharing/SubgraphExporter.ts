@@ -93,18 +93,20 @@ async function expandSeeds(
           if (page) collectedPages.push(page);
         }
       }
-
-      // Collect Hebbian edges among visited nodes
-      const hebbianEdges = await metadataStore.getNeighbors(pageId);
-      for (const e of hebbianEdges) {
-        if (visited.has(e.toPageId)) {
-          const key = `${e.fromPageId}\x00${e.toPageId}`;
-          if (!edgeMap.has(key)) edgeMap.set(key, e);
-        }
-      }
     }
 
     frontier = nextFrontier;
+  }
+
+  // After BFS completes, collect Hebbian edges among visited nodes using the final visited set
+  for (const fromPageId of visited) {
+    const hebbianEdges = await metadataStore.getNeighbors(fromPageId);
+    for (const e of hebbianEdges) {
+      if (visited.has(e.toPageId)) {
+        const key = `${e.fromPageId}\x00${e.toPageId}`;
+        if (!edgeMap.has(key)) edgeMap.set(key, e);
+      }
+    }
   }
 
   return { pages: collectedPages, edges: [...edgeMap.values()] };
