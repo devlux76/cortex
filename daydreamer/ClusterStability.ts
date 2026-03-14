@@ -20,8 +20,6 @@ export interface ClusterStabilityOptions {
   metadataStore: MetadataStore;
   /** Maximum number of label propagation iterations. Default: 20. */
   maxIterations?: number;
-  /** Seed for deterministic tie-breaking. Default: undefined (uses min-label). */
-  seed?: string;
 }
 
 export interface LabelPropagationResult {
