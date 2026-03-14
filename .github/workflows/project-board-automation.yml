@@ -1,0 +1,42 @@
+name: Project Board Automation
+
+# Automatically adds newly opened issues and pull requests to the GitHub
+# Projects board.
+#
+# SETUP REQUIRED — before this workflow can run:
+# 1. Create (or identify) a GitHub Projects v2 board for this repository.
+# 2. Copy its URL, e.g. https://github.com/orgs/devlux76/projects/1
+#    or https://github.com/users/devlux76/projects/1
+# 3. Store that URL as a repository Actions variable named PROJECT_URL:
+#      Repository → Settings → Secrets and variables → Actions → Variables
+#      Name: PROJECT_URL   Value: <your project URL>
+# 4. Create a fine-grained Personal Access Token (PAT) with the
+#    "Projects (read & write)" permission and store it as the repository
+#    secret PROJECT_TOKEN.
+#    (The default GITHUB_TOKEN does not have project write access.)
+#
+# Once both are set, this workflow will auto-populate the board with every
+# new issue or pull request.
+
+on:
+  issues:
+    types: [opened]
+  pull_request:
+    types: [opened]
+
+jobs:
+  add-to-project:
+    name: Add to project board
+    runs-on: ubuntu-latest
+    permissions: {}
+    # Skip entirely if the repository variable or token have not been configured,
+    # or if this is a pull request from a fork (no secrets available).
+    if: vars.PROJECT_URL != '' &&
+      secrets.PROJECT_TOKEN != '' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    steps:
+      - name: Add issue or PR to project board
+        uses: actions/add-to-project@v1.0.2
+        with:
+          project-url: ${{ vars.PROJECT_URL }}
+          github-token: ${{ secrets.PROJECT_TOKEN }}
