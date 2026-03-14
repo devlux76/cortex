@@ -136,7 +136,8 @@ export async function runFullNeighborRecalc(
 
     // Compute pairwise similarities and build neighbor lists
     const pairsInVolume = volumePages.length * (volumePages.length - 1);
-    if (totalPairsComputed + pairsInVolume > pairBudget && totalVolumesProcessed > 0) {
+    const remainingBudget = pairBudget - totalPairsComputed;
+    if (pairsInVolume > remainingBudget) {
       // Budget exhausted — leave this volume dirty for next cycle
       break;
     }
