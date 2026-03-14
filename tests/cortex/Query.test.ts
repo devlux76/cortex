@@ -237,4 +237,56 @@ describe("cortex query (dialectical orchestrator)", () => {
     expect(Array.isArray(result.coherencePath)).toBe(true);
     expect(result.metroid).toBeDefined();
   });
+
+  it("uses hierarchical routing when volumes and shelves exist", async () => {
+    const metadataStore = await IndexedDbMetadataStore.open(freshDbName());
+    const vectorStore = new MemoryVectorStore();
+    const keyPair = await generateKeyPair();
+
+    const backend = new DeterministicDummyEmbeddingBackend({ dimension: 4 });
+
+    const runner = new EmbeddingRunner(async () => ({
+      backend,
+      selectedKind: "dummy" as const,
+      reason: "forced" as const,
+      supportedKinds: ["dummy" as const],
+      measurements: [],
+    }));
+
+    const profile: ModelProfile = {
+      modelId: "test-model",
+      embeddingDimension: 4,
+      contextWindowTokens: 64,
+      truncationTokens: 48,
+      maxChunkTokens: 5,
+      source: "metadata",
+    };
+
+    const text = "One two three four five six seven eight nine ten.";
+    const ingestResult = await ingestText(text, {
+      modelProfile: profile,
+      embeddingRunner: runner,
+      vectorStore,
+      metadataStore,
+      keyPair,
+    });
+
+    // Ingest should now produce hierarchy
+    expect(ingestResult.volumes.length).toBeGreaterThanOrEqual(1);
+    expect(ingestResult.shelves.length).toBeGreaterThanOrEqual(1);
+
+    // Query should still work correctly with hierarchy-based routing
+    const result = await query(ingestResult.pages[0].content, {
+      modelProfile: profile,
+      embeddingRunner: runner,
+      vectorStore,
+      metadataStore,
+      topK: 2,
+    });
+
+    expect(result.pages.length).toBeGreaterThan(0);
+    expect(result.scores.length).toBeGreaterThan(0);
+    expect(Array.isArray(result.coherencePath)).toBe(true);
+    expect(result.metroid).toBeDefined();
+  });
 });

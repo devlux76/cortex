@@ -4,7 +4,7 @@ import type { EmbeddingRunner } from "../embeddings/EmbeddingRunner";
 import { runPromotionSweep } from "../core/SalienceEngine";
 import { computeSubgraphBounds } from "../core/HotpathPolicy";
 import type { QueryResult } from "./QueryResult";
-import { rankPages, spillToWarm } from "./Ranking";
+import { rankPages, rankBooks, rankVolumes, rankShelves, spillToWarm } from "./Ranking";
 import { buildMetroid } from "./MetroidBuilder";
 import { detectKnowledgeGap } from "./KnowledgeGapDetector";
 import { solveOpenTSP } from "./OpenTSPSolver";
@@ -46,11 +46,82 @@ export async function query(
 
   const rankingOptions = { vectorStore, metadataStore };
 
-  // --- HOT path: score resident pages ---
-  const hotpathEntries = await metadataStore.getHotpathEntries("page");
-  const hotpathIds = hotpathEntries.map((e) => e.entityId);
+  // --- Hierarchical routing: Shelf → Volume → Book → Page ---
+  // When higher-tier hotpath entries exist, we route through the hierarchy
+  // to narrow the candidate set before flat page scoring.
+  const hotpathShelfEntries = await metadataStore.getHotpathEntries("shelf");
+  const hotpathVolumeEntries = await metadataStore.getHotpathEntries("volume");
+  const hotpathBookEntries = await metadataStore.getHotpathEntries("book");
+  const hotpathPageEntries = await metadataStore.getHotpathEntries("page");
 
-  const hotResults = await rankPages(queryEmbedding, hotpathIds, topK, rankingOptions);
+  // Collect candidate page IDs from hierarchical routing.
+  const hierarchyPageIds = new Set<Hash>();
+
+  // Shelf → Volume → Book → Page drill-down
+  if (hotpathShelfEntries.length > 0) {
+    const topShelves = await rankShelves(
+      queryEmbedding,
+      hotpathShelfEntries.map((e) => e.entityId),
+      Math.max(2, Math.ceil(hotpathShelfEntries.length / 2)),
+      rankingOptions,
+    );
+    for (const s of topShelves) {
+      const shelf = await metadataStore.getShelf(s.id);
+      if (shelf) {
+        for (const vid of shelf.volumeIds) hierarchyPageIds.add(vid);
+      }
+    }
+  }
+
+  // Rank volumes — include both hotpath volumes and those found via shelf drill-down
+  const volumeCandidateIds = new Set<Hash>([
+    ...hotpathVolumeEntries.map((e) => e.entityId),
+    ...hierarchyPageIds,
+  ]);
+  hierarchyPageIds.clear();
+
+  if (volumeCandidateIds.size > 0) {
+    const topVolumes = await rankVolumes(
+      queryEmbedding,
+      [...volumeCandidateIds],
+      Math.max(2, Math.ceil(volumeCandidateIds.size / 2)),
+      rankingOptions,
+    );
+    for (const v of topVolumes) {
+      const volume = await metadataStore.getVolume(v.id);
+      if (volume) {
+        for (const bid of volume.bookIds) hierarchyPageIds.add(bid);
+      }
+    }
+  }
+
+  // Rank books — include both hotpath books and those found via volume drill-down
+  const bookCandidateIds = new Set<Hash>([
+    ...hotpathBookEntries.map((e) => e.entityId),
+    ...hierarchyPageIds,
+  ]);
+  hierarchyPageIds.clear();
+
+  if (bookCandidateIds.size > 0) {
+    const topBooks = await rankBooks(
+      queryEmbedding,
+      [...bookCandidateIds],
+      Math.max(2, Math.ceil(bookCandidateIds.size / 2)),
+      rankingOptions,
+    );
+    for (const b of topBooks) {
+      const book = await metadataStore.getBook(b.id);
+      if (book) {
+        for (const pid of book.pageIds) hierarchyPageIds.add(pid);
+      }
+    }
+  }
+
+  // --- HOT path: score resident pages merged with hierarchy-discovered pages ---
+  const hotpathIds = hotpathPageEntries.map((e) => e.entityId);
+  const combinedPageIds = new Set<Hash>([...hotpathIds, ...hierarchyPageIds]);
+
+  const hotResults = await rankPages(queryEmbedding, [...combinedPageIds], topK, rankingOptions);
   const seenIds = new Set(hotResults.map((r) => r.id));
 
   // --- Warm spill: fill up to topK if hot path is insufficient ---
@@ -75,8 +146,7 @@ export async function query(
     .map((r) => r.score);
 
   // --- MetroidBuilder: build dialectical probe ---
-  // Candidates: hotpath book medoid pages + hotpath pages themselves
-  const hotpathBookEntries = await metadataStore.getHotpathEntries("book");
+  // Candidates: hotpath book medoid pages + top-ranked pages
   const bookCandidates = (
     await Promise.all(
       hotpathBookEntries.map(async (e) => {
