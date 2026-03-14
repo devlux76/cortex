@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "test": "bun run lint && bun run build && vitest run tests/*.test.ts tests/**/*.test.ts",
     "test:unit": "vitest run tests/*.test.ts tests/**/*.test.ts",
+    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest tests/*.test.ts tests/**/*.test.ts",
     "dev:harness": "bun scripts/runtime-harness-server.mjs",
     "test:browser": "playwright test",
@@ -19,6 +20,7 @@
     "test:all": "bun run test:unit && bun run test:runtime",
     "guard:model-derived": "bun scripts/guard-model-derived.mjs",
     "guard:hotpath-policy": "bun scripts/guard-hotpath-policy.mjs",
+    "prepare": "husky install",
     "benchmark:dummy": "vitest bench --watch=false tests/benchmarks/DummyEmbedderHotpath.bench.ts",
     "benchmark:query-latency": "vitest bench --watch=false tests/benchmarks/QueryLatency.bench.ts",
     "benchmark:storage-overhead": "vitest bench --watch=false tests/benchmarks/StorageOverhead.bench.ts",
@@ -33,10 +35,12 @@
   "devDependencies": {
     "@eslint/js": "latest",
     "@playwright/test": "latest",
+    "@vitest/coverage-v8": "latest",
     "@webgpu/types": "latest",
     "electron": "latest",
     "eslint": "latest",
     "fake-indexeddb": "latest",
+    "husky": "latest",
     "typescript": "latest",
     "typescript-eslint": "latest",
     "vitest": "latest"

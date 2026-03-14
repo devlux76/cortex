@@ -15,8 +15,12 @@ const IGNORED_DIRS = new Set([
 ]);
 
 const ALLOWED_SOURCE_FILES = new Set([
+  // These files are the canonical source of model-derived numeric constants.
+  // They are explicitly allowed to contain hardcoded model profile values.
   "core/ModelDefaults.ts",
   "core/BuiltInModelProfiles.ts",
+  "lib/core/ModelDefaults.ts",
+  "lib/core/BuiltInModelProfiles.ts",
 ]);
 
 const MODEL_FIELD_PATTERN =

@@ -1,0 +1,10 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+# Enforce minimum coverage locally before pushing.
+# This mirrors the CI coverage enforcement and keeps merge-ready branches aligned.
+bun run test:coverage
+
+# Also run project guards locally (same as CI) so issues are caught before push.
+bun run guard:model-derived
+bun run guard:hotpath-policy
