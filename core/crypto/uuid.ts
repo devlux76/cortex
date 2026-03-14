@@ -26,10 +26,11 @@ export function randomUUID(): string {
   if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
     crypto.getRandomValues(bytes);
   } else {
-    // Last resort for environments with no crypto at all (e.g., old Node)
-    for (let i = 0; i < 16; i++) {
-      bytes[i] = Math.floor(Math.random() * 256);
-    }
+    // No secure RNG available: refuse to generate a UUID with weak randomness
+    throw new Error(
+      "randomUUID() requires a secure crypto.getRandomValues implementation; " +
+        "no suitable crypto API was found in this environment."
+    );
   }
 
   // Set version bits (v4) and variant bits (RFC 4122)
