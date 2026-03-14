@@ -243,7 +243,7 @@ describe("Daydreamer integration", () => {
     }
   });
 
-  it("curiosity broadcasting exports eligible pages and blocks PII content", async () => {
+  it("curiosity broadcasting filters out PII pages from eligible content", async () => {
     const metadataStore = await IndexedDbMetadataStore.open(freshDbName());
     const vectorStore = new MemoryVectorStore();
     const runner = makeRunner();
