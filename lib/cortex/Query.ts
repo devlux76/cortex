@@ -4,7 +4,7 @@ import type { EmbeddingRunner } from "../embeddings/EmbeddingRunner";
 import { runPromotionSweep } from "../core/SalienceEngine";
 import { computeSubgraphBounds } from "../core/HotpathPolicy";
 import type { QueryResult } from "./QueryResult";
-import { rankPages, rankBooks, rankVolumes, rankShelves, spillToWarm } from "./Ranking";
+import { rankPages, rankBooks, rankVolumes, rankShelves, spillToWarm, type RankedResult } from "./Ranking";
 import { buildMetroid } from "./MetroidBuilder";
 import { detectKnowledgeGap } from "./KnowledgeGapDetector";
 import { solveOpenTSP } from "./OpenTSPSolver";
@@ -64,10 +64,7 @@ export async function query(
       rankingOptions,
     );
     for (const s of topShelves) {
-      const shelf = await metadataStore.getShelf(s.id);
-      if (shelf) {
-        for (const vid of shelf.volumeIds) volumeIdsFromShelves.add(vid);
-      }
+      for (const vid of s.childIds) volumeIdsFromShelves.add(vid);
     }
   }
 
@@ -86,10 +83,7 @@ export async function query(
       rankingOptions,
     );
     for (const v of topVolumes) {
-      const volume = await metadataStore.getVolume(v.id);
-      if (volume) {
-        for (const bid of volume.bookIds) bookIdsFromVolumes.add(bid);
-      }
+      for (const bid of v.childIds) bookIdsFromVolumes.add(bid);
     }
   }
 
@@ -108,10 +102,7 @@ export async function query(
       rankingOptions,
     );
     for (const b of topBooks) {
-      const book = await metadataStore.getBook(b.id);
-      if (book) {
-        for (const pid of book.pageIds) pageIdsFromBooks.add(pid);
-      }
+      for (const pid of b.childIds) pageIdsFromBooks.add(pid);
     }
   }
 
@@ -123,7 +114,7 @@ export async function query(
   const seenIds = new Set(hotResults.map((r) => r.id));
 
   // --- Warm spill: fill up to topK if hot path is insufficient ---
-  let warmResults: Array<{ id: Hash; score: number }> = [];
+  let warmResults: RankedResult[] = [];
   if (hotResults.length < topK) {
     const allWarm = await spillToWarm("page", queryEmbedding, topK, rankingOptions);
     warmResults = allWarm.filter((r) => !seenIds.has(r.id));
