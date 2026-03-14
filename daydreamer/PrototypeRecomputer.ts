@@ -170,26 +170,15 @@ async function recomputeVolumePrototypes(
     updatedVolumeIds.push(volume.volumeId);
   }
 
-  // Refresh salience and promotion for volume tier
-  if (updatedVolumeIds.length > 0) {
-    // Volume-tier hotpath uses volume IDs as entity IDs
-    const volumeHotpathCandidates = updatedVolumeIds;
-    await batchComputeSalience(volumeHotpathCandidates, metadataStore, policy, now);
-
-    // Build synthetic HotpathEntry at volume tier for updated volumes
-    const updatedEntries: HotpathEntry[] = updatedVolumeIds.map((id) => ({
-      entityId: id,
-      tier: "volume" as const,
-      salience: 0,
-      communityId: undefined,
-    }));
-
-    for (const entry of updatedEntries) {
-      await metadataStore.putHotpathEntry(entry);
-    }
-
-    await runPromotionSweep(updatedVolumeIds, metadataStore, policy, now);
-  }
+  // Note: We intentionally do not call the page-centric SalienceEngine here.
+  // batchComputeSalience/runPromotionSweep currently assume page-tier entities
+  // and hardcode `tier: "page"`. Passing volume IDs into those functions would
+  // compute meaningless salience values and could overwrite volume-tier
+  // HotpathEntry records with page-tier entries using the same entityId.
+  //
+  // Volume-tier salience/promotion should be wired up once SalienceEngine
+  // supports non-page tiers. For now, we only update the volume metadata and
+  // return the list of volumes that were recomputed.
 
   return { volumeIds: updatedVolumeIds, volumesUpdated: updatedVolumeIds.length };
 }
