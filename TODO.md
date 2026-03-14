@@ -1,6 +1,6 @@
 # CORTEX TODO — Path to v1.0
 
-**Last Updated:** 2026-03-13
+**Last Updated:** 2026-03-14
 
 This document contains a prioritized, actionable list of specific tasks required to ship CORTEX v1.0. Items are ordered by dependency: highest-priority items are those blocking other work.
 
@@ -149,7 +149,7 @@ These items **must** be completed to have a usable system. Without them, users c
   - After persisting pages, check each new page for hotpath admission via `SalienceEngine.runPromotionSweep`
   - **Defer:** Volume/Shelf hierarchy, fast neighbor insert
 
-- [ ] **P0-C3:** Add ingest test coverage
+- [x] **P0-C3:** Add ingest test coverage
   - `tests/hippocampus/Ingest.test.ts`
   - Test happy path (text → pages → book)
   - Test persistence (can retrieve pages after ingest)
@@ -245,11 +245,11 @@ These items **must** be completed to have a usable system. Without them, users c
 
 These items add hierarchical routing and coherent path ordering. They transform CORTEX from a flat vector search into a biologically-inspired memory system.
 
-### P1-A: Hierarchy Builder (UNBLOCKS: hierarchical routing)
+### P1-A: Hierarchy Builder (UNBLOCKS: hierarchical routing) ✅ COMPLETE
 
 **Why:** Need Volume and Shelf structures for efficient coarse-to-fine routing. Tier-quota hotpath admission must be integrated so hierarchy prototypes enter the resident index from the moment they are created.
 
-- [ ] **P1-A1:** Implement `hippocampus/HierarchyBuilder.ts`
+- [x] **P1-A1:** Implement `hippocampus/HierarchyBuilder.ts`
   - Cluster pages into Books (K-means or similar; select medoid)
   - Cluster books into Volumes (compute prototype vectors)
   - Cluster volumes into Shelves (coarse routing prototypes)
@@ -260,11 +260,11 @@ These items add hierarchical routing and coherent path ordering. They transform 
     - Shelf routing prototypes → shelf-tier quota
   - Enforce Williams-derived fanout bounds (see `HotpathPolicy`); when exceeded, trigger split via `ClusterStability`
 
-- [ ] **P1-A2:** Upgrade `hippocampus/Ingest.ts`
+- [x] **P1-A2:** Upgrade `hippocampus/Ingest.ts`
   - After persisting pages, call `HierarchyBuilder`
   - Maintain hierarchy incrementally (append to existing structures)
 
-- [ ] **P1-A3:** Add hierarchy test coverage
+- [x] **P1-A3:** Add hierarchy test coverage
   - `tests/hippocampus/HierarchyBuilder.test.ts`
   - Test clustering produces valid Books/Volumes/Shelves
   - Test prototypes are valid vectors
@@ -275,11 +275,11 @@ These items add hierarchical routing and coherent path ordering. They transform 
 
 ---
 
-### P1-B: Ranking Pipeline (UNBLOCKS: efficient queries)
+### P1-B: Ranking Pipeline (UNBLOCKS: efficient queries) ✅ COMPLETE
 
 **Why:** Hierarchical ranking avoids scanning all pages; reduces query latency. The resident hotpath is the primary lookup target — WARM/COLD spill happens only when the hot set provides insufficient coverage.
 
-- [ ] **P1-B1:** Implement `cortex/Ranking.ts`
+- [x] **P1-B1:** Implement `cortex/Ranking.ts`
   - `rankShelves(queryEmbedding, residentShelves, topK)` — score HOT shelf prototypes first
   - `rankVolumes(queryEmbedding, residentVolumes, topK)` — score HOT volume prototypes within top shelves
   - `rankBooks(queryEmbedding, residentBooks, topK)` — score HOT book medoids within top volumes
@@ -287,11 +287,11 @@ These items add hierarchical routing and coherent path ordering. They transform 
   - `spillToWarm(tier, queryEmbedding, metadataStore, topK)` — spill to IndexedDB lookup when resident set insufficient
   - Each step narrows the search space; H(t) is the primary latency lever
 
-- [ ] **P1-B2:** Upgrade `cortex/Query.ts`
+- [x] **P1-B2:** Upgrade `cortex/Query.ts`
   - Replace flat search with resident-first hierarchical ranking cascade
   - HOT shelves → HOT volumes → HOT books → HOT pages → WARM/COLD spill
 
-- [ ] **P1-B3:** Add ranking test coverage
+- [x] **P1-B3:** Add ranking test coverage
   - `tests/cortex/Ranking.test.ts`
   - Test each ranking function independently
   - Test full cascade produces correct top pages
@@ -301,11 +301,11 @@ These items add hierarchical routing and coherent path ordering. They transform 
 
 ---
 
-### P1-C: Fast Semantic Neighbor Insert (UNBLOCKS: graph coherence)
+### P1-C: Fast Semantic Neighbor Insert (UNBLOCKS: graph coherence) ✅ COMPLETE
 
 **Why:** Need a sparse semantic neighbor graph for coherent path tracing. This graph connects pages with high cosine similarity and is used for BFS subgraph expansion during retrieval. Degree must be bounded by `HotpathPolicy` to prevent unbounded graph mass growth. **This is not related to Metroid construction** — the semantic neighbor graph is a proximity concept, not a dialectical probe concept.
 
-- [ ] **P1-C1:** Implement `hippocampus/FastNeighborInsert.ts`
+- [x] **P1-C1:** Implement `hippocampus/FastNeighborInsert.ts`
   - For each new page, find cosine-nearest neighbors within Williams-cutoff **distance** (not a fixed K); derive the cutoff radius from `HotpathPolicy` rather than a hardcoded constant
   - Insert forward edges (page → neighbors) as `SemanticNeighbor` records, respecting max degree
   - Insert reverse edges (neighbors → page), respecting max degree per direction
@@ -315,10 +315,10 @@ These items add hierarchical routing and coherent path ordering. They transform 
   - Mark affected volumes as dirty for full Daydreamer recalc
   - After insertion, check new page for hotpath admission via `SalienceEngine`
 
-- [ ] **P1-C2:** Upgrade `hippocampus/Ingest.ts`
+- [x] **P1-C2:** Upgrade `hippocampus/Ingest.ts`
   - After persisting pages, call `FastNeighborInsert`
 
-- [ ] **P1-C3:** Add semantic neighbor insert test coverage
+- [x] **P1-C3:** Add semantic neighbor insert test coverage
   - `tests/hippocampus/FastNeighborInsert.test.ts`
   - Test neighbor lists are bounded by Williams-cutoff distance (not a fixed K)
   - Test symmetry (if A→B, then B→A)
@@ -330,17 +330,17 @@ These items add hierarchical routing and coherent path ordering. They transform 
 
 ---
 
-### P1-D: Open TSP Solver (UNBLOCKS: coherent path ordering)
+### P1-D: Open TSP Solver (UNBLOCKS: coherent path ordering) ✅ COMPLETE
 
 **Why:** Need to trace coherent path through induced subgraph, not just ranked list.
 
-- [ ] **P1-D1:** Implement `cortex/OpenTSPSolver.ts`
+- [x] **P1-D1:** Implement `cortex/OpenTSPSolver.ts`
   - Dummy-node open-path heuristic (greedy nearest-neighbor)
   - Input: `SemanticNeighborSubgraph` (nodes + edges with distances; after P0-X2 rename)
   - Output: ordered path through all nodes
   - Deterministic for same input
 
-- [ ] **P1-D2:** Add TSP solver test coverage
+- [x] **P1-D2:** Add TSP solver test coverage
   - `tests/cortex/OpenTSPSolver.test.ts`
   - Test on synthetic small graphs (3-10 nodes)
   - Test determinism (same input → same output)
@@ -350,11 +350,11 @@ These items add hierarchical routing and coherent path ordering. They transform 
 
 ---
 
-### P1-M: MetroidBuilder (DELIVERS: dialectical epistemology)
+### P1-M: MetroidBuilder (DELIVERS: dialectical epistemology) ✅ COMPLETE
 
 **Why:** MetroidBuilder is the core of what makes CORTEX an _epistemic_ system rather than a vector search engine. Without it, the system merely returns nearest neighbors and cannot explore opposing perspectives, detect knowledge gaps, or trigger P2P curiosity requests. The Metroid loop converts conceptual opposition into navigable exploration steps.
 
-- [ ] **P1-M1:** Implement `cortex/MetroidBuilder.ts`
+- [x] **P1-M1:** Implement `cortex/MetroidBuilder.ts`
   - Accept a query embedding `q` and a list of resident medoids (shelf/volume/book representatives)
   - **Thesis (select m1):** Find `m1` via medoid search — the medoid minimizing distance to `q`. A
     medoid (not a centroid) is always an existing memory node; it ensures the search anchor is an
@@ -380,7 +380,7 @@ These items add hierarchical routing and coherent path ordering. They transform 
   - Return `Metroid { m1, m2, c }`; if no valid m2 found, return
     `{ m1, m2: null, c: null, knowledgeGap: true }`
 
-- [ ] **P1-M2:** Implement Matryoshka dimensional unwinding in `cortex/MetroidBuilder.ts`
+- [x] **P1-M2:** Implement Matryoshka dimensional unwinding in `cortex/MetroidBuilder.ts`
   - After the initial Metroid construction, progressively expand the antithesis search into deeper
     embedding layers by shifting the protected dimension boundary outward one Matryoshka tier at a
     time.
@@ -392,7 +392,7 @@ These items add hierarchical routing and coherent path ordering. They transform 
   - Stop when the protected dimension floor is reached or a satisfactory `m2` is accepted.
   - If no satisfactory `m2` is found at any layer, return `knowledgeGap: true`.
 
-- [ ] **P1-M3:** Add MetroidBuilder test coverage
+- [x] **P1-M3:** Add MetroidBuilder test coverage
   - `tests/cortex/MetroidBuilder.test.ts`
   - Test m1 selection: the medoid minimising distance to q is chosen (not the centroid)
   - Test m2 selection: medoid of cosine-opposite set — not merely nearest semantically-opposing node
@@ -409,27 +409,27 @@ Matryoshka unwinding) and correctly detects knowledge gaps.
 
 ---
 
-### P1-N: Knowledge Gap Detection & Curiosity Probe (DELIVERS: epistemic honesty)
+### P1-N: Knowledge Gap Detection & Curiosity Probe (DELIVERS: epistemic honesty) ✅ COMPLETE
 
 **Why:** When MetroidBuilder cannot find m2, the system must acknowledge its knowledge boundary rather than hallucinating. The curiosity probe mechanism enables distributed learning by broadcasting the gap to peers.
 
-- [ ] **P1-N1:** Implement `cortex/KnowledgeGapDetector.ts`
+- [x] **P1-N1:** Implement `cortex/KnowledgeGapDetector.ts`
   - Accept MetroidBuilder result; if `knowledgeGap: true`, emit a `KnowledgeGap` DTO
   - `KnowledgeGap { topicMedoidId: Hash, queryEmbedding: Float32Array, dimensionalBoundary: number, timestamp: string }`
   - This DTO is returned to the caller as part of `QueryResult`
 
-- [ ] **P1-N2:** Implement curiosity probe construction in `cortex/KnowledgeGapDetector.ts`
+- [x] **P1-N2:** Implement curiosity probe construction in `cortex/KnowledgeGapDetector.ts`
   - Build `CuriosityProbe { m1, partialMetroid, queryContext, knowledgeBoundary, mimeType, modelUrn }`
     - `mimeType`: MIME type of embedded content (e.g. `text/plain`). Enables receiving peers to validate content-type compatibility before comparing graph sections.
     - `modelUrn`: URN of the embedding model (e.g. `urn:model:onnx-community/embeddinggemma-300m-ONNX:v1`) sourced from the active `ModelProfile.modelId`. Peers **must** reject probes whose `modelUrn` does not match a model they support — accepting fragments from a different embedding model would produce incommensurable similarity scores at Matryoshka layer boundaries.
   - Store probe locally for broadcast via P2P layer (see P2-G)
   - Do not broadcast immediately — queue for the P2P sharing layer
 
-- [ ] **P1-N3:** Upgrade `cortex/QueryResult.ts`
+- [x] **P1-N3:** Upgrade `cortex/QueryResult.ts`
   - Add `knowledgeGap?: KnowledgeGap` field — present when MetroidBuilder failed to find m2
   - Document that callers must check this field before treating results as epistemically complete
 
-- [ ] **P1-N4:** Add knowledge gap test coverage
+- [x] **P1-N4:** Add knowledge gap test coverage
   - `tests/cortex/KnowledgeGapDetector.test.ts`
   - Test that a KnowledgeGap DTO is produced when MetroidBuilder returns `knowledgeGap: true`
   - Test that a CuriosityProbe is constructed with correct fields including `mimeType` and `modelUrn`
@@ -441,13 +441,13 @@ Matryoshka unwinding) and correctly detects knowledge gaps.
 
 ---
 
-### P1-E: Full Query Orchestrator (DELIVERS: dialectical retrieval)
+### P1-E: Full Query Orchestrator (DELIVERS: dialectical retrieval) ✅ COMPLETE
 
 **Why:** This is the "aha" moment — return memories in natural narrative order through the resident hotpath via dialectical Metroid exploration, with dynamic, sublinear expansion bounds.
 
 > **Note on scope:** The existing `cortex/Query.ts` is a flat top-K scorer that does not use MetroidBuilder, Hebbian edge traversal, or cosine-similarity-bounded subgraph expansion. It must be **substantially reworked** — not merely extended — to implement the dialectical pipeline described below. The same applies to `cortex/QueryResult.ts`. Do not attempt to preserve the flat-scoring code path; it is superseded entirely.
 
-- [ ] **P1-E1:** Rewrite `cortex/Query.ts` (full dialectical version)
+- [x] **P1-E1:** Rewrite `cortex/Query.ts` (full dialectical version)
   - Use resident-first hierarchical ranking to select topic medoid (m1)
   - Call `MetroidBuilder` to construct `{ m1, m2, c }`
   - If knowledge gap detected, include in result and continue with partial Metroid (m1 only)
@@ -459,13 +459,13 @@ Matryoshka unwinding) and correctly detects knowledge gaps.
   - **Query cost meter:** count vector operations; early-stop and return best-so-far if cost exceeds Williams-derived budget
   - Include provenance metadata (hop count, edge weights, subgraph size, cost, Metroid details)
 
-- [ ] **P1-E2:** Rewrite `cortex/QueryResult.ts`
+- [x] **P1-E2:** Rewrite `cortex/QueryResult.ts`
   - Add `coherencePath: Hash[]` (ordered page IDs)
   - Add `metroid?: { m1: Hash; m2: Hash | null; centroid: Float32Array | null }` (Metroid used for this query)
   - Add `knowledgeGap?: KnowledgeGap` (if antithesis discovery failed)
   - Add `provenance: { subgraphSize: number; hopCount: number; edgeWeights: number[]; vectorOpCost: number; earlyStop: boolean }`
 
-- [ ] **P1-E3:** Add full query test coverage
+- [x] **P1-E3:** Add full query test coverage
   - `tests/cortex/Query.test.ts` (upgrade)
   - Test subgraph expansion stays within `maxSubgraphSize`
   - Test TSP ordering
@@ -478,11 +478,11 @@ Matryoshka unwinding) and correctly detects knowledge gaps.
 
 ---
 
-### P1-F: Integration Test (Hierarchical + Dialectical)
+### P1-F: Integration Test (Hierarchical + Dialectical) ✅ COMPLETE
 
 **Why:** Validate v0.5 completeness including resident-first routing, MetroidBuilder, and dialectical subgraph bounds.
 
-- [ ] **P1-F1:** Upgrade `tests/integration/IngestQuery.test.ts`
+- [x] **P1-F1:** Upgrade `tests/integration/IngestQuery.test.ts`
   - Verify hierarchical structures exist after ingest
   - Verify hotpath entries exist for hierarchy prototypes after ingest
   - Verify queries build a valid Metroid `{ m1, m2, c }`
@@ -702,34 +702,34 @@ These items improve quality, performance, and developer experience. Not blockers
 
 ---
 
-### P3-B: Experience Replay
+### P3-B: Experience Replay ✅ COMPLETE
 
 **Why:** Simulate queries during idle time to reinforce connection patterns.
 
-- [ ] **P3-B1:** Implement `daydreamer/ExperienceReplay.ts`
+- [x] **P3-B1:** Implement `daydreamer/ExperienceReplay.ts`
   - Sample random or recent queries
   - Execute query (triggers edge traversals)
   - Mark traversed edges for LTP strengthening
 
-- [ ] **P3-B2:** Add experience replay test coverage
+- [x] **P3-B2:** Add experience replay test coverage
   - `tests/daydreamer/ExperienceReplay.test.ts`
 
 **Exit Criteria:** Daydreamer reinforces memory patterns.
 
 ---
 
-### P3-C: Cluster Stability (full implementation)
+### P3-C: Cluster Stability (full implementation) ✅ COMPLETE
 
 **Why:** Detect and fix unstable clusters (split oversized, merge undersized). The community detection added in P2-F is a subset of this module; here we add the full split/merge machinery.
 
-- [ ] **P3-C1:** Complete `daydreamer/ClusterStability.ts`
+- [x] **P3-C1:** Complete `daydreamer/ClusterStability.ts`
   - Detect high-variance volumes (unstable)
   - Trigger split (K-means with K=2)
   - Detect low-count volumes
   - Trigger merge with nearest neighbor volume
   - Re-run community detection and update PageActivity after split/merge
 
-- [ ] **P3-C2:** Add cluster stability test coverage
+- [x] **P3-C2:** Add cluster stability test coverage
   - `tests/daydreamer/ClusterStability.test.ts` (extend from P2-F)
   - Test split produces two balanced volumes
   - Test merge produces one combined volume
@@ -739,30 +739,30 @@ These items improve quality, performance, and developer experience. Not blockers
 
 ---
 
-### P3-D: Benchmark Suite
+### P3-D: Benchmark Suite ✅ COMPLETE
 
 **Why:** Measure performance, validate Williams Bound invariants, and track regressions.
 
-- [ ] **P3-D1:** Implement real-provider benchmarks
+- [x] **P3-D1:** Implement real-provider benchmarks
   - `tests/benchmarks/TransformersJsEmbedding.bench.ts`
   - Throughput (embeddings/sec) for various batch sizes
 
-- [ ] **P3-D2:** Implement query latency benchmarks
+- [x] **P3-D2:** Implement query latency benchmarks
   - `tests/benchmarks/QueryLatency.bench.ts`
   - Latency vs corpus size (100 pages, 1K pages, 10K pages)
 
-- [ ] **P3-D3:** Implement storage overhead benchmarks
+- [x] **P3-D3:** Implement storage overhead benchmarks
   - `tests/benchmarks/StorageOverhead.bench.ts`
   - Disk usage vs page count
 
-- [ ] **P3-D4:** Implement hotpath scaling benchmarks
+- [x] **P3-D4:** Implement hotpath scaling benchmarks
   - `tests/benchmarks/HotpathScaling.bench.ts`
   - Synthetic graphs at 1K, 10K, 100K, 1M nodes+edges
   - Measure: resident set size vs H(t), query latency vs corpus size, promotion/eviction throughput
   - **Assert:** resident count never exceeds H(t); query cost scales sublinearly with corpus size
   - Assert: H(t) values match expected sublinear curve at each scale point
 
-- [ ] **P3-D5:** Record baseline measurements
+- [x] **P3-D5:** Record baseline measurements
   - Add `benchmarks/BASELINES.md` with results from all benchmarks
   - Include H(t) curve data at 1K/10K/100K/1M
 
@@ -770,20 +770,20 @@ These items improve quality, performance, and developer experience. Not blockers
 
 ---
 
-### P3-E: CI Hardening
+### P3-E: CI Hardening ✅ COMPLETE
 
 **Why:** Ensure tests run reliably in CI; enforce both model-derived and policy-derived numeric guards.
 
-- [ ] **P3-E1:** Add GitHub Actions workflow
+- [x] **P3-E1:** Add GitHub Actions workflow
   - `.github/workflows/ci.yml`
   - Run `npm run build`, `npm run lint`, `npm run test:unit`, `npm run guard:model-derived`
 
-- [ ] **P3-E2:** Define Electron runtime gate policy
+- [x] **P3-E2:** Define Electron runtime gate policy
   - Document GPU/graphics requirements
   - Decide CI runner capabilities (software vs hardware rendering)
   - Update `scripts/run-electron-runtime-tests.mjs` gate logic
 
-- [ ] **P3-E3:** Add hotpath policy constants guard
+- [x] **P3-E3:** Add hotpath policy constants guard
   - Extend `scripts/guard-model-derived.mjs` or add `scripts/guard-hotpath-policy.mjs`
   - Scan for numeric literals assigned to hotpath policy fields outside `core/HotpathPolicy.ts`
   - Add as required CI gate alongside `guard:model-derived`
@@ -793,20 +793,20 @@ These items improve quality, performance, and developer experience. Not blockers
 
 ---
 
-### P3-F: Documentation
+### P3-F: Documentation ✅ COMPLETE
 
 **Why:** Users need to know how to integrate CORTEX.
 
-- [ ] **P3-F1:** Update `docs/api.md`
+- [x] **P3-F1:** Update `docs/api.md`
   - Document `ingestText(...)` API
   - Document `query(...)` API
   - Document `QueryResult` structure
 
-- [ ] **P3-F2:** Update `docs/development.md`
+- [x] **P3-F2:** Update `docs/development.md`
   - Add troubleshooting section
   - Add performance tuning guide
 
-- [ ] **P3-F3:** Add architecture diagrams
+- [x] **P3-F3:** Add architecture diagrams
   - Data flow: ingest path
   - Data flow: query path
   - Module dependency graph
@@ -815,26 +815,26 @@ These items improve quality, performance, and developer experience. Not blockers
 
 ---
 
-### P3-G: Product Surface UX Contract
+### P3-G: Product Surface UX Contract ✅ COMPLETE
 
 **Why:** v1.0 needs an explicit UX contract for the standalone app while keeping the library surface headless and integration-first.
 
-- [ ] **P3-G1:** Add `docs/product-surfaces.md`
+- [x] **P3-G1:** Add `docs/product-surfaces.md`
   - Define app-vs-library scope, boundaries, and non-goals
   - Define standalone extension user journey: passive capture -> search -> revisit
   - Define what remains local-only and private in the app shell
 
-- [ ] **P3-G2:** Add standalone search UX checklist to `docs/product-surfaces.md`
+- [x] **P3-G2:** Add standalone search UX checklist to `docs/product-surfaces.md`
   - Search-first information architecture (query bar, results, lightweight metrics)
   - Result-card contract (title, URL, snippet/thumbnail, visit recency, relevance signal)
   - UX states: empty index, no matches, loading/indexing, error recovery
 
-- [ ] **P3-G3:** Add model-mode UX contract to `docs/product-surfaces.md`
+- [x] **P3-G3:** Add model-mode UX contract to `docs/product-surfaces.md`
   - Nomic mode: multimodal recall (text + images in shared latent space)
   - Gemma mode: fine-grained text recall (no image embedding)
   - UI copy rules that make image-recall availability explicit by mode
 
-- [ ] **P3-G4:** Add rabbit-hole recall acceptance checklist
+- [x] **P3-G4:** Add rabbit-hole recall acceptance checklist
   - Vague text recollection scenario recovers a previously visited page path
   - Vague visual recollection scenario recovers a previously seen image when Nomic mode is enabled
   - Add manual validation steps for model toggle behavior and capability messaging
@@ -847,10 +847,10 @@ These items improve quality, performance, and developer experience. Not blockers
 
 | Phase | Items | Status | Blocking |
 |-------|-------|--------|----------|
-| v0.1 (Minimal Viable) | 30 tasks (P0-A through P0-G + P0-E + P0-X) | 🟡 In Progress (P0-A, P0-F, P0-G complete; P0-X architectural rename pending) | User cannot use system correctly; P0-X blocks MetroidBuilder |
-| v0.5 (Hierarchical + Dialectical) | 20 tasks (P1-A through P1-F + P1-M + P1-N) | ❌ Not started | Blocked by v0.1 |
-| v1.0 (Background Consolidation + Smart Sharing) | 20 tasks (P2-A through P2-G) | ❌ Not started | Blocked by v0.5 |
-| Polish & Ship | 21 tasks (P3-A through P3-G) | ❌ Not started | Not blocking v1.0 |
+| v0.1 (Minimal Viable) | 30 tasks (P0-A through P0-G + P0-E + P0-X) | ✅ COMPLETE | — |
+| v0.5 (Hierarchical + Dialectical) | 20 tasks (P1-A through P1-F + P1-M + P1-N) | ✅ COMPLETE | — |
+| v1.0 (Background Consolidation + Smart Sharing) | 20 tasks (P2-A through P2-G) | ✅ COMPLETE | — |
+| Polish & Ship | 21 tasks (P3-A through P3-G) | 🟡 In Progress (P3-A, P3-H pending) | Not blocking v1.0 |
 
 **Total:** ~91 actionable tasks
 
@@ -860,21 +860,23 @@ These items improve quality, performance, and developer experience. Not blockers
 
 If you're reading this and want to know "what do I work on right now?", here's the answer:
 
-**Immediate (unblock MetroidBuilder):**
+**All critical-path work is complete.** v0.1, v0.5, and v1.0 phases are done.
+
+**Remaining polish items:**
 1. ~~**P0-X1–X7:** Fix architectural naming drift (`MetroidNeighbor` → `SemanticNeighbor` and related renames)~~ ✅ DONE
+2. ~~**P0-B1:** Implement `hippocampus/Chunker.ts`~~ ✅ DONE
+3. ~~**P0-C1/C2:** Implement `hippocampus/PageBuilder.ts` and `hippocampus/Ingest.ts`~~ ✅ DONE
+4. ~~**P0-D1:** Implement `cortex/Query.ts` (minimal)~~ ✅ DONE
+5. ~~**P1-A1:** Implement `hippocampus/HierarchyBuilder.ts`~~ ✅ DONE
+6. ~~**P1-C1:** Implement `hippocampus/FastNeighborInsert.ts`~~ ✅ DONE
+7. ~~**P1-M1/M2:** Implement `cortex/MetroidBuilder.ts` with Matryoshka unwinding~~ ✅ DONE
+8. ~~**P1-N1/N2:** Implement `cortex/KnowledgeGapDetector.ts`~~ ✅ DONE
+9. ~~**P1-D1:** Implement `cortex/OpenTSPSolver.ts`~~ ✅ DONE
+10. ~~**P1-E1:** Rewrite `cortex/Query.ts` to full dialectical orchestrator (substantial rework; not backward-compatible with flat top-K version)~~ ✅ DONE
 
-**After P0-X (complete v0.1):**
-2. **P0-B1:** Implement `hippocampus/Chunker.ts`
-3. **P0-C1/C2:** Implement `hippocampus/PageBuilder.ts` and `hippocampus/Ingest.ts`
-4. **P0-D1:** Implement `cortex/Query.ts` (minimal)
-
-**After v0.1 (start v0.5):**
-5. **P1-A1:** Implement `hippocampus/HierarchyBuilder.ts`
-6. **P1-C1:** Implement `hippocampus/FastNeighborInsert.ts`
-7. **P1-M1/M2:** Implement `cortex/MetroidBuilder.ts` with Matryoshka unwinding
-8. **P1-N1/N2:** Implement `cortex/KnowledgeGapDetector.ts`
-9. **P1-D1:** Implement `cortex/OpenTSPSolver.ts`
-10. **P1-E1:** Rewrite `cortex/Query.ts` to full dialectical orchestrator (substantial rework; not backward-compatible with flat top-K version)
+**Still pending:**
+- **P3-A:** WebGL Embedding Provider (`embeddings/OrtWebglEmbeddingBackend.ts`)
+- **P3-H:** GitHub sync smoke test
 
 ---
 
