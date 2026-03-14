@@ -480,9 +480,16 @@ const policy = createRoutingPolicy(profile, { normalDimRatio: 1 / 3 });
 
 ## Hippocampus — Ingest API
 
-The Hippocampus layer encodes new content into the memory engine. All ingest
-operations are idempotent (re-ingesting the same content produces the same
-page hash and is deduplicated at the storage layer).
+The Hippocampus layer encodes new content into the memory engine. Ingest
+operations are deterministic (re-ingesting the same content produces the same
+page hash), but the current storage pipeline is **not** fully idempotent:
+embeddings and books are appended to the `VectorStore` on every run and are
+not automatically deduplicated.
+
+Re-ingesting the same text will therefore grow the underlying vector file and
+can create multiple vector offsets for the same `pageId`. Callers that require
+strict idempotence should avoid re-ingesting identical content or implement an
+application-level deduplication strategy on top of the exposed metadata.
 
 ### `ingestText(text, options)`
 
@@ -497,7 +504,7 @@ import { ingestText } from "./hippocampus/Ingest";
 const result = await ingestText("Your text content here...", {
   modelProfile,        // ModelProfile — controls chunking and embedding dimension
   embeddingRunner,     // EmbeddingRunner — resolves and runs the embedding model
-  vectorStore,         // VectorStore — append-only vector file (OPFS or in-memory)
+  vectorStore,         // VectorStore — append-only, non-deduplicating vector file (OPFS or in-memory)
   metadataStore,       // MetadataStore — structured hierarchy store (IndexedDB)
   creatorKeyPair: {
     publicKey,         // PublicKey — creator's identity for signing pages
