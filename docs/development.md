@@ -223,7 +223,7 @@ requirements:
 
 ---
 
-
+## Hotpath Policy Constants Guard
 
 To prevent hardcoded hotpath policy numeric literals (salience weights, tier
 quota ratios, Williams Bound constant) from leaking outside
