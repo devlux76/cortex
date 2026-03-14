@@ -8,52 +8,7 @@ import { DeterministicDummyEmbeddingBackend } from "../../embeddings/Determinist
 import { EmbeddingRunner } from "../../embeddings/EmbeddingRunner";
 import { generateKeyPair } from "../../core/crypto/sign";
 import { ingestText } from "../../hippocampus/Ingest";
-import { topKByScore } from "../../TopK";
-import type { BackendKind } from "../../BackendKind";
 import type { ModelProfile } from "../../core/ModelProfile";
-import type { VectorBackend } from "../../VectorBackend";
-
-// ---------------------------------------------------------------------------
-// Minimal vector backend for tests
-// ---------------------------------------------------------------------------
-
-class TestVectorBackend implements VectorBackend {
-  readonly kind: BackendKind = "wasm";
-
-  async dotMany(
-    queryVec: Float32Array,
-    matrix: Float32Array,
-    dim: number,
-    count: number,
-  ): Promise<Float32Array> {
-    const out = new Float32Array(count);
-    for (let i = 0; i < count; i++) {
-      let sum = 0;
-      const offset = i * dim;
-      for (let j = 0; j < dim; j++) {
-        sum += queryVec[j] * matrix[offset + j];
-      }
-      out[i] = sum;
-    }
-    return out;
-  }
-
-  async project(): Promise<Float32Array> {
-    throw new Error("Not implemented");
-  }
-
-  async hashToBinary(): Promise<Uint32Array> {
-    throw new Error("Not implemented");
-  }
-
-  async hammingTopK(): Promise<never> {
-    throw new Error("Not implemented");
-  }
-
-  async topKFromScores(scores: Float32Array, k: number) {
-    return topKByScore(scores, k);
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -101,7 +56,6 @@ describe("ExperienceReplay", () => {
   it("returns zero counts when the corpus is empty", async () => {
     const metadataStore = await IndexedDbMetadataStore.open(freshDbName());
     const vectorStore = new MemoryVectorStore();
-    const vectorBackend = new TestVectorBackend();
     const runner = makeRunner();
     const profile = makeProfile();
 
@@ -111,7 +65,6 @@ describe("ExperienceReplay", () => {
       runner,
       vectorStore,
       metadataStore,
-      vectorBackend,
     );
 
     expect(result.queriesExecuted).toBe(0);
@@ -122,7 +75,6 @@ describe("ExperienceReplay", () => {
   it("executes at most queriesPerCycle queries when corpus is large enough", async () => {
     const metadataStore = await IndexedDbMetadataStore.open(freshDbName());
     const vectorStore = new MemoryVectorStore();
-    const vectorBackend = new TestVectorBackend();
     const runner = makeRunner();
     const profile = makeProfile();
     const keyPair = await generateKeyPair();
@@ -153,7 +105,6 @@ describe("ExperienceReplay", () => {
       runner,
       vectorStore,
       metadataStore,
-      vectorBackend,
     );
 
     expect(result.queriesExecuted).toBe(3);
@@ -163,7 +114,6 @@ describe("ExperienceReplay", () => {
   it("executes fewer queries than queriesPerCycle when corpus is smaller", async () => {
     const metadataStore = await IndexedDbMetadataStore.open(freshDbName());
     const vectorStore = new MemoryVectorStore();
-    const vectorBackend = new TestVectorBackend();
     const runner = makeRunner();
     const profile = makeProfile();
     const keyPair = await generateKeyPair();
@@ -190,7 +140,6 @@ describe("ExperienceReplay", () => {
       runner,
       vectorStore,
       metadataStore,
-      vectorBackend,
     );
 
     // Should execute at most 2 queries (one per available page)
@@ -201,7 +150,6 @@ describe("ExperienceReplay", () => {
   it("strengthens edges between query source and result pages", async () => {
     const metadataStore = await IndexedDbMetadataStore.open(freshDbName());
     const vectorStore = new MemoryVectorStore();
-    const vectorBackend = new TestVectorBackend();
     const runner = makeRunner();
     const profile = makeProfile();
     const keyPair = await generateKeyPair();
@@ -233,7 +181,6 @@ describe("ExperienceReplay", () => {
       runner,
       vectorStore,
       metadataStore,
-      vectorBackend,
     );
 
     expect(result.edgesStrengthened).toBeGreaterThan(0);
@@ -242,7 +189,6 @@ describe("ExperienceReplay", () => {
   it("increments edge weight by ltpIncrement for previously unseen pairs", async () => {
     const metadataStore = await IndexedDbMetadataStore.open(freshDbName());
     const vectorStore = new MemoryVectorStore();
-    const vectorBackend = new TestVectorBackend();
     const runner = makeRunner();
     const profile = makeProfile();
     const keyPair = await generateKeyPair();
@@ -269,7 +215,7 @@ describe("ExperienceReplay", () => {
       ltpIncrement,
     });
 
-    await replay.run(profile, runner, vectorStore, metadataStore, vectorBackend);
+    await replay.run(profile, runner, vectorStore, metadataStore);
 
     // Edges written should have weight >= ltpIncrement
     const allPages = await metadataStore.getAllPages();
@@ -284,7 +230,6 @@ describe("ExperienceReplay", () => {
   it("does not exceed maxEdgeWeight after repeated cycles", async () => {
     const metadataStore = await IndexedDbMetadataStore.open(freshDbName());
     const vectorStore = new MemoryVectorStore();
-    const vectorBackend = new TestVectorBackend();
     const runner = makeRunner();
     const profile = makeProfile();
     const keyPair = await generateKeyPair();
@@ -314,7 +259,7 @@ describe("ExperienceReplay", () => {
 
     // Run multiple cycles; edge weights must not exceed the cap
     for (let cycle = 0; cycle < 5; cycle++) {
-      await replay.run(profile, runner, vectorStore, metadataStore, vectorBackend);
+      await replay.run(profile, runner, vectorStore, metadataStore);
     }
 
     const allPages = await metadataStore.getAllPages();
@@ -329,7 +274,6 @@ describe("ExperienceReplay", () => {
   it("reports a valid ISO timestamp in completedAt", async () => {
     const metadataStore = await IndexedDbMetadataStore.open(freshDbName());
     const vectorStore = new MemoryVectorStore();
-    const vectorBackend = new TestVectorBackend();
     const runner = makeRunner();
     const profile = makeProfile();
 
@@ -339,7 +283,6 @@ describe("ExperienceReplay", () => {
       runner,
       vectorStore,
       metadataStore,
-      vectorBackend,
     );
 
     expect(() => new Date(result.completedAt)).not.toThrow();

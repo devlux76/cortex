@@ -2,8 +2,7 @@
  * P3-D2: Query latency benchmarks.
  *
  * Measures end-to-end query latency against in-memory corpora of increasing
- * size using the deterministic dummy embedder (zero model load cost) and an
- * in-process vector backend.
+ * size using the deterministic dummy embedder (zero model load cost).
  *
  * Williams Bound assertion: resident set size must never exceed H(t).
  */
@@ -17,38 +16,7 @@ import { MemoryVectorStore } from "../../storage/MemoryVectorStore";
 import { ingestText } from "../../hippocampus/Ingest";
 import { query } from "../../cortex/Query";
 import { generateKeyPair } from "../../core/crypto/sign";
-import { topKByScore } from "../../TopK";
-import type { BackendKind } from "../../BackendKind";
 import type { ModelProfile } from "../../core/ModelProfile";
-import type { VectorBackend } from "../../VectorBackend";
-
-// ---------------------------------------------------------------------------
-// Minimal vector backend
-// ---------------------------------------------------------------------------
-
-class InProcVectorBackend implements VectorBackend {
-  readonly kind: BackendKind = "wasm";
-
-  async dotMany(
-    queryVec: Float32Array,
-    matrix: Float32Array,
-    dim: number,
-    count: number,
-  ): Promise<Float32Array> {
-    const out = new Float32Array(count);
-    for (let i = 0; i < count; i++) {
-      let sum = 0;
-      for (let j = 0; j < dim; j++) sum += queryVec[j] * matrix[i * dim + j];
-      out[i] = sum;
-    }
-    return out;
-  }
-
-  async project(): Promise<Float32Array> { return new Float32Array(0); }
-  async hashToBinary(): Promise<Uint32Array> { return new Uint32Array(0); }
-  async hammingTopK(): Promise<never[]> { return []; }
-  async topKFromScores(scores: Float32Array, k: number) { return topKByScore(scores, k); }
-}
 
 // ---------------------------------------------------------------------------
 // Corpus builder
@@ -77,7 +45,6 @@ async function buildCorpus(size: number): Promise<{
   metadataStore: IndexedDbMetadataStore;
   vectorStore: MemoryVectorStore;
   embeddingRunner: EmbeddingRunner;
-  vectorBackend: InProcVectorBackend;
 }> {
   (globalThis as unknown as Record<string, unknown>).indexedDB = new IDBFactory();
   (globalThis as unknown as Record<string, unknown>).IDBKeyRange = FakeIDBKeyRange;
@@ -92,7 +59,6 @@ async function buildCorpus(size: number): Promise<{
     supportedKinds: ["dummy" as const],
     measurements: [],
   }));
-  const vectorBackend = new InProcVectorBackend();
   const keyPair = await generateKeyPair();
 
   for (let i = 0; i < size; i++) {
@@ -105,7 +71,7 @@ async function buildCorpus(size: number): Promise<{
     });
   }
 
-  return { metadataStore, vectorStore, embeddingRunner, vectorBackend };
+  return { metadataStore, vectorStore, embeddingRunner };
 }
 
 // ---------------------------------------------------------------------------

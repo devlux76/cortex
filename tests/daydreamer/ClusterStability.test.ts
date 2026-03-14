@@ -7,13 +7,13 @@ import type {
   Hash,
   HotpathEntry,
   MetadataStore,
-  MetroidSubgraph,
+  SemanticNeighbor,
+  SemanticNeighborSubgraph,
   Page,
   PageActivity,
   Shelf,
   Volume,
 } from "../../core/types";
-import type { MetroidNeighbor } from "../../core/types";
 
 // ---------------------------------------------------------------------------
 // In-memory MetadataStore mock
@@ -40,6 +40,7 @@ class MockMetadataStore implements MetadataStore {
   // Volumes
   async putVolume(volume: Volume): Promise<void> { this.volumes.set(volume.volumeId, { ...volume }); }
   async getVolume(id: Hash): Promise<Volume | undefined> { return this.volumes.get(id); }
+  async deleteVolume(volumeId: Hash): Promise<void> { this.volumes.delete(volumeId); }
 
   // Shelves
   async putShelf(shelf: Shelf): Promise<void> { this.shelves.set(shelf.shelfId, { ...shelf }); }
@@ -62,13 +63,13 @@ class MockMetadataStore implements MetadataStore {
     return [...this.shelves.values()].filter((s) => s.volumeIds.includes(volumeId));
   }
 
-  // Metroid neighbors
-  async putMetroidNeighbors(): Promise<void> { /* stub */ }
-  async getMetroidNeighbors(): Promise<MetroidNeighbor[]> { return []; }
-  async getInducedMetroidSubgraph(): Promise<MetroidSubgraph> { return { nodes: [], edges: [] }; }
-  async needsMetroidRecalc(): Promise<boolean> { return false; }
-  async flagVolumeForMetroidRecalc(): Promise<void> { /* stub */ }
-  async clearMetroidRecalcFlag(): Promise<void> { /* stub */ }
+  // Metroid / Semantic neighbor stubs
+  async putSemanticNeighbors(): Promise<void> { /* stub */ }
+  async getSemanticNeighbors(): Promise<SemanticNeighbor[]> { return []; }
+  async getInducedNeighborSubgraph(): Promise<SemanticNeighborSubgraph> { return { nodes: [], edges: [] }; }
+  async needsNeighborRecalc(): Promise<boolean> { return false; }
+  async flagVolumeForNeighborRecalc(): Promise<void> { /* stub */ }
+  async clearNeighborRecalcFlag(): Promise<void> { /* stub */ }
 
   // Hotpath
   async putHotpathEntry(entry: HotpathEntry): Promise<void> { this.hotpath.set(entry.entityId, { ...entry }); }
@@ -242,6 +243,9 @@ describe("ClusterStability", () => {
       for (const book of books) {
         expect(allNewBooks.has(book.bookId)).toBe(true);
       }
+
+      // The original volume must be deleted from the store (no orphan)
+      expect(await store.getVolume("vol-high-var")).toBeUndefined();
     });
 
     it("produces two non-empty sub-volumes when splitting", async () => {
@@ -338,6 +342,10 @@ describe("ClusterStability", () => {
         if (vol) vol.bookIds.forEach((id) => allBooks.add(id));
       }
       expect(allBooks.has("small-book")).toBe(true);
+
+      // The consumed volumes must be deleted from the store (no orphans)
+      expect(await store.getVolume("vol-small")).toBeUndefined();
+      expect(await store.getVolume("vol-big")).toBeUndefined();
     });
 
     it("does not merge when there is only one volume in the shelf", async () => {

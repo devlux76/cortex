@@ -23,14 +23,14 @@ import type {
   Hash,
   HotpathEntry,
   MetadataStore,
-  MetroidSubgraph,
+  SemanticNeighbor,
+  SemanticNeighborSubgraph,
   Page,
   PageActivity,
   Book,
   Volume,
   Shelf,
 } from "../../core/types";
-import type { MetroidNeighbor } from "../../core/types";
 
 // ---------------------------------------------------------------------------
 // In-memory MetadataStore for benchmark (no IDB overhead)
@@ -102,17 +102,18 @@ class BenchMetadataStore implements MetadataStore {
   async getBook(): Promise<undefined> { return undefined; }
   async putVolume(): Promise<void> { /* stub */ }
   async getVolume(): Promise<undefined> { return undefined; }
+  async deleteVolume(): Promise<void> { /* stub */ }
   async putShelf(): Promise<void> { /* stub */ }
   async getShelf(): Promise<undefined> { return undefined; }
   async getBooksByPage(): Promise<Book[]> { return []; }
   async getVolumesByBook(): Promise<Volume[]> { return []; }
   async getShelvesByVolume(): Promise<Shelf[]> { return []; }
-  async putMetroidNeighbors(): Promise<void> { /* stub */ }
-  async getMetroidNeighbors(): Promise<MetroidNeighbor[]> { return []; }
-  async getInducedMetroidSubgraph(): Promise<MetroidSubgraph> { return { nodes: [], edges: [] }; }
-  async needsMetroidRecalc(): Promise<boolean> { return false; }
-  async flagVolumeForMetroidRecalc(): Promise<void> { /* stub */ }
-  async clearMetroidRecalcFlag(): Promise<void> { /* stub */ }
+  async putSemanticNeighbors(): Promise<void> { /* stub */ }
+  async getSemanticNeighbors(): Promise<SemanticNeighbor[]> { return []; }
+  async getInducedNeighborSubgraph(): Promise<SemanticNeighborSubgraph> { return { nodes: [], edges: [] }; }
+  async needsNeighborRecalc(): Promise<boolean> { return false; }
+  async flagVolumeForNeighborRecalc(): Promise<void> { /* stub */ }
+  async clearNeighborRecalcFlag(): Promise<void> { /* stub */ }
 }
 
 // ---------------------------------------------------------------------------

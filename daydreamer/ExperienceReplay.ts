@@ -13,7 +13,6 @@
 import type { EmbeddingRunner } from "../embeddings/EmbeddingRunner";
 import type { ModelProfile } from "../core/ModelProfile";
 import type { MetadataStore, Page, VectorStore, Edge } from "../core/types";
-import type { VectorBackend } from "../VectorBackend";
 import { query as cortexQuery } from "../cortex/Query";
 import type { QueryOptions } from "../cortex/Query";
 
@@ -108,7 +107,6 @@ export class ExperienceReplay {
     embeddingRunner: EmbeddingRunner,
     vectorStore: VectorStore,
     metadataStore: MetadataStore,
-    vectorBackend: VectorBackend,
   ): Promise<ExperienceReplayResult> {
     const allPages = await metadataStore.getAllPages();
     if (allPages.length === 0) {
@@ -127,7 +125,6 @@ export class ExperienceReplay {
       embeddingRunner,
       vectorStore,
       metadataStore,
-      vectorBackend,
       topK: this.topK,
     };
 

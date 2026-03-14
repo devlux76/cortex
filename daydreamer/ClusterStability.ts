@@ -127,12 +127,14 @@ export class ClusterStability {
             splits,
             metadataStore,
           );
-          // Remove the original volume from storage (replace with two new ones)
+          // Replace the old volume in shelves with the two new sub-volumes,
+          // then delete the orphan volume record and its reverse-index entries.
           await this.replaceVolumeInShelves(
             volume.volumeId,
             splits,
             metadataStore,
           );
+          await metadataStore.deleteVolume(volume.volumeId);
         }
       }
     }
@@ -179,6 +181,8 @@ export class ClusterStability {
         [mergedVolume],
         metadataStore,
       );
+      // Replace the consumed volumes in shelves with the merged volume,
+      // then delete their orphan records and reverse-index entries.
       await this.replaceVolumeInShelves(
         small.volumeId,
         [mergedVolume],
@@ -189,6 +193,8 @@ export class ClusterStability {
         [],
         metadataStore,
       );
+      await metadataStore.deleteVolume(small.volumeId);
+      await metadataStore.deleteVolume(neighbour.volumeId);
     }
 
     return {
@@ -239,7 +245,7 @@ export class ClusterStability {
 
   /**
    * Assign books to two clusters using a simple K-means initialisation:
-   * centroid A = first book, centroid B = the book most dissimilar to A.
+   * centroid A = first half by index, centroid B = second half.
    *
    * Returns `null` when it is not possible to form two non-empty clusters.
    *
@@ -247,11 +253,19 @@ export class ClusterStability {
    * real vectors are not loaded), which produces a balanced split without
    * requiring a live VectorStore.  A production pass would replace this with
    * actual cosine distances between medoid embeddings.
+   *
+   * Precomputes a `bookId → index` map so each iteration is O(n) rather than
+   * O(n²) (avoids repeated Array.indexOf calls inside the inner loop).
    */
   private kmeansAssign(books: Book[]): [Book[], Book[]] | null {
     if (books.length < 2) return null;
 
     const n = books.length;
+    // Precompute index map to avoid O(n²) indexOf calls
+    const indexMap = new Map<string, number>(
+      books.map((b, i) => [b.bookId, i]),
+    );
+
     // Centroid A = first half, centroid B = second half (index-based split)
     const splitPoint = Math.ceil(n / 2);
 
@@ -262,14 +276,14 @@ export class ClusterStability {
 
     // Run up to maxKmeansIterations assignment cycles using index centroids
     for (let iter = 0; iter < this.maxKmeansIterations; iter++) {
-      const centroidA = this.indexCentroid(groupA, books);
-      const centroidB = this.indexCentroid(groupB, books);
+      const centroidA = this.indexCentroid(groupA, indexMap);
+      const centroidB = this.indexCentroid(groupB, indexMap);
 
       const newA: Book[] = [];
       const newB: Book[] = [];
 
       for (const book of books) {
-        const idx = books.indexOf(book);
+        const idx = indexMap.get(book.bookId) ?? 0;
         const distA = Math.abs(idx - centroidA);
         const distB = Math.abs(idx - centroidB);
         if (distA <= distB) {
@@ -300,10 +314,16 @@ export class ClusterStability {
     return [groupA, groupB];
   }
 
-  /** Compute the mean index of a group relative to the global book array. */
-  private indexCentroid(group: Book[], allBooks: Book[]): number {
-    const indices = group.map((b) => allBooks.indexOf(b));
-    return indices.reduce((a, b) => a + b, 0) / indices.length;
+  /** Compute the mean index of a group using the precomputed index map. */
+  private indexCentroid(
+    group: Book[],
+    indexMap: Map<string, number>,
+  ): number {
+    const sum = group.reduce(
+      (acc, b) => acc + (indexMap.get(b.bookId) ?? 0),
+      0,
+    );
+    return sum / group.length;
   }
 
   private async buildSubVolume(
@@ -499,14 +519,6 @@ export class ClusterStability {
     const volumes = await Promise.all(
       [...volumeIds].map((id) => metadataStore.getVolume(id)),
     );
-    return volumes.filter((v): v is Volume => v !== undefined);
-  }
-
-  private async reloadVolumes(
-    ids: Hash[],
-    metadataStore: MetadataStore,
-  ): Promise<Volume[]> {
-    const volumes = await Promise.all(ids.map((id) => metadataStore.getVolume(id)));
     return volumes.filter((v): v is Volume => v !== undefined);
   }
 }

@@ -38,19 +38,20 @@ const ALLOWED_SOURCE_FILE = "core/HotpathPolicy.ts";
  * Field names that must not receive hardcoded numeric literals outside the
  * allowed source file.
  *
- * Matches the HotpathPolicy interface fields and common aliases:
- *   - c          (Williams Bound scaling factor)
- *   - alpha      (Hebbian connectivity weight)
- *   - beta       (recency weight)
- *   - gamma      (query-hit frequency weight)
- *   - shelf      (shelf quota ratio)
- *   - volume     (volume quota ratio — only as a quota ratio field)
- *   - book       (book quota ratio)
- *   - page       (page quota ratio — only as a quota ratio field)
- *   - salienceWeights / tierQuotaRatios (policy field names)
+ * Matches the HotpathPolicy salience weight fields and the policy type names:
+ *   - alpha      (Hebbian connectivity weight in SalienceWeights)
+ *   - beta       (recency weight in SalienceWeights)
+ *   - gamma      (query-hit frequency weight in SalienceWeights)
+ *   - salienceWeights / tierQuotaRatios (top-level policy field names)
+ *
+ * Note: `c` (Williams Bound scaling factor) and the per-tier quota fields
+ * (shelf, volume, book, page) are enforced structurally by TypeScript typing
+ * through the HotpathPolicy and TierQuotaRatios interfaces rather than by
+ * this guard, because those single words appear ubiquitously as domain
+ * identifiers throughout the codebase (e.g. volume.bookIds, book.pageIds).
  */
 const HOTPATH_FIELD_PATTERN =
-  /\b(salienceWeights|tierQuotaRatios|(?<![a-zA-Z_$])c(?![a-zA-Z_$])|(?<![a-zA-Z_$])alpha(?![a-zA-Z_$])|(?<![a-zA-Z_$])beta(?![a-zA-Z_$])|(?<![a-zA-Z_$])gamma(?![a-zA-Z_$])|(?<![a-zA-Z_$])shelf(?![a-zA-Z_$])|(?<![a-zA-Z_$])volume(?![a-zA-Z_$])|(?<![a-zA-Z_$])book(?![a-zA-Z_$])|(?<![a-zA-Z_$])page(?![a-zA-Z_$]))\b/;
+  /\b(salienceWeights|tierQuotaRatios|(?<![a-zA-Z_$])alpha(?![a-zA-Z_$])|(?<![a-zA-Z_$])beta(?![a-zA-Z_$])|(?<![a-zA-Z_$])gamma(?![a-zA-Z_$]))\b/;
 
 const ASSIGNMENT_PATTERN = /[:=]/;
 const NUMERIC_LITERAL_PATTERN = /(^|[^\w.])-?\d+(?:\.\d+)?([^\w.]|$)/;

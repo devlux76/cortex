@@ -4,8 +4,8 @@ import type {
   Hash,
   HotpathEntry,
   MetadataStore,
-  MetroidNeighbor,
-  MetroidSubgraph,
+  SemanticNeighbor,
+  SemanticNeighborSubgraph,
   Page,
   PageActivity,
   Shelf,
@@ -16,7 +16,7 @@ import type {
 // Schema constants
 // ---------------------------------------------------------------------------
 
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 /** Object-store names used across the schema. */
 const STORE = {
@@ -25,7 +25,7 @@ const STORE = {
   volumes: "volumes",
   shelves: "shelves",
   edges: "edges_hebbian",
-  metroidNeighbors: "metroid_neighbors",
+  neighborGraph: "neighbor_graph",
   flags: "flags",
   pageToBook: "page_to_book",
   bookToVolume: "book_to_volume",
@@ -72,9 +72,7 @@ function applyUpgrade(db: IDBDatabase): void {
     edgeStore.createIndex("by-from", "fromPageId");
   }
 
-  if (!db.objectStoreNames.contains(STORE.metroidNeighbors)) {
-    db.createObjectStore(STORE.metroidNeighbors, { keyPath: "pageId" });
-  }
+
   if (!db.objectStoreNames.contains(STORE.flags)) {
     db.createObjectStore(STORE.flags, { keyPath: "volumeId" });
   }
@@ -96,6 +94,11 @@ function applyUpgrade(db: IDBDatabase): void {
   }
   if (!db.objectStoreNames.contains(STORE.pageActivity)) {
     db.createObjectStore(STORE.pageActivity, { keyPath: "pageId" });
+  }
+
+  // v3 stores — neighbor_graph (replaces the old metroid_neighbors name)
+  if (!db.objectStoreNames.contains(STORE.neighborGraph)) {
+    db.createObjectStore(STORE.neighborGraph, { keyPath: "pageId" });
   }
 }
 
@@ -231,6 +234,55 @@ export class IndexedDbMetadataStore implements MetadataStore {
     return this._get<Volume>(STORE.volumes, volumeId);
   }
 
+  /**
+   * Delete a volume and clean up its reverse-index entries:
+   * - Removes the volume from the `bookToVolume` index for each of its books.
+   * - Deletes the `volumeToShelf` index entry for this volume.
+   * - Deletes the volume record itself.
+   *
+   * Callers should update or remove the volume from any shelf's `volumeIds`
+   * list before calling this method.
+   */
+  async deleteVolume(volumeId: Hash): Promise<void> {
+    const volume = await this.getVolume(volumeId);
+
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(
+        [STORE.volumes, STORE.bookToVolume, STORE.volumeToShelf],
+        "readwrite",
+      );
+
+      // Remove from bookToVolume reverse index for each book the volume owned
+      if (volume) {
+        const bookToVolumeStore = tx.objectStore(STORE.bookToVolume);
+        for (const bookId of volume.bookIds) {
+          const getReq = bookToVolumeStore.get(bookId);
+          getReq.onsuccess = () => {
+            const existing: { bookId: Hash; volumeIds: Hash[] } | undefined =
+              getReq.result;
+            if (!existing) return;
+            const updatedVolumeIds = existing.volumeIds.filter(
+              (id) => id !== volumeId,
+            );
+            if (updatedVolumeIds.length === 0) {
+              bookToVolumeStore.delete(bookId);
+            } else {
+              bookToVolumeStore.put({ bookId, volumeIds: updatedVolumeIds });
+            }
+          };
+        }
+      }
+
+      // Remove volumeToShelf reverse index entry
+      tx.objectStore(STORE.volumeToShelf).delete(volumeId);
+
+      // Delete the volume record itself
+      tx.objectStore(STORE.volumes).delete(volumeId);
+
+      promisifyTransaction(tx).then(resolve).catch(reject);
+    });
+  }
+
   // -------------------------------------------------------------------------
   // Shelf CRUD + reverse index
   // -------------------------------------------------------------------------
@@ -328,19 +380,19 @@ export class IndexedDbMetadataStore implements MetadataStore {
   }
 
   // -------------------------------------------------------------------------
-  // Metroid NN radius index
+  // Semantic neighbor radius index
   // -------------------------------------------------------------------------
 
-  putMetroidNeighbors(pageId: Hash, neighbors: MetroidNeighbor[]): Promise<void> {
-    return this._put(STORE.metroidNeighbors, { pageId, neighbors });
+  putSemanticNeighbors(pageId: Hash, neighbors: SemanticNeighbor[]): Promise<void> {
+    return this._put(STORE.neighborGraph, { pageId, neighbors });
   }
 
-  async getMetroidNeighbors(
+  async getSemanticNeighbors(
     pageId: Hash,
     maxDegree?: number,
-  ): Promise<MetroidNeighbor[]> {
-    const row = await this._get<{ pageId: Hash; neighbors: MetroidNeighbor[] }>(
-      STORE.metroidNeighbors,
+  ): Promise<SemanticNeighbor[]> {
+    const row = await this._get<{ pageId: Hash; neighbors: SemanticNeighbor[] }>(
+      STORE.neighborGraph,
       pageId,
     );
     if (!row) return [];
@@ -348,10 +400,10 @@ export class IndexedDbMetadataStore implements MetadataStore {
     return maxDegree !== undefined ? list.slice(0, maxDegree) : list;
   }
 
-  async getInducedMetroidSubgraph(
+  async getInducedNeighborSubgraph(
     seedPageIds: Hash[],
     maxHops: number,
-  ): Promise<MetroidSubgraph> {
+  ): Promise<SemanticNeighborSubgraph> {
     const visited = new Set<Hash>(seedPageIds);
     const nodeSet = new Set<Hash>(seedPageIds);
     const edgeMap = new Map<string, { from: Hash; to: Hash; distance: number }>();
@@ -362,7 +414,7 @@ export class IndexedDbMetadataStore implements MetadataStore {
       const nextFrontier: Hash[] = [];
 
       for (const pageId of frontier) {
-        const neighbors = await this.getMetroidNeighbors(pageId);
+        const neighbors = await this.getSemanticNeighbors(pageId);
         for (const n of neighbors) {
           const key = `${pageId}\x00${n.neighborPageId}`;
           if (!edgeMap.has(key)) {
@@ -393,7 +445,7 @@ export class IndexedDbMetadataStore implements MetadataStore {
   // Dirty-recalc flags
   // -------------------------------------------------------------------------
 
-  async needsMetroidRecalc(volumeId: Hash): Promise<boolean> {
+  async needsNeighborRecalc(volumeId: Hash): Promise<boolean> {
     const row = await this._get<{ volumeId: Hash; needsRecalc: boolean }>(
       STORE.flags,
       volumeId,
@@ -401,11 +453,11 @@ export class IndexedDbMetadataStore implements MetadataStore {
     return row?.needsRecalc === true;
   }
 
-  flagVolumeForMetroidRecalc(volumeId: Hash): Promise<void> {
+  flagVolumeForNeighborRecalc(volumeId: Hash): Promise<void> {
     return this._put(STORE.flags, { volumeId, needsRecalc: true });
   }
 
-  clearMetroidRecalcFlag(volumeId: Hash): Promise<void> {
+  clearNeighborRecalcFlag(volumeId: Hash): Promise<void> {
     return this._put(STORE.flags, { volumeId, needsRecalc: false });
   }
 
