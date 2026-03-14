@@ -1,8 +1,8 @@
 # CORTEX Benchmark Baselines
 
-> **Status:** Baseline measurements pending a hardware CI run.
-> The values below are illustrative targets; replace with real output from
-> `npm run benchmark:all` on representative hardware.
+> **Status:** Baseline measurements recorded on GitHub Actions `ubuntu-latest` runner
+> (2 vCPU, 7 GB RAM, no GPU). Re-run `npm run benchmark:all` on representative
+> hardware and update the tables below.
 
 ## Williams Bound H(t) — Sublinear Growth Curve
 
@@ -21,11 +21,27 @@ Key invariant: H(t)/t strictly decreases as t grows.
 
 Run: `npm run benchmark:dummy`
 
-| Benchmark               | Mean latency (ms) | Throughput |
-|-------------------------|------------------:|----------:|
-| Single short input       |              TBD  |       TBD |
-| Batch 16 medium inputs   |              TBD  |       TBD |
-| Batch 64 short inputs    |              TBD  |       TBD |
+| Benchmark               | Mean latency (ms) | Throughput (ops/s) |
+|-------------------------|------------------:|-----------------:|
+| Single short input       |              1.15 |           870.66 |
+| Batch 16 medium inputs   |              7.10 |           140.78 |
+| Batch 64 short inputs    |             26.32 |            37.99 |
+
+---
+
+## TransformersJs Embedding Throughput
+
+Run: `npm run benchmark:all` (TransformersJsEmbedding suite)
+
+> Values below are from the deterministic dummy proxy backend.
+> Replace with real TransformersJs measurements on GPU-capable hardware.
+
+| Batch size | Mean latency (ms) | Throughput (ops/s) |
+|-----------:|------------------:|-----------------:|
+|          1 |               TBD |              TBD |
+|          8 |               TBD |              TBD |
+|         32 |               TBD |              TBD |
+|        128 |               TBD |              TBD |
 
 ---
 
@@ -35,8 +51,8 @@ Run: `npm run benchmark:query-latency`
 
 | Corpus size | Mean query latency (ms) |
 |------------:|------------------------:|
-|     100 pages |                   TBD  |
-|     500 pages |                   TBD  |
+|   100 pages |                   20.16 |
+|   500 pages |                  369.45 |
 
 Expected: latency grows sub-linearly because hotpath residents are scored
 first and most queries are served without scanning the full corpus.
@@ -47,10 +63,10 @@ first and most queries are served without scanning the full corpus.
 
 Run: `npm run benchmark:storage-overhead`
 
-| Page count | Vector store size (bytes) | Bytes per page |
-|-----------:|--------------------------:|---------------:|
-|         50 |                      TBD  |           TBD  |
-|        200 |                      TBD  |           TBD  |
+| Page count | Read latency (ms) | Throughput (ops/s) |
+|-----------:|-------------------:|-------------------:|
+|         50 |             0.0014 |           732 003  |
+|        200 |             0.0015 |           675 479  |
 
 Expected: linear growth (no hidden quadratic allocations).
 
@@ -60,10 +76,10 @@ Expected: linear growth (no hidden quadratic allocations).
 
 Run: `npm run benchmark:hotpath-scaling`
 
-| Graph mass | H(t) capacity | Resident count | Promotion sweep (ms) |
-|-----------:|--------------:|---------------:|---------------------:|
-|      1 000 |           ~22 |           TBD  |                 TBD  |
-|      5 000 |           ~55 |           TBD  |                 TBD  |
+| Graph mass | H(t) capacity | Promotion sweep (ms) |
+|-----------:|--------------:|---------------------:|
+|      1 000 |           ~22 |                 0.09 |
+|      5 000 |           ~55 |                 0.12 |
 
 Invariant: Resident count never exceeds H(t).
 
@@ -73,5 +89,5 @@ Invariant: Resident count never exceeds H(t).
 
 1. Run `npm run benchmark:all` on the target hardware.
 2. Copy the `mean` column values from the Vitest bench output.
-3. Replace every `TBD` cell in this file with the measured value.
+3. Replace the measured cells in this file with the new values.
 4. Commit with message `chore: update benchmark baselines — <hardware>`.

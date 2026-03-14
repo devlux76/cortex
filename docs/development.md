@@ -14,7 +14,8 @@ This guide covers building, testing, debugging, and contributing to CORTEX.
 8. [VS Code Debugging (Electron)](#vs-code-debugging-electron)
 9. [Docker Debug Lane](#docker-debug-lane)
 10. [Model-Derived Numeric Guard](#model-derived-numeric-guard)
-11. [Documentation Maintenance](#documentation-maintenance)
+11. [Electron Runtime Gate Policy](#electron-runtime-gate-policy)
+12. [Documentation Maintenance](#documentation-maintenance)
 
 ---
 
@@ -180,7 +181,49 @@ At the end of every implementation pass, update documents in this order:
 
 ---
 
-## Hotpath Policy Constants Guard
+## Electron Runtime Gate Policy
+
+The Electron test lane enforces the following gate policy for GPU/graphics
+requirements:
+
+### GPU Requirements
+
+| Capability | Required? | Notes |
+|---|---|---|
+| **WebGPU** | Optional | Preferred for vector operations and TransformersJs device; CI runners lack GPU access |
+| **WebNN** | Optional | Preferred for ML inference; not available on most CI runners |
+| **WebGL** | Required (software OK) | Minimum graphics capability; software-rendered via Xvfb in Docker |
+| **WASM** | Required | Always-available compute fallback for vectors and embeddings |
+| **OPFS** | Required | Origin Private File System for vector persistence |
+| **IndexedDB** | Required | Metadata and hierarchy persistence |
+
+### CI Gate Behaviour
+
+- **Host-shell Electron** may crash with `SIGSEGV` in headless sandbox
+  environments that lack a GPU. This is **not** a blocking failure — use the
+  Docker lane instead.
+- **Docker Electron lane** (`npm run docker:electron:up`) runs with Xvfb
+  software rendering. WebGL reports as available but WebGPU does not.
+  This lane is **not** a GPU-realism gate — it validates application startup,
+  IPC wiring, and storage initialisation.
+- Set `CORTEX_ALLOW_ELECTRON_SKIP=1` to exit the Electron lane with code 0
+  when hardware is unavailable, rather than failing the build.
+- The CI workflow does **not** run Electron tests by default. Electron tests
+  are gated behind the `test:electron` / `test:runtime` scripts and should be
+  run manually or in a dedicated GPU-enabled runner.
+
+### Decision Matrix
+
+| Environment | Electron tests run? | GPU available? | Expectation |
+|---|---|---|---|
+| Local (with GPU) | Yes | Yes | Full pass |
+| Local (no GPU) | Skip (`CORTEX_ALLOW_ELECTRON_SKIP=1`) | No | Skip gracefully |
+| CI (ubuntu-latest) | No | No | Unit tests only |
+| Docker lane | Yes (software render) | No | Startup + storage pass; WebGPU tests skipped |
+
+---
+
+
 
 To prevent hardcoded hotpath policy numeric literals (salience weights, tier
 quota ratios, Williams Bound constant) from leaking outside

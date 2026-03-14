@@ -28,3 +28,9 @@ jobs:
 
       - name: Test
         run: bun run test
+
+      - name: Guard — model-derived numerics
+        run: bun run guard:model-derived
+
+      - name: Guard — hotpath policy constants
+        run: bun run guard:hotpath-policy

@@ -41,7 +41,7 @@ function isValidPage(p: unknown): p is Page {
     typeof page.pageId === "string" && page.pageId.length > 0 &&
     typeof page.content === "string" &&
     typeof page.embeddingOffset === "number" &&
-    typeof page.embeddingDim === "number" && page.embeddingDim > 0
+    typeof page.embeddingDim === "number" && page.embeddingDim > 0 // model-derived-ok
   );
 }
 
@@ -103,7 +103,7 @@ async function importNodes(
       signature: "",
       // Mark as "no local embedding yet"; downstream code can choose to re-embed.
       embeddingOffset: 0,
-      embeddingDim: 0,
+      embeddingDim: 0, // model-derived-ok — sentinel: no local embedding yet
     };
 
     // Optionally verify that pageId matches SHA-256(content)
