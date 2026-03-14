@@ -59,6 +59,24 @@ function isValidEdge(e: unknown): e is Edge {
 // Import logic
 // ---------------------------------------------------------------------------
 
+async function computeContentHash(content: string): Promise<string> {
+  if (!("crypto" in globalThis) || !globalThis.crypto?.subtle) {
+    throw new Error("SubtleCrypto not available for content hash verification");
+  }
+
+  const encoder = new TextEncoder();
+  const data = encoder.encode(content);
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", data);
+  const bytes = new Uint8Array(digest);
+
+  let hex = "";
+  for (const b of bytes) {
+    hex += b.toString(16).padStart(2, "0");
+  }
+
+  return hex;
+}
+
 async function importNodes(
   nodes: Page[],
   vectorStore: VectorStore,
@@ -83,12 +101,22 @@ async function importNodes(
       signature: "",
     };
 
-    // Optionally verify that an existing page with the same ID exists or skip
-    // (full crypto verification is production-only; test envs skip)
+    // Optionally verify that pageId matches SHA-256(content)
     if (verifyContentHashes) {
-      // In a full implementation, recompute SHA-256(content) and compare to pageId.
-      // Skipped here because the hash utility is async and requires importing
-      // the crypto module — this is a no-op placeholder for the interface.
+      let computedId: string;
+      try {
+        computedId = await computeContentHash(page.content);
+      } catch {
+        // If we cannot verify hashes, reject the page rather than
+        // silently accepting unverified content.
+        rejected.push(page.pageId);
+        continue;
+      }
+
+      if (computedId !== page.pageId) {
+        rejected.push(page.pageId);
+        continue;
+      }
     }
 
     // Persist vector if the page's embedding offset points beyond current store
