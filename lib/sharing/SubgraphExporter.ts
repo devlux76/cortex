@@ -83,9 +83,9 @@ async function expandSeeds(
     for (const pageId of frontier) {
       if (collectedPages.length >= maxNodes) break;
 
-      // Expand via Metroid (semantic) neighbors
-      const metroidNeighbors: SemanticNeighbor[] = await metadataStore.getSemanticNeighbors(pageId);
-      for (const n of metroidNeighbors) {
+      // Expand via semantic neighbors
+      const semanticNeighbors: SemanticNeighbor[] = await metadataStore.getSemanticNeighbors(pageId);
+      for (const n of semanticNeighbors) {
         if (!visited.has(n.neighborPageId) && collectedPages.length < maxNodes) {
           visited.add(n.neighborPageId);
           nextFrontier.push(n.neighborPageId);

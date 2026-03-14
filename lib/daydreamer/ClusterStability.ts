@@ -52,7 +52,7 @@ export interface LabelPropagationResult {
 /**
  * Run one pass of label propagation over all pages.
  *
- * Each node adopts the most frequent label among its Metroid neighbors.
+ * Each node adopts the most frequent label among its semantic neighbors.
  * Ties are broken deterministically by choosing the lexicographically
  * smallest label (consistent across runs and nodes).
  *
@@ -107,7 +107,7 @@ async function propagationPass(
 
 /**
  * Assign community labels to all pages via label propagation on the
- * Metroid (semantic) neighbor graph.
+ * Semantic neighbor graph.
  *
  * Initial labels: each page is its own community (pageId as initial label).
  * Each iteration: every node adopts the most frequent label among neighbors.

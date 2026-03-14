@@ -31,7 +31,7 @@ export interface FullNeighborRecalcOptions {
   metadataStore: MetadataStore;
   vectorStore: VectorStore;
   policy?: HotpathPolicy;
-  /** Maximum Metroid neighbors stored per page. Default: 16. */
+  /** Maximum semantic neighbors stored per page. Default: 16. */
   maxNeighbors?: number;
   /** Current timestamp (ms since epoch). Defaults to Date.now(). */
   now?: number;
@@ -71,7 +71,7 @@ function cosineSimilarity(a: Float32Array, b: Float32Array): number {
  *
  * Finds all volumes flagged as dirty (via `needsNeighborRecalc`), loads
  * their pages, computes pairwise cosine similarities, and updates the
- * Metroid neighbor index. Processing is bounded by the Williams-Bound-derived
+ * semantic neighbor index. Processing is bounded by the Williams-Bound-derived
  * maintenance budget to avoid blocking the idle loop.
  *
  * After recalculation, salience is recomputed for affected pages and a
