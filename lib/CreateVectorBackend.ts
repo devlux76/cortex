@@ -15,9 +15,9 @@ export async function createVectorBackend(
     );
   }
   if (kind === "webgl") {
-    return Promise.resolve(WebGlVectorBackend.create()).catch(() =>
-      WasmVectorBackend.create(wasmBytes)
-    );
+    return Promise.resolve()
+      .then(() => WebGlVectorBackend.create())
+      .catch(() => WasmVectorBackend.create(wasmBytes));
   }
   if (kind === "webnn") {
     return WebNnVectorBackend.create(wasmBytes).catch(() =>
