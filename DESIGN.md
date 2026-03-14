@@ -99,8 +99,6 @@ A Metroid is a structured search primitive for epistemically balanced exploratio
 
 The name captures a key architectural insight: what looks like an obstacle to progress — a medoid representing conceptual opposition — is not an enemy. The centroid computed from that opposition can be **held as a stable, frozen platform**, turning semantic divergence into a navigable step toward a goal. Every Metroid construction converts the antithesis (m2) into the anchor for the frozen centroid (c), which then provides structural support for deeper exploration.
 
-A Metroid replaces all prior sparse nearest-neighbor graph constructions as the canonical mechanism for guided semantic exploration in CORTEX. Opposition, divergence, and curiosity-driven augmentation are the designed search dynamics — not similarity-chasing.
-
 ```
 Metroid = { m1, m2, c }
 ```
