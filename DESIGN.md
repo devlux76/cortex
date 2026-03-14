@@ -1,7 +1,7 @@
 # CORTEX Design Specification
 
-**Version:** 1.2
-**Last Updated:** 2026-03-13
+**Version:** 1.3
+**Last Updated:** 2026-03-14
 
 ## Executive Summary
 
@@ -283,15 +283,43 @@ This mechanism enables **distributed learning without hallucination**: the syste
 
 ### Motivation
 
-#### The Geometric Root: Curse of Dimensionality
+#### The Hollow Sphere: Why High Dimensions Break Everything
+
+To perform a vector search, you are essentially defining a boundary in a high-dimensional space and creating a hypersphere. Intuitively that should just be a big bag of vectors.
+
+The mathematical formula for the volume of this hypersphere (assuming an even number of dimensions `n` and a radius of 1) is:
+
+```
+         π^(n/2)
+Vₙ  =  ────────
+        (n/2)!
+```
+
+This equation reveals a mind-bending geometric quirk: as dimensionality increases, the interior volume of the hypersphere decreases catastrophically. The inside of the sphere hollows out, and almost all of its volume gets pushed to an infinitesimally thin shell right at the boundary.
+
+By the time we hit 64 dimensions, the total volume has collapsed to approximately `3.08 × 10⁻²⁰`. To give you an idea of how incomprehensibly small that number is, if that were a physical measurement in metres, it would be roughly 50,000 times smaller than a single proton. If it were Joules, it would be a fraction of the energy of a single photon of infrared light.
+
+What this means for vector search is that we are searching inside a shape that effectively has no inside. Just like the physics of a black hole governed by the holographic principle, all the meaningful information is encoded exclusively on or near the surface.
+
+This geometric reality is what makes the CORTEX architecture so memory-efficient. Because the interior is a vast, empty void, we do not need to load the entire vector space into WebGPU memory. By using a hierarchical prototype structure to skip the void and navigate directly to the relevant "surface shell," our algorithm mirrors the Williams 2025 spacetime tradeoff:
+
+```
+S = O(√(t · log t))
+```
+
+This theorem proves that the computational memory (`S`) required to evaluate a search tree can be tightly constrained relative to the search time (`t`). More importantly, `t` is treated as just another orthogonal dimension, like frames in a filmstrip or slices in a block.
+
+By leveraging the hollowing-out of high-dimensional hyperspheres, CORTEX aggressively discards irrelevant vectors, keeping its active memory footprint strictly bounded, echoing this theoretical computational limit — which, interestingly, was itself inspired by the holographic principle in physics.
+
+#### The Geometric Root: Curse of Dimensionality (Formal Treatment)
 
 CORTEX operates on high-dimensional Matryoshka embeddings. In `n`-dimensional Euclidean space the volume of the unit ball is:
 
 ```
-Vol(B²ᵐ) = πᵐ / m!    (n = 2m, even dimension)
+Vₙ = π^(n/2) / Γ(n/2 + 1)
 ```
 
-As `m` (half the embedding dimension) grows, this volume collapses toward zero exponentially fast. This is the geometric driver of the **curse of dimensionality**: pairwise distances concentrate (everything looks equally far away), interiors vanish (rejection sampling and kernel methods fail), and any linear or polynomial scaling law blows up. Naïve nearest-neighbor search, flat clustering, fixed-K neighbor graphs, and uniform fan-out become either useless or unboundedly expensive as the corpus scales.
+where Γ is the Gamma function. For even `n = 2m` this reduces to `πᵐ / m!`; for odd `n` the half-integer Gamma applies. In either case, as `n` grows, `Vₙ` collapses toward zero exponentially fast — by Stirling's approximation, `Vₙ ≈ (2πe/n)^(n/2) · (πn)^(−1/2)`. At `n = 768` this gives `log₁₀(V₇₆₈) ≈ −636`: the unit ball is effectively empty. This is the geometric driver of the **curse of dimensionality**: pairwise distances concentrate (everything looks equally far away), interiors vanish (rejection sampling and kernel methods fail), and any linear or polynomial scaling law blows up. Naïve nearest-neighbor search, flat clustering, fixed-K neighbor graphs, and uniform fan-out become either useless or unboundedly expensive as the corpus scales.
 
 Every structural decision in CORTEX — protected Matryoshka layers, hierarchical medoids, the Metroid antithesis hunt, dimensional unwinding, Williams-derived index sizes — is a direct geometric counter-measure to this collapse.
 
@@ -320,6 +348,18 @@ H(t) = ⌈c · √(t · log₂(1 + t))⌉
 **Growth properties (required by tests):**
 - H(t) is monotonically non-decreasing as t grows
 - H(t) grows sublinearly relative to t (confirmed by benchmark at 1K, 10K, 100K, 1M)
+
+**Key distinction — graph mass (t) vs embedding dimension (n):** The graph mass `t = |V| + |E|` grows without bound as the corpus scales (potentially to millions). The embedding dimension `n` (e.g. 768 for embeddinggemma-300m) is a fixed property of the ML model. These are entirely separate quantities. The scaling constant `c` in H(t) controls how aggressively the hotpath compresses relative to graph mass — it has no relationship to embedding dimensionality. At the default `c = 0.5`:
+
+| Graph Mass (t) | H(t) | Compression Ratio |
+|----------------|-------|-------------------|
+| 100 | 13 | 13.0% |
+| 1,000 | 50 | 5.0% |
+| 10,000 | 183 | 1.8% |
+| 100,000 | 645 | 0.65% |
+| 1,000,000 | 2,233 | 0.22% |
+
+Setting `c` much above 1.0 defeats the sublinear bound: e.g. `c = 9.0` yields H(100) = 233 — larger than the graph itself. The purpose of `c = 0.5` is aggressive compression: even a million-entity graph keeps only ~2,200 entries resident.
 
 ### Three-Zone Memory Model
 
@@ -700,6 +740,8 @@ During early development (pre-v1.0) the schema upgrade path intentionally drops 
 - Trigger split/merge when thresholds exceeded
 - Run community detection after structural changes
 
+**Scheduling Invariant:** The Daydreamer's reindexing frequency must track the rate of graph mass growth. If `t` grows faster than the background loop can reconcile the semantic neighbor graph, the Williams-derived degree bounds fall out of sync with actual graph state. The idle scheduler (`daydreamer/IdleScheduler.ts`) enforces this by gating recalc on dirty-volume flags — volumes are flagged at ingest time and processed in priority order during idle cycles, ensuring structural consistency converges even during high-velocity ingestion bursts. The Williams-bounded batch size (O(√(t log t)) pairwise comparisons per cycle) guarantees each maintenance pass is lightweight, while the dirty-flag mechanism guarantees no ingested data is permanently orphaned from the index.
+
 ## Security & Trust
 
 ### Cryptographic Integrity
@@ -813,7 +855,7 @@ relative to frozen c. Planned module: `cortex/MetroidBuilder.ts`.
 
 **Hotpath**: The in-memory resident index of H(t) entries spanning all four hierarchy tiers. The hotpath is the first lookup target for every query; misses spill to WARM/COLD storage. HOT membership and salience are checkpointed to the `hotpath_index` IndexedDB store by Daydreamer each maintenance cycle, allowing the RAM index to be restored after a page reload or machine reboot without full corpus replay.
 
-**Williams Bound**: The theoretical result S = O(√(t log t)) from Williams 2025, applied here as a universal sublinear growth law for all space-time tradeoff subsystems in CORTEX. The bound is the constructive answer to the curse of dimensionality: in `n`-dimensional space the unit-ball volume collapses as `πᵐ/m!` (n = 2m), making linear-scale data structures infeasible. The Williams sublinear bound keeps every budget — hotpath capacity, hierarchy fanout, neighbor degree, maintenance batch size — proportional to √(t log t) rather than t, ensuring on-device viability at any corpus scale.
+**Williams Bound**: The theoretical result S = O(√(t log t)) from Williams 2025, applied here as a universal sublinear growth law for all space-time tradeoff subsystems in CORTEX. The bound is the constructive answer to the curse of dimensionality: in `n`-dimensional space the unit-ball volume collapses as `π^(n/2) / Γ(n/2 + 1)`, making linear-scale data structures infeasible. The Williams sublinear bound keeps every budget — hotpath capacity, hierarchy fanout, neighbor degree, maintenance batch size — proportional to √(t log t) rather than t, ensuring on-device viability at any corpus scale.
 
 **Graph mass (t)**: t = |V| + |E| = total pages plus all edges (Hebbian + semantic neighbor). The canonical input to all capacity and bound formulas.
 
