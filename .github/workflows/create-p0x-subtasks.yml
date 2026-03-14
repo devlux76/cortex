@@ -290,10 +290,15 @@ where it refers to the proximity graph (not to the \`{ m1, m2, c }\` probe type)
             // ------------------------------------------------------------------
             if (created.length > 0) {
               const lines = created.map(n => `- #${n}`).join('\n');
+              const summaryBody =
+                `The following individually tracked subtask issues have been created:\n\n${lines}\n\n` +
+                `Each issue carries the \`P0: critical\` label` +
+                (milestoneNumber ? ', is linked to the **v0.1 — Minimal Viable** milestone,' : ',') +
+                ' and references this parent issue in its description.';
               await github.rest.issues.createComment({
                 owner, repo,
                 issue_number: PARENT,
-                body: `The following individually tracked subtask issues have been created:\n\n${lines}\n\nEach issue carries the \`P0: critical\` label, is linked to the **v0.1 — Minimal Viable** milestone, and references this parent issue in its description.`,
+                body: summaryBody,
               });
               console.log(`Posted summary comment on #${PARENT}`);
             } else if (!DRY_RUN) {
