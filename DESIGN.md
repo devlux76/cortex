@@ -283,7 +283,23 @@ This mechanism enables **distributed learning without hallucination**: the syste
 
 ### Motivation
 
+#### The Geometric Root: Curse of Dimensionality
+
+CORTEX operates on high-dimensional Matryoshka embeddings. In `n`-dimensional Euclidean space the volume of the unit ball is:
+
+```
+Vol(B²ᵐ) = πᵐ / m!    (n = 2m, even dimension)
+```
+
+As `m` (half the embedding dimension) grows, this volume collapses toward zero exponentially fast. This is the geometric driver of the **curse of dimensionality**: pairwise distances concentrate (everything looks equally far away), interiors vanish (rejection sampling and kernel methods fail), and any linear or polynomial scaling law blows up. Naïve nearest-neighbor search, flat clustering, fixed-K neighbor graphs, and uniform fan-out become either useless or unboundedly expensive as the corpus scales.
+
+Every structural decision in CORTEX — protected Matryoshka layers, hierarchical medoids, the Metroid antithesis hunt, dimensional unwinding, Williams-derived index sizes — is a direct geometric counter-measure to this collapse.
+
+#### The Fix: Williams 2025 Sublinear Bound
+
 CORTEX applies the Williams 2025 result — S = O(√(t log t)) — as a universal sublinear growth law everywhere the system trades space against time: the resident hotpath index, per-tier hierarchy quotas, per-community graph budgets, semantic neighbor degree limits, and Daydreamer maintenance batch sizing. This single principle ensures the system stays efficient as the memory graph scales from hundreds to millions of nodes.
+
+Concretely: where a naïve system would grow capacity linearly (O(t)) or even quadratically (O(t²) for pairwise operations), CORTEX caps every space-or-time budget at O(√(t log t)). This is the mathematically precise bound that keeps the engine on-device forever, regardless of corpus size.
 
 ### Graph Mass Definition
 
@@ -797,7 +813,7 @@ relative to frozen c. Planned module: `cortex/MetroidBuilder.ts`.
 
 **Hotpath**: The in-memory resident index of H(t) entries spanning all four hierarchy tiers. The hotpath is the first lookup target for every query; misses spill to WARM/COLD storage. HOT membership and salience are checkpointed to the `hotpath_index` IndexedDB store by Daydreamer each maintenance cycle, allowing the RAM index to be restored after a page reload or machine reboot without full corpus replay.
 
-**Williams Bound**: The theoretical result S = O(√(t log t)) from Williams 2025, applied here as a universal sublinear growth law for all space-time tradeoff subsystems in CORTEX.
+**Williams Bound**: The theoretical result S = O(√(t log t)) from Williams 2025, applied here as a universal sublinear growth law for all space-time tradeoff subsystems in CORTEX. The bound is the constructive answer to the curse of dimensionality: in `n`-dimensional space the unit-ball volume collapses as `πᵐ/m!` (n = 2m), making linear-scale data structures infeasible. The Williams sublinear bound keeps every budget — hotpath capacity, hierarchy fanout, neighbor degree, maintenance batch size — proportional to √(t log t) rather than t, ensuring on-device viability at any corpus scale.
 
 **Graph mass (t)**: t = |V| + |E| = total pages plus all edges (Hebbian + semantic neighbor). The canonical input to all capacity and bound formulas.
 
