@@ -1,3 +1,4 @@
+export * from "../lib/sharing/SubgraphImporter";
 // ---------------------------------------------------------------------------
 // SubgraphImporter — safely integrate received graph fragments (P2-G3)
 // ---------------------------------------------------------------------------

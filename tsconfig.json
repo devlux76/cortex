@@ -13,10 +13,8 @@
   "include": [
     "*.ts",
     "*.d.ts",
-    "core/**/*.ts",
-    "storage/**/*.ts",
-    "embeddings/**/*.ts",
-    "hippocampus/**/*.ts",
+    "lib/**/*.ts",
+    "lib/**/*.d.ts",
     "tests/**/*.ts"
   ],
   "exclude": ["dist", "node_modules"]

@@ -100,7 +100,7 @@ The harness is a thin browser page that detects runtime capabilities (WebGPU, We
 
 ```sh
 bun run dev:harness
-# → serving runtime/harness on http://127.0.0.1:4173
+# → serving ui/harness on http://127.0.0.1:4173
 ```
 
 Open the URL in Chrome/Edge to see the capability report in the browser console.

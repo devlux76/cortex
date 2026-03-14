@@ -139,7 +139,7 @@ This document tracks the implementation status of each major module in CORTEX. I
 
 | Module | Status | Files | Notes |
 |--------|--------|-------|-------|
-| Browser Harness | ✅ Complete | `runtime/harness/index.html`, `scripts/runtime-harness-server.mjs` | Localhost-served HTML harness for browser testing |
+| Browser Harness | ✅ Complete | `ui/harness/index.html`, `scripts/runtime-harness-server.mjs` | Localhost-served HTML harness for browser testing |
 | Electron Wrapper | ✅ Complete | `scripts/electron-harness-main.mjs` | Thin Electron launcher for GPU-realism testing |
 | Playwright Tests | ✅ Complete | `tests/runtime/browser-harness.spec.mjs`, `tests/runtime/electron-harness.spec.mjs` | Browser lane passes; Electron context-sensitive |
 | Docker Debug Lane | ✅ Complete | `docker/electron-debug/*`, `docker-compose.electron-debug.yml` | Sandbox-isolated Electron debugging via VS Code attach |
