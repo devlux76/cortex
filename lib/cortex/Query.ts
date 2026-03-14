@@ -191,16 +191,16 @@ export async function query(
 
   // --- Subgraph expansion ---
   // Use dynamic Williams-derived bounds unless the caller has pinned an
-  // explicit maxHops value.  Only load all pages when we actually need to
-  // compute bounds — skip the full-page scan on the hot path when maxHops is
-  // already known.
+  // explicit maxHops value.  Prefer the hotpath resident count as an efficient
+  // proxy for corpus size to avoid scanning all pages on the hot path.
   const topPageIds = topPages.map((p) => p.pageId);
   let effectiveMaxHops: number;
   if (options.maxHops !== undefined) {
     effectiveMaxHops = options.maxHops;
   } else {
-    const allPages = await metadataStore.getAllPages();
-    effectiveMaxHops = computeSubgraphBounds(allPages.length).maxHops;
+    const residentCount = await metadataStore.getResidentCount();
+    const graphMass = residentCount > 0 ? residentCount : combinedPageIds.size;
+    effectiveMaxHops = computeSubgraphBounds(Math.max(1, graphMass)).maxHops;
   }
   const subgraph = await metadataStore.getInducedNeighborSubgraph(topPageIds, effectiveMaxHops);
 
