@@ -1,77 +1,23 @@
 import type { ModelProfile } from "../core/ModelProfile";
-import type { MetadataStore, Page, VectorStore } from "../core/types";
-import type { VectorBackend } from "../VectorBackend";
+import type { Hash, MetadataStore, Page, VectorStore } from "../core/types";
 import type { EmbeddingRunner } from "../embeddings/EmbeddingRunner";
 import { runPromotionSweep } from "../core/SalienceEngine";
 import type { QueryResult } from "./QueryResult";
+import { rankPages, spillToWarm } from "./Ranking";
+import { buildMetroid } from "./MetroidBuilder";
+import { detectKnowledgeGap } from "./KnowledgeGapDetector";
+import { solveOpenTSP } from "./OpenTSPSolver";
 
 export interface QueryOptions {
   modelProfile: ModelProfile;
   embeddingRunner: EmbeddingRunner;
   vectorStore: VectorStore;
   metadataStore: MetadataStore;
-  vectorBackend: VectorBackend;
   topK?: number;
-}
-
-function dot(a: Float32Array, b: Float32Array): number {
-  const len = Math.min(a.length, b.length);
-  let sum = 0;
-  for (let i = 0; i < len; i++) {
-    sum += a[i] * b[i];
-  }
-  return sum;
-}
-
-/**
- * Concatenates an array of equal-length vectors into a single flat buffer.
- * @param vectors - Must be non-empty; every element must have the same length.
- */
-function concatVectors(vectors: Float32Array[]): Float32Array {
-  const dim = vectors[0].length;
-  const out = new Float32Array(vectors.length * dim);
-  for (let i = 0; i < vectors.length; i++) {
-    out.set(vectors[i], i * dim);
-  }
-  return out;
-}
-
-async function scorePages(
-  queryEmbedding: Float32Array,
-  pages: Page[],
-  vectorStore: VectorStore,
-  vectorBackend: VectorBackend,
-  maxResults: number,
-): Promise<Array<{ page: Page; score: number }>> {
-  if (pages.length === 0) return [];
-
-  const [firstPage] = pages;
-  const dim = firstPage.embeddingDim;
-  const offsets = pages.map((p) => p.embeddingOffset);
-
-  // If all pages share the same embedding dimension and it matches the query,
-  // use the vector backend for fast scoring.
-  const uniformDim = pages.every((p) => p.embeddingDim === dim);
-  const canUseBackend = uniformDim && queryEmbedding.length === dim;
-
-  if (canUseBackend) {
-    const embeddings = await vectorStore.readVectors(offsets, dim);
-    const matrix = concatVectors(embeddings);
-    const scores = await vectorBackend.dotMany(queryEmbedding, matrix, dim, pages.length);
-    const topk = await vectorBackend.topKFromScores(scores, Math.min(maxResults, pages.length));
-    return topk.map((r) => ({ page: pages[r.index], score: r.score }));
-  }
-
-  // Fallback: compute dot product per page.
-  const scored = await Promise.all(
-    pages.map(async (page) => {
-      const vec = await vectorStore.readVector(page.embeddingOffset, page.embeddingDim);
-      return { page, score: dot(queryEmbedding, vec) };
-    }),
-  );
-
-  scored.sort((a, b) => b.score - a.score || a.page.pageId.localeCompare(b.page.pageId));
-  return scored.slice(0, Math.min(maxResults, scored.length));
+  /** BFS depth for semantic neighbor subgraph expansion. 2 hops covers direct
+   *  neighbors and their neighbors, which is the minimum needed to surface
+   *  bridge nodes without exploding the graph size. */
+  maxHops?: number;
 }
 
 export async function query(
@@ -83,10 +29,9 @@ export async function query(
     embeddingRunner,
     vectorStore,
     metadataStore,
-    vectorBackend,
     topK = 10,
+    maxHops = 2,
   } = options;
-
   const nowIso = new Date().toISOString();
 
   const embeddings = await embeddingRunner.embed([queryText]);
@@ -95,71 +40,114 @@ export async function query(
   }
   const queryEmbedding = embeddings[0];
 
-  // Score resident (hotpath) pages first.
+  const rankingOptions = { vectorStore, metadataStore };
+
+  // --- HOT path: score resident pages ---
   const hotpathEntries = await metadataStore.getHotpathEntries("page");
   const hotpathIds = hotpathEntries.map((e) => e.entityId);
 
-  const hotpathPages = (await Promise.all(
-    hotpathIds.map((id) => metadataStore.getPage(id)),
-  )).filter((p): p is Page => p !== undefined);
+  const hotResults = await rankPages(queryEmbedding, hotpathIds, topK, rankingOptions);
+  const seenIds = new Set(hotResults.map((r) => r.id));
 
-  const hotpathResults = await scorePages(
-    queryEmbedding,
-    hotpathPages,
-    vectorStore,
-    vectorBackend,
-    topK,
-  );
-
-  const seen = new Set(hotpathResults.map((r) => r.page.pageId));
-
-  // If we still need more results, score remaining pages (warm/cold).
-  const remaining = Math.max(0, topK - hotpathResults.length);
-  const coldResults: Array<{ page: Page; score: number }> = [];
-
-  if (remaining > 0) {
-    const allPages = await metadataStore.getAllPages();
-    const candidates = allPages.filter((p) => !seen.has(p.pageId));
-
-    const scored = await scorePages(
-      queryEmbedding,
-      candidates,
-      vectorStore,
-      vectorBackend,
-      remaining,
-    );
-
-    coldResults.push(...scored);
+  // --- Warm spill: fill up to topK if hot path is insufficient ---
+  let warmResults: Array<{ id: Hash; score: number }> = [];
+  if (hotResults.length < topK) {
+    const allWarm = await spillToWarm("page", queryEmbedding, topK, rankingOptions);
+    warmResults = allWarm.filter((r) => !seenIds.has(r.id));
   }
 
-  const combined = [...hotpathResults, ...coldResults];
-  combined.sort((a, b) => b.score - a.score);
+  // Merge, deduplicate, sort, and slice to topK
+  const merged = [...hotResults, ...warmResults];
+  merged.sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));
+  const topResults = merged.slice(0, topK);
 
-  // Ensure combined results are sorted by descending score for top-K semantics.
-  combined.sort((a, b) => b.score - a.score);
+  // Load Page objects for the top results
+  const topPages = (
+    await Promise.all(topResults.map((r) => metadataStore.getPage(r.id)))
+  ).filter((p): p is Page => p !== undefined);
 
-  // Update activity for returned pages
-  await Promise.all(combined.map(async ({ page }) => {
-    const activity = await metadataStore.getPageActivity(page.pageId);
-    const updated = {
-      pageId: page.pageId,
-      queryHitCount: (activity?.queryHitCount ?? 0) + 1,
-      lastQueryAt: nowIso,
-      communityId: activity?.communityId,
-    };
-    await metadataStore.putPageActivity(updated);
+  const topScores = topResults
+    .filter((r) => topPages.some((p) => p.pageId === r.id))
+    .map((r) => r.score);
+
+  // --- MetroidBuilder: build dialectical probe ---
+  // Candidates: hotpath book medoid pages + hotpath pages themselves
+  const hotpathBookEntries = await metadataStore.getHotpathEntries("book");
+  const bookCandidates = (
+    await Promise.all(
+      hotpathBookEntries.map(async (e) => {
+        const book = await metadataStore.getBook(e.entityId);
+        if (!book) return null;
+        const medoidPage = await metadataStore.getPage(book.medoidPageId);
+        if (!medoidPage) return null;
+        return {
+          pageId: medoidPage.pageId,
+          embeddingOffset: medoidPage.embeddingOffset,
+          embeddingDim: medoidPage.embeddingDim,
+        };
+      }),
+    )
+  ).filter((c): c is NonNullable<typeof c> => c !== null);
+
+  const pageCandidates = topPages.map((p) => ({
+    pageId: p.pageId,
+    embeddingOffset: p.embeddingOffset,
+    embeddingDim: p.embeddingDim,
   }));
 
-  // Recompute salience and run promotion sweep for pages returned in this query.
-  await runPromotionSweep(combined.map((r) => r.page.pageId), metadataStore);
+  // Deduplicate candidates by pageId
+  const candidateMap = new Map<Hash, { pageId: Hash; embeddingOffset: number; embeddingDim: number }>();
+  for (const c of [...bookCandidates, ...pageCandidates]) {
+    candidateMap.set(c.pageId, c);
+  }
+  const metroidCandidates = [...candidateMap.values()];
+
+  const metroid = await buildMetroid(queryEmbedding, metroidCandidates, {
+    modelProfile,
+    vectorStore,
+  });
+
+  // --- KnowledgeGapDetector ---
+  const knowledgeGap = await detectKnowledgeGap(
+    queryText,
+    queryEmbedding,
+    metroid,
+    modelProfile,
+  );
+
+  // --- Subgraph expansion ---
+  const topPageIds = topPages.map((p) => p.pageId);
+  const subgraph = await metadataStore.getInducedNeighborSubgraph(topPageIds, maxHops);
+
+  // --- TSP coherence path ---
+  const coherencePath = solveOpenTSP(subgraph);
+
+  // --- Update activity for returned pages ---
+  await Promise.all(
+    topPages.map(async (page) => {
+      const activity = await metadataStore.getPageActivity(page.pageId);
+      await metadataStore.putPageActivity({
+        pageId: page.pageId,
+        queryHitCount: (activity?.queryHitCount ?? 0) + 1,
+        lastQueryAt: nowIso,
+        communityId: activity?.communityId,
+      });
+    }),
+  );
+
+  // --- Promotion sweep ---
+  await runPromotionSweep(topPageIds, metadataStore);
 
   return {
-    pages: combined.map((r) => r.page),
-    scores: combined.map((r) => r.score),
+    pages: topPages,
+    scores: topScores,
+    coherencePath,
+    metroid,
+    knowledgeGap,
     metadata: {
       queryText,
       topK,
-      returned: combined.length,
+      returned: topPages.length,
       timestamp: nowIso,
       modelId: modelProfile.modelId,
     },

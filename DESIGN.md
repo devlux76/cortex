@@ -442,7 +442,10 @@ interface Page {
 ```
 
 #### Book
-Ordered sequence of pages with representative medoid.
+Ordered sequence of pages from a **single ingest call** with a representative medoid.
+One `ingestText()` call always produces exactly one Book — the entire ingested document.
+A collection of Books forms a Volume; a collection of Volumes forms a Shelf.
+Books are identified by `SHA-256(sorted pageIds)` so their identity is content-addressed.
 
 ```typescript
 interface Book {
@@ -495,8 +498,6 @@ interface Edge {
 #### Semantic Neighbor (Proximity Edge)
 Sparse radius-graph edge connecting pages with high cosine similarity. Used for subgraph expansion during retrieval.
 
-> **Note:** The current codebase names this type `MetroidNeighbor` — this is an architectural naming error introduced by early conceptual drift. The correct term is `SemanticNeighbor` (or equivalent). A code-level rename is tracked in the TODO. The edge is a proximity concept, not a Metroid concept.
-
 **Critical distinction — two edge types, two roles:**
 
 | Edge type | Storage | Role |
@@ -524,8 +525,6 @@ interface SemanticNeighbor {
 
 #### Semantic Neighbor Subgraph
 Induced subgraph for BFS-based coherence path expansion.
-
-> **Note:** Currently named `MetroidSubgraph` in the codebase — same renaming correction applies.
 
 ```typescript
 interface SemanticNeighborSubgraph {
@@ -587,7 +586,7 @@ Structured entity storage with automatic reverse indexes.
 **Object Stores:**
 - `pages`, `books`, `volumes`, `shelves`
 - `edges_hebbian` (Hebbian weights)
-- `neighbor_graph` (sparse semantic neighbor graph — currently named `metroid_neighbors` in code; rename tracked in TODO)
+- `neighbor_graph` (sparse semantic neighbor graph)
 - `flags` (dirty-volume recalc markers)
 - `page_to_book`, `book_to_volume`, `volume_to_shelf` (reverse indexes)
 - `hotpath_index` (periodic HOT-membership checkpoint, keyed by `entityId`; loaded on startup to reconstruct the RAM resident index; written by Daydreamer each maintenance cycle)
@@ -634,14 +633,19 @@ Rather than returning nearest neighbors by similarity, Cortex traces a coherent 
 2. **Generate Embeddings** — Batch embed with selected provider
 3. **Persist Vectors** — Append to OPFS vector file
 4. **Persist Pages** — Write page metadata to IndexedDB; initialise `PageActivity` record
-5. **Build/Attach Hierarchy** — Construct/update books, volumes, shelves; attempt hotpath admission for each level's medoid/prototype using tier quota via `SalienceEngine`
-6. **Fast Semantic Neighbor Insert** — Update semantic neighbor graph incrementally; bounded degree via `HotpathPolicy`; check new page for hotpath admission
+5. **Create Ingest Book** — Build exactly one Book for the entire ingest: compute the medoid page (minimum total cosine distance to all other pages in the document), derive `bookId = SHA-256(sorted pageIds)`, persist. Hotpath admission for the book runs via `SalienceEngine`. Volumes and Shelves are assembled lazily by the Daydreamer from accumulated Books.
+6. **Fast Semantic Neighbor Insert** — Update semantic neighbor graph incrementally; bounded degree via `HotpathPolicy`; check new pages for hotpath admission
 7. **Mark Dirty** — Flag volumes for full recalc by Daydreamer
 
-**Incremental Strategy:**
-Fast local semantic neighbor insertion keeps ingest-time latency low. At ingest time, only the initial forward and reverse edges are created — neighbors are selected by cosine similarity within Williams-cutoff **distance** (not a fixed K; the cutoff is derived from `HotpathPolicy`). On degree overflow, the lowest-cosine-similarity neighbor is evicted.
+**Incremental Strategy (fast and lightweight):**
+Ingest must remain fast and lightweight. At ingest time only two classes of edges are created:
+- **Document-order adjacency** — Forward and reverse `SemanticNeighbor` edges between each consecutive page pair within the book slice, inserted unconditionally (document-adjacent chunks are always related). This uses a pre-built `Map<pageId, embedding>` for O(1) lookups; no O(n²) index scans.
+- **Proximity edges** — Additional `SemanticNeighbor` edges to nearby pages already in the corpus, bounded by cosine-distance cutoff and `maxDegree` eviction.
 
-Full cross-edge reconnection is intentionally deferred: Daydreamer walks the graph during idle passes to build additional edges, strengthening or pruning connections via LTP/LTD. This avoids a full graph recalculation on every insert while still converging to a well-connected graph over time. Hotpath admission runs at ingest time for new pages and hierarchy prototypes.
+Full cross-edge reconnection is intentionally deferred: Daydreamer walks the graph during idle passes to build additional edges — connections we never noticed at ingest time — and strengthens or prunes them via LTP/LTD. This keeps ingest cost sublinear while converging to a well-connected graph over time.
+
+**IndexedDB Schema Upgrade Strategy:**
+During early development (pre-v1.0) the schema upgrade path intentionally drops and recreates object stores rather than migrating data. This keeps upgrade code minimal and avoids cruft until the data model stabilises. The neighbor graph is rebuilt from scratch after any ingest replay.
 
 ## Consolidation Design
 
@@ -789,7 +793,7 @@ Matryoshka dimensional unwinding. Runs the thesis→freeze→antithesis→synthe
 search; m2 via cosine-opposite medoid; c computed once and frozen; subsequent candidates evaluated
 relative to frozen c. Planned module: `cortex/MetroidBuilder.ts`.
 
-**Semantic neighbor graph** (also: proximity graph, neighbor graph): The sparse radius-graph of cosine-similarity edges between pages, used for subgraph expansion during retrieval. This is **not** the same as a Metroid. The edges connect pages with high cosine similarity and are used for BFS expansion. Currently named `MetroidNeighbor` / `metroid_neighbors` in the codebase — this is a naming error that must be corrected (tracked in TODO as P0-X).
+**Semantic neighbor graph** (also: proximity graph, neighbor graph): The sparse radius-graph of cosine-similarity edges between pages, used for subgraph expansion during retrieval. This is **not** the same as a Metroid. The edges connect pages with high cosine similarity and are used for BFS expansion.
 
 **Hotpath**: The in-memory resident index of H(t) entries spanning all four hierarchy tiers. The hotpath is the first lookup target for every query; misses spill to WARM/COLD storage. HOT membership and salience are checkpointed to the `hotpath_index` IndexedDB store by Daydreamer each maintenance cycle, allowing the RAM index to be restored after a page reload or machine reboot without full corpus replay.
 

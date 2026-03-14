@@ -1,6 +1,6 @@
 # CORTEX API Reference
 
-> **Status:** The codebase is under active development. The interfaces documented here reflect the current implemented contracts. The Hippocampus, Cortex, and Daydreamer orchestration layers are planned but not yet implemented.
+> **Status:** The codebase is under active development. The interfaces documented here reflect the current implemented contracts.
 
 ## Table of Contents
 
@@ -10,6 +10,9 @@
 4. [Embedding Backends](#embedding-backends)
 5. [Model Profiles](#model-profiles)
 6. [Routing Policy](#routing-policy)
+7. [Hippocampus — Ingest API](#hippocampus--ingest-api)
+8. [Cortex — Query API](#cortex--query-api)
+9. [Daydreamer — Background Consolidation](#daydreamer--background-consolidation)
 
 ---
 
@@ -112,18 +115,18 @@ interface Edge {
 }
 ```
 
-#### `MetroidNeighbor`
+#### `SemanticNeighbor`
 
-A nearest-neighbour entry in the Metroid radius graph (a project-domain term for the medoid-inspired NN graph).
+A nearest-neighbor entry in the semantic neighbor radius graph — a sparse proximity graph connecting pages with high cosine similarity, used for BFS subgraph expansion during retrieval.
 
 ```typescript
-interface MetroidNeighbor {
+interface SemanticNeighbor {
   neighborPageId: Hash;
   cosineSimilarity: number;  // threshold defined by runtime policy
   distance: number;          // 1 – cosineSimilarity (TSP-ready)
 }
 
-interface MetroidSubgraph {
+interface SemanticNeighborSubgraph {
   nodes: Hash[];
   edges: { from: Hash; to: Hash; distance: number }[];
 }
@@ -180,20 +183,20 @@ interface MetadataStore {
   getVolumesByBook(bookId: Hash): Promise<Volume[]>;
   getShelvesByVolume(volumeId: Hash): Promise<Shelf[]>;
 
-  // Metroid NN radius index
-  putMetroidNeighbors(pageId: Hash, neighbors: MetroidNeighbor[]): Promise<void>;
-  getMetroidNeighbors(pageId: Hash, maxDegree?: number): Promise<MetroidNeighbor[]>;
+  // Semantic neighbor radius index
+  putSemanticNeighbors(pageId: Hash, neighbors: SemanticNeighbor[]): Promise<void>;
+  getSemanticNeighbors(pageId: Hash, maxDegree?: number): Promise<SemanticNeighbor[]>;
 
-  /** BFS expansion of the Metroid subgraph up to `maxHops` levels deep. */
-  getInducedMetroidSubgraph(
+  /** BFS expansion of the semantic neighbor subgraph up to `maxHops` levels deep. */
+  getInducedNeighborSubgraph(
     seedPageIds: Hash[],
     maxHops: number,
-  ): Promise<MetroidSubgraph>;
+  ): Promise<SemanticNeighborSubgraph>;
 
   // Dirty-volume recalculation flags
-  needsMetroidRecalc(volumeId: Hash): Promise<boolean>;
-  flagVolumeForMetroidRecalc(volumeId: Hash): Promise<void>;
-  clearMetroidRecalcFlag(volumeId: Hash): Promise<void>;
+  needsNeighborRecalc(volumeId: Hash): Promise<boolean>;
+  flagVolumeForNeighborRecalc(volumeId: Hash): Promise<void>;
+  clearNeighborRecalcFlag(volumeId: Hash): Promise<void>;
 }
 ```
 
@@ -471,4 +474,170 @@ interface RoutingPolicyDerivation {
 
 ```typescript
 const policy = createRoutingPolicy(profile, { normalDimRatio: 1 / 3 });
+```
+
+---
+
+## Hippocampus — Ingest API
+
+The Hippocampus layer encodes new content into the memory engine. Ingest
+operations are deterministic (re-ingesting the same content produces the same
+page hash), but the current storage pipeline is **not** fully idempotent:
+embeddings and books are appended to the `VectorStore` on every run and are
+not automatically deduplicated.
+
+Re-ingesting the same text will therefore grow the underlying vector file and
+can create multiple vector offsets for the same `pageId`. Callers that require
+strict idempotence should avoid re-ingesting identical content or implement an
+application-level deduplication strategy on top of the exposed metadata.
+
+### `ingestText(text, options)`
+
+Defined in [`hippocampus/Ingest.ts`](../hippocampus/Ingest.ts).
+
+Splits `text` into chunks, embeds each chunk, persists the pages and their
+embeddings, creates a `Book` for the batch, and runs a hotpath promotion sweep.
+
+```typescript
+import { ingestText } from "./hippocampus/Ingest";
+
+const result = await ingestText("Your text content here...", {
+  modelProfile,        // ModelProfile — controls chunking and embedding dimension
+  embeddingRunner,     // EmbeddingRunner — resolves and runs the embedding model
+  vectorStore,         // VectorStore — append-only, non-deduplicating vector file (OPFS or in-memory)
+  metadataStore,       // MetadataStore — structured hierarchy store (IndexedDB)
+  keyPair: {
+    publicKey,         // PublicKey — creator's identity for verifying page signatures
+    privateKeyJwk,     // JsonWebKey — exportable private key material used for signing
+    signingKey,        // CryptoKey — private signing key used to sign each page
+  },
+});
+```
+
+**Returns:** `IngestResult`
+
+```typescript
+interface IngestResult {
+  pages: Page[];        // all pages created for this ingest
+  book?: Book;          // optional Book grouping all created pages
+}
+```
+
+**Behaviour:**
+- Text is split by `Chunker` using the `maxChunkTokens` field from `ModelProfile`.
+- Each chunk is embedded and written to `vectorStore`.
+- A `Page` is created per chunk and written to `metadataStore`.
+- A `Book` is created to group the pages with a medoid representative.
+- `runPromotionSweep` is called automatically to update the hotpath index.
+
+---
+
+## Cortex — Query API
+
+The Cortex layer routes queries through the memory engine and returns the
+most relevant pages, updating the hotpath index as a side-effect.
+
+### `query(queryText, options)`
+
+Defined in [`cortex/Query.ts`](../cortex/Query.ts).
+
+Embeds `queryText`, scores stored pages using dot-product similarity, and
+returns the top-K results. Hotpath (resident) pages are scored first for
+low latency; the full corpus is scanned only if the hotpath is insufficient.
+
+```typescript
+import { query } from "./cortex/Query";
+
+const result = await query("your search query", {
+  modelProfile,        // ModelProfile
+  embeddingRunner,     // EmbeddingRunner
+  vectorStore,         // VectorStore
+  metadataStore,       // MetadataStore
+  vectorBackend,       // VectorBackend — accelerated dot-product (WebGPU/WASM)
+  topK: 10,            // optional, default 10
+});
+```
+
+**Returns:** `QueryResult`
+
+```typescript
+interface QueryResult {
+  pages: Page[];                     // top-K pages, sorted by descending score
+  scores: number[];                  // cosine similarity score per page
+  metadata: {
+    queryText: string;
+    topK: number;
+    returned: number;
+    timestamp: string;               // ISO 8601
+    modelId: string;
+  };
+}
+```
+
+**Behaviour:**
+- Hotpath (resident) pages are scored first.
+- Cold pages are scored only when fewer than `topK` hotpath results are available.
+- `PageActivity.queryHitCount` is incremented for every returned page.
+- `runPromotionSweep` is called automatically to update the hotpath index.
+
+---
+
+## Daydreamer — Background Consolidation
+
+The Daydreamer layer runs in a background Web Worker and performs idle-time
+memory maintenance: experience replay, cluster stability, and LTP/LTD.
+
+### `ExperienceReplay`
+
+Defined in [`daydreamer/ExperienceReplay.ts`](../daydreamer/ExperienceReplay.ts).
+
+During idle periods, re-executes synthetic queries from recently seen pages
+and strengthens (LTP) the Hebbian edges between co-activated pages.
+
+```typescript
+import { ExperienceReplay } from "./daydreamer/ExperienceReplay";
+
+const replay = new ExperienceReplay({
+  queriesPerCycle: 5,    // synthetic queries per idle cycle (default: 5)
+  samplePoolSize: 200,   // recent pages to sample from (default: 200)
+  ltpIncrement: 0.1,     // edge weight increment per activation (default: 0.1)
+  maxEdgeWeight: 1.0,    // maximum Hebbian weight cap (default: 1.0)
+  topK: 5,               // pages to retrieve per synthetic query (default: 5)
+});
+
+const result = await replay.run(
+  modelProfile,
+  embeddingRunner,
+  vectorStore,
+  metadataStore,
+  vectorBackend,
+);
+
+console.log(result.queriesExecuted);   // number of queries run
+console.log(result.edgesStrengthened); // number of edge updates written
+console.log(result.completedAt);       // ISO timestamp
+```
+
+### `ClusterStability`
+
+Defined in [`daydreamer/ClusterStability.ts`](../daydreamer/ClusterStability.ts).
+
+Detects and fixes unstable or undersized volume clusters to keep the
+knowledge hierarchy balanced over time.
+
+```typescript
+import { ClusterStability } from "./daydreamer/ClusterStability";
+
+const stability = new ClusterStability({
+  varianceThreshold: 0.5,    // volumes above this variance are split (default: 0.5)
+  minBooksPerVolume: 2,      // volumes below this count are merged (default: 2)
+  maxKmeansIterations: 10,   // K-means convergence limit (default: 10)
+});
+
+const result = await stability.run(metadataStore);
+
+console.log(result.splitCount);        // volumes split
+console.log(result.mergeCount);        // volumes merged
+console.log(result.communityUpdates);  // PageActivity community label updates
+console.log(result.completedAt);       // ISO timestamp
 ```

@@ -1,0 +1,81 @@
+name: Enforce Milestone on Issues
+
+# Automatically assigns a milestone to any newly opened issue (or an issue
+# that just received a priority label) based on the priority label present:
+#
+#   P0: critical  →  v0.1 — Minimal Viable
+#   P1: high      →  v0.5 — Alpha
+#   P2: medium    →  v1.0 — Production
+#   P3: low       →  v1.0 — Production
+#
+# If the issue already has a milestone the workflow is a no-op.
+
+on:
+  issues:
+    types: [opened, labeled]
+
+permissions:
+  issues: write
+
+jobs:
+  assign-milestone:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Assign milestone based on priority label
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo  = context.repo.repo;
+
+            const issue = context.payload.issue;
+
+            // Skip if milestone is already assigned
+            if (issue.milestone) {
+              console.log(`Issue #${issue.number} already has milestone "${issue.milestone.title}" — skipping.`);
+              return;
+            }
+
+            // Map priority labels to milestone titles.
+            // The em dash (—) is U+2014. Verify titles match exactly in
+            // repository Settings → Milestones.
+            const PRIORITY_MAP = {
+              'P0: critical': 'v0.1 \u2014 Minimal Viable',
+              'P1: high':     'v0.5 \u2014 Alpha',
+              'P2: medium':   'v1.0 \u2014 Production',
+              'P3: low':      'v1.0 \u2014 Production',
+            };
+
+            const labelNames = (issue.labels || []).map(l => l.name);
+            let targetMilestoneTitle = null;
+            for (const [label, milestoneTitle] of Object.entries(PRIORITY_MAP)) {
+              if (labelNames.includes(label)) {
+                targetMilestoneTitle = milestoneTitle;
+                break;
+              }
+            }
+
+            if (!targetMilestoneTitle) {
+              console.log(`Issue #${issue.number} has no recognized priority label — skipping.`);
+              return;
+            }
+
+            // Look up the milestone number
+            // Use per_page: 100 (API max) to avoid missing milestones on
+            // repositories that have more than 50 open milestones.
+            const { data: milestones } = await github.rest.issues.listMilestones({
+              owner, repo, state: 'open', per_page: 100,
+            });
+            const milestone = milestones.find(m => m.title === targetMilestoneTitle);
+
+            if (!milestone) {
+              console.log(`Milestone "${targetMilestoneTitle}" not found — cannot auto-assign.`);
+              return;
+            }
+
+            await github.rest.issues.update({
+              owner, repo,
+              issue_number: issue.number,
+              milestone: milestone.number,
+            });
+            console.log(`Assigned milestone "${milestone.title}" to issue #${issue.number}.`);

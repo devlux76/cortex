@@ -1,0 +1,306 @@
+name: Create P0-X Subtask Issues
+
+# One-shot workflow: creates the seven individually tracked subtasks for
+# Issue #56 (P0-X: Fix Architectural Naming Drift) and links each one back
+# to the parent with a "Part of #56" reference.
+# Run this once after the branch is merged; re-running is idempotent
+# (skips any subtask whose title already exists).
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Print actions without creating any issues (true/false)"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+permissions:
+  issues: write
+
+jobs:
+  create-subtasks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create P0-X1 through P0-X7 subtask issues
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner  = context.repo.owner;
+            const repo   = context.repo.repo;
+            const PARENT = 56;
+            const DRY_RUN = '${{ inputs.dry_run }}' === 'true';
+            // Must match the GitHub milestone title exactly (character-for-character).
+            // The em dash (—) is U+2014. Verify in repository Settings → Milestones.
+            const MILESTONE_TITLE = 'v0.1 \u2014 Minimal Viable';
+
+            // ------------------------------------------------------------------
+            // Subtask definitions (one entry per P0-X checklist item in #56)
+            // ------------------------------------------------------------------
+            const subtasks = [
+              {
+                id: 'P0-X1',
+                title: '[P0-X1] Rename MetroidNeighbor → SemanticNeighbor',
+                labels: ['P0: critical', 'layer: foundation', 'layer: storage', 'task'],
+                body: `**Parent issue:** #${PARENT}
+
+**Objective:**
+Rename the \`MetroidNeighbor\` type to \`SemanticNeighbor\` throughout the codebase.
+
+**Files to modify:**
+- \`core/types.ts\` — rename type declaration
+- \`storage/IndexedDbMetadataStore.ts\` — update all references
+- All test files that reference \`MetroidNeighbor\`
+- JSDoc and inline comments
+
+**Exit criteria:**
+- [ ] No occurrence of \`MetroidNeighbor\` remains in source files
+- [ ] All tests pass
+- [ ] Lint and typecheck clean
+`,
+              },
+              {
+                id: 'P0-X2',
+                title: '[P0-X2] Rename MetroidSubgraph → SemanticNeighborSubgraph',
+                labels: ['P0: critical', 'layer: foundation', 'layer: storage', 'layer: cortex', 'task'],
+                body: `**Parent issue:** #${PARENT}
+
+**Objective:**
+Rename the \`MetroidSubgraph\` type to \`SemanticNeighborSubgraph\`.
+
+**Files to modify:**
+- \`core/types.ts\` — rename type declaration
+- \`storage/IndexedDbMetadataStore.ts\` — update all references
+- \`cortex/Query.ts\` — update all references
+- JSDoc and inline comments
+
+**Exit criteria:**
+- [ ] No occurrence of \`MetroidSubgraph\` remains in source files
+- [ ] All tests pass
+- [ ] Lint and typecheck clean
+`,
+              },
+              {
+                id: 'P0-X3',
+                title: '[P0-X3] Rename MetadataStore proximity-graph methods',
+                labels: ['P0: critical', 'layer: foundation', 'layer: storage', 'layer: cortex', 'task'],
+                body: `**Parent issue:** #${PARENT}
+
+**Objective:**
+Rename all MetadataStore methods that refer to the proximity graph:
+
+| Old name | New name |
+|---|---|
+| \`putMetroidNeighbors\` | \`putSemanticNeighbors\` |
+| \`getMetroidNeighbors\` | \`getSemanticNeighbors\` |
+| \`getInducedMetroidSubgraph\` | \`getInducedNeighborSubgraph\` |
+| \`needsMetroidRecalc\` | \`needsNeighborRecalc\` |
+| \`flagVolumeForMetroidRecalc\` | \`flagVolumeForNeighborRecalc\` |
+| \`clearMetroidRecalcFlag\` | \`clearNeighborRecalcFlag\` |
+
+**Files to modify:**
+- \`core/types.ts\` — MetadataStore interface
+- \`storage/IndexedDbMetadataStore.ts\` — implementation + all callers
+- \`cortex/Query.ts\` — all callers
+- All test files that call these methods
+
+**Exit criteria:**
+- [ ] No method named \`*Metroid*\` exists on MetadataStore
+- [ ] All tests pass
+- [ ] Lint and typecheck clean
+`,
+              },
+              {
+                id: 'P0-X4',
+                title: '[P0-X4] Rename planned file FastMetroidInsert → FastNeighborInsert',
+                labels: ['P0: critical', 'layer: hippocampus', 'task'],
+                body: `**Parent issue:** #${PARENT}
+
+**Objective:**
+Rename the planned Hippocampus file and class for inserting proximity neighbors.
+
+**Files to modify/create:**
+- Rename \`hippocampus/FastMetroidInsert.ts\` → \`hippocampus/FastNeighborInsert.ts\`
+- Rename class/function to \`FastNeighborInsert\` / \`insertSemanticNeighbors\`
+- Update any imports that reference the old path
+
+**Exit criteria:**
+- [ ] No file named \`FastMetroidInsert.ts\` exists
+- [ ] No symbol named \`FastMetroidInsert\` exists in source
+- [ ] Lint and typecheck clean
+`,
+              },
+              {
+                id: 'P0-X5',
+                title: '[P0-X5] Rename planned file FullMetroidRecalc → FullNeighborRecalc',
+                labels: ['P0: critical', 'layer: daydreamer', 'task'],
+                body: `**Parent issue:** #${PARENT}
+
+**Objective:**
+Rename the planned Daydreamer file and class for full neighbor recalculation.
+
+**Files to modify/create:**
+- Rename \`daydreamer/FullMetroidRecalc.ts\` → \`daydreamer/FullNeighborRecalc.ts\`
+- Rename class/function to \`FullNeighborRecalc\` / \`runNeighborRecalc\`
+- Update any imports that reference the old path
+
+**Exit criteria:**
+- [ ] No file named \`FullMetroidRecalc.ts\` exists
+- [ ] No symbol named \`FullMetroidRecalc\` exists in source
+- [ ] Lint and typecheck clean
+`,
+              },
+              {
+                id: 'P0-X6',
+                title: '[P0-X6] Rename IndexedDB object store metroid_neighbors → neighbor_graph',
+                labels: ['P0: critical', 'layer: storage', 'task'],
+                body: `**Parent issue:** #${PARENT}
+
+**Objective:**
+Rename the IndexedDB object store used for the proximity graph.
+
+**Files to modify:**
+- \`storage/IndexedDbMetadataStore.ts\`
+  - Change store name from \`metroid_neighbors\` to \`neighbor_graph\`
+  - Increment \`DB_VERSION\`
+  - Add migration in \`applyUpgrade\`: copy data from old store to new store, then delete old store
+
+**Exit criteria:**
+- [ ] No reference to the string \`metroid_neighbors\` in source
+- [ ] DB_VERSION incremented
+- [ ] Migration tested (open old DB, upgrade, verify data preserved)
+- [ ] All tests pass
+`,
+              },
+              {
+                id: 'P0-X7',
+                title: '[P0-X7] Update all docs and JSDoc: "Metroid neighbor" → "semantic neighbor"',
+                labels: ['P0: critical', 'layer: documentation', 'task'],
+                body: `**Parent issue:** #${PARENT}
+
+**Objective:**
+Remove all remaining uses of "Metroid" from documentation and code comments
+where it refers to the proximity graph (not to the \`{ m1, m2, c }\` probe type).
+
+**Files to review:**
+- \`DESIGN.md\`
+- All \`*.ts\` files — JSDoc blocks and inline comments
+- \`README.md\`
+- Any other \`.md\` files
+
+**Exit criteria:**
+- [ ] The word "Metroid" does not appear in any doc comment where it describes the neighbor/proximity graph
+- [ ] "Metroid" is reserved exclusively for the \`{ m1, m2, c }\` dialectical probe
+- [ ] All tests pass
+`,
+              },
+            ];
+
+            // ------------------------------------------------------------------
+            // Resolve milestone number
+            // ------------------------------------------------------------------
+            let milestoneNumber = null;
+            try {
+              // Use per_page: 100 (API max) to handle repositories with many milestones.
+              const { data: milestones } = await github.rest.issues.listMilestones({
+                owner, repo, state: 'open', per_page: 100,
+              });
+              const m = milestones.find(x => x.title === MILESTONE_TITLE);
+              if (m) {
+                milestoneNumber = m.number;
+                console.log(`Resolved milestone "${MILESTONE_TITLE}" → #${milestoneNumber}`);
+              } else {
+                console.log(`Milestone "${MILESTONE_TITLE}" not found — will create issues without milestone.`);
+                console.log('Available milestones: ' + milestones.map(x => x.title).join(', '));
+              }
+            } catch (err) {
+              console.log(`Could not fetch milestones: ${err.message}`);
+            }
+
+            // ------------------------------------------------------------------
+            // Fetch existing issue titles to allow idempotent re-runs
+            // ------------------------------------------------------------------
+            const existing = new Set();
+            for await (const page of github.paginate.iterator(
+              github.rest.issues.listForRepo,
+              { owner, repo, state: 'all', per_page: 100 },
+            )) {
+              for (const issue of page.data) {
+                // `issues.listForRepo` returns both issues and pull requests.
+                // Only track real issues here so idempotency isn't affected by PR titles.
+                if (!issue.pull_request) {
+                  existing.add(issue.title);
+                }
+              }
+            }
+
+            // ------------------------------------------------------------------
+            // Ensure required labels exist
+            // ------------------------------------------------------------------
+            const requiredLabels = [
+              { name: 'task',           color: '0075ca', description: 'Implementation task' },
+              { name: 'P0: critical',   color: 'e11d48', description: 'Blocks dependent work' },
+            ];
+            for (const lbl of requiredLabels) {
+              try {
+                await github.rest.issues.getLabel({ owner, repo, name: lbl.name });
+              } catch (err) {
+                if (err.status === 404) {
+                  if (!DRY_RUN) {
+                    await github.rest.issues.createLabel({ owner, repo, ...lbl });
+                    console.log(`Created label: ${lbl.name}`);
+                  }
+                } else {
+                  console.log(`Unexpected error checking label "${lbl.name}": ${err.message}`);
+                }
+              }
+            }
+
+            // ------------------------------------------------------------------
+            // Create subtask issues
+            // ------------------------------------------------------------------
+            const created = [];
+            for (const task of subtasks) {
+              if (existing.has(task.title)) {
+                console.log(`SKIP (already exists): ${task.title}`);
+                continue;
+              }
+              if (DRY_RUN) {
+                console.log(`DRY RUN — would create: ${task.title}`);
+                continue;
+              }
+              const payload = {
+                owner, repo,
+                title:  task.title,
+                body:   task.body,
+                labels: task.labels,
+              };
+              if (milestoneNumber) payload.milestone = milestoneNumber;
+
+              const { data: issue } = await github.rest.issues.create(payload);
+              console.log(`Created #${issue.number}: ${issue.title}`);
+              created.push(issue.number);
+            }
+
+            // ------------------------------------------------------------------
+            // Post a summary comment on the parent issue
+            // ------------------------------------------------------------------
+            if (created.length > 0) {
+              const lines = created.map(n => `- #${n}`).join('\n');
+              const summaryBody =
+                `The following individually tracked subtask issues have been created:\n\n${lines}\n\n` +
+                `Each issue carries the \`P0: critical\` label` +
+                (milestoneNumber ? ', is linked to the **v0.1 — Minimal Viable** milestone,' : ',') +
+                ' and references this parent issue in its description.';
+              await github.rest.issues.createComment({
+                owner, repo,
+                issue_number: PARENT,
+                body: summaryBody,
+              });
+              console.log(`Posted summary comment on #${PARENT}`);
+            } else if (!DRY_RUN) {
+              console.log('All subtasks already exist — nothing created.');
+            }

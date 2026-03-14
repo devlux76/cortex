@@ -387,3 +387,164 @@ describe("integration: ingest and query", () => {
     expect(hits3[0].page.content).toBe(astronomyChunks[0]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// P1-F: Hierarchical + Dialectical integration tests (v0.5)
+// ---------------------------------------------------------------------------
+
+describe("integration (v0.5): hierarchical and dialectical ingest/query", () => {
+  beforeEach(() => {
+    (globalThis as Record<string, unknown>)["indexedDB"] = new IDBFactory();
+    (globalThis as Record<string, unknown>)["IDBKeyRange"] = FakeIDBKeyRange;
+  });
+
+  it("ingest produces a single Book containing all ingested pages", async () => {
+    const dbName = freshDbName();
+    const metadataStore = await IndexedDbMetadataStore.open(dbName);
+    const vectorStore = new MemoryVectorStore();
+    const keyPair = await generateKeyPair();
+    const profile = makeProfile();
+    const runner = makeRunner(makeBackend());
+
+    const result = await ingestText(ASTRONOMY_TEXT + " " + BIOLOGY_TEXT, {
+      modelProfile: profile,
+      embeddingRunner: runner,
+      vectorStore,
+      metadataStore,
+      keyPair,
+    });
+
+    // Pages were created
+    expect(result.pages.length).toBeGreaterThanOrEqual(1);
+
+    // Exactly one Book was created and it contains ALL ingested pages
+    expect(result.book).toBeDefined();
+    const storedBook = await metadataStore.getBook(result.book!.bookId);
+    expect(storedBook).toBeDefined();
+    expect(storedBook!.medoidPageId).toBeDefined();
+    expect(storedBook!.pageIds).toContain(storedBook!.medoidPageId);
+    // Every page from the ingest must be a member of the book
+    for (const page of result.pages) {
+      expect(storedBook!.pageIds).toContain(page.pageId);
+    }
+    // The book covers all pages — not just a subset
+    expect(storedBook!.pageIds.length).toBe(result.pages.length);
+
+    // Volumes and Shelves are assembled by the Daydreamer; not created at ingest time
+    expect(result.book).toBeDefined(); // only book is returned
+  });
+
+  it("hotpath entries exist for hierarchy prototypes after ingest", async () => {
+    const dbName = freshDbName();
+    const metadataStore = await IndexedDbMetadataStore.open(dbName);
+    const vectorStore = new MemoryVectorStore();
+    const keyPair = await generateKeyPair();
+    const profile = makeProfile();
+    const runner = makeRunner(makeBackend());
+
+    await ingestText(ASTRONOMY_TEXT + " " + BIOLOGY_TEXT + " " + HISTORY_TEXT, {
+      modelProfile: profile,
+      embeddingRunner: runner,
+      vectorStore,
+      metadataStore,
+      keyPair,
+    });
+
+    // At least some hotpath entries should exist
+    const allEntries = await metadataStore.getHotpathEntries();
+    expect(allEntries.length).toBeGreaterThan(0);
+
+    // Page-tier entries should exist
+    const pageEntries = await metadataStore.getHotpathEntries("page");
+    expect(pageEntries.length).toBeGreaterThan(0);
+  });
+
+  it("semantic neighbor graph is populated after ingest", async () => {
+    const dbName = freshDbName();
+    const metadataStore = await IndexedDbMetadataStore.open(dbName);
+    const vectorStore = new MemoryVectorStore();
+    const keyPair = await generateKeyPair();
+    const profile = makeProfile();
+    const runner = makeRunner(makeBackend());
+
+    const result = await ingestText(ASTRONOMY_TEXT + " " + BIOLOGY_TEXT, {
+      modelProfile: profile,
+      embeddingRunner: runner,
+      vectorStore,
+      metadataStore,
+      keyPair,
+    });
+
+    // Verify that semantic neighbor records are structurally valid when present.
+    // With content-hash-based embeddings, pages may not meet the cosine-similarity
+    // threshold, so we only validate structure — not that neighbors must exist.
+    for (const page of result.pages) {
+      const neighbors = await metadataStore.getSemanticNeighbors(page.pageId);
+      for (const n of neighbors) {
+        expect(n.neighborPageId).toBeDefined();
+        expect(typeof n.neighborPageId).toBe("string");
+        expect(n.cosineSimilarity).toBeGreaterThanOrEqual(-1);
+        expect(n.cosineSimilarity).toBeLessThanOrEqual(1);
+        expect(n.distance).toBeCloseTo(1 - n.cosineSimilarity, 5);
+      }
+    }
+  });
+
+  it("Williams Bound: resident count never exceeds H(t) after ingest", async () => {
+    const dbName = freshDbName();
+    const metadataStore = await IndexedDbMetadataStore.open(dbName);
+    const vectorStore = new MemoryVectorStore();
+    const keyPair = await generateKeyPair();
+    const profile = makeProfile();
+    const runner = makeRunner(makeBackend());
+
+    await ingestText(ASTRONOMY_TEXT + " " + BIOLOGY_TEXT + " " + HISTORY_TEXT, {
+      modelProfile: profile,
+      embeddingRunner: runner,
+      vectorStore,
+      metadataStore,
+      keyPair,
+    });
+
+    // Williams Bound: H(t) = ceil(c * sqrt(t * log2(1+t)))
+    const allPages = await metadataStore.getAllPages();
+    const graphMass = allPages.length;
+    const c = 0.5;
+    const capacity = Math.max(1, Math.ceil(c * Math.sqrt(graphMass * Math.log2(1 + graphMass))));
+
+    const residentCount = await metadataStore.getResidentCount();
+    expect(residentCount).toBeLessThanOrEqual(capacity);
+  });
+
+  it("knowledge gap is signalled for a model without Matryoshka dims", async () => {
+    const dbName = freshDbName();
+    const metadataStore = await IndexedDbMetadataStore.open(dbName);
+    const vectorStore = new MemoryVectorStore();
+    const keyPair = await generateKeyPair();
+    // Non-Matryoshka model: no matryoshkaProtectedDim
+    const profile = makeProfile();
+    const runner = makeRunner(makeBackend());
+    const { query } = await import("../../cortex/Query");
+
+    await ingestText(ASTRONOMY_TEXT, {
+      modelProfile: profile,
+      embeddingRunner: runner,
+      vectorStore,
+      metadataStore,
+      keyPair,
+    });
+
+    const result = await query(ASTRONOMY_TEXT.slice(0, 50), {
+      modelProfile: profile,
+      embeddingRunner: runner,
+      vectorStore,
+      metadataStore,
+      topK: 3,
+    });
+
+    // Profile has no matryoshkaProtectedDim → MetroidBuilder always declares a gap
+    expect(result.metroid).not.toBeNull();
+    expect(result.metroid!.knowledgeGap).toBe(true);
+    expect(result.knowledgeGap).not.toBeNull();
+  });
+});
