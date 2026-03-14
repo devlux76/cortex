@@ -104,14 +104,18 @@ export interface RecomputeResult {
 // ---------------------------------------------------------------------------
 
 /**
- * Recompute medoid and centroid prototypes for all volumes.
+ * Recompute centroid prototypes for all volumes.
  *
  * For each volume:
  * 1. Load all page embeddings for every book in the volume.
- * 2. Select the medoid page (minimises average distance to all others).
- * 3. Compute the centroid embedding across all pages.
- * 4. Append updated vectors to VectorStore; update volume metadata.
- * 5. Refresh salience and run promotion sweep for the volume tier.
+ * 2. Compute the centroid embedding across all pages.
+ * 3. Append updated centroid vector to VectorStore; update volume metadata.
+ *
+ * Note: Medoid selection and salience/promotion sweeps are intentionally
+ * omitted here.  SalienceEngine methods currently assume page-tier entities;
+ * running them with volume IDs would produce incorrect tier assignments.
+ * Volume-tier salience should be wired up once SalienceEngine supports
+ * non-page tiers.
  */
 async function recomputeVolumePrototypes(
   options: PrototypeRecomputerOptions,

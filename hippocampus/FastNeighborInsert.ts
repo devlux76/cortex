@@ -1,12 +1,12 @@
 import type { Hash, MetadataStore, SemanticNeighbor, VectorStore } from "../core/types";
 import type { ModelProfile } from "../core/ModelProfile";
 import type { HotpathPolicy } from "../core/HotpathPolicy";
-import { computeNeighborMaxDegree } from "../core/HotpathPolicy";
+import { computeNeighborMaxDegree, DEFAULT_HOTPATH_POLICY } from "../core/HotpathPolicy";
 import { runPromotionSweep } from "../core/SalienceEngine";
 
-// Hard cap for the semantic neighbor degree: even if the Williams formula
-// returns a higher value, we never allow a node to have more than this many
-// semantic neighbors.  Kept as a policy constant (not model-derived).
+// Absolute upper cap for the semantic neighbor degree.  The Williams formula
+// can produce larger values for very large corpora; this hard cap keeps the
+// neighbor graph manageable even at scale.
 const NEIGHBOR_DEGREE_HARD_CAP = 32;
 
 // Default cosine-distance cutoff when no policy hint is available.
@@ -88,16 +88,17 @@ export async function insertSemanticNeighbors(
     cutoffDistance = DEFAULT_CUTOFF_DISTANCE,
   } = options;
 
-  // Derive maxDegree from the Williams bound if a policy is supplied and the
-  // caller has not pinned an explicit value.  This keeps the semantic neighbor
-  // graph sparse in proportion to corpus size rather than hardcoding a constant.
+  // Derive maxDegree from the Williams bound, scaled by corpus size.
+  // When a policy is provided, use its scaling constant; otherwise fall back
+  // to the default constant so that corpus-proportional scaling applies in
+  // all cases (not just when a policy object is explicitly threaded through).
+  // An explicit options.maxDegree always wins.
   let maxDegree: number;
   if (options.maxDegree !== undefined) {
     maxDegree = options.maxDegree;
-  } else if (policy) {
-    maxDegree = computeNeighborMaxDegree(allPageIds.length, policy.c, NEIGHBOR_DEGREE_HARD_CAP);
   } else {
-    maxDegree = NEIGHBOR_DEGREE_HARD_CAP;
+    const c = policy?.c ?? DEFAULT_HOTPATH_POLICY.c;
+    maxDegree = computeNeighborMaxDegree(allPageIds.length, c, NEIGHBOR_DEGREE_HARD_CAP);
   }
 
   if (newPageIds.length === 0) return;

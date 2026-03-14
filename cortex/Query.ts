@@ -121,12 +121,17 @@ export async function query(
 
   // --- Subgraph expansion ---
   // Use dynamic Williams-derived bounds unless the caller has pinned an
-  // explicit maxHops value.  The bounds are derived from the current corpus
-  // size so expansion cost stays sublinear as the graph grows.
+  // explicit maxHops value.  Only load all pages when we actually need to
+  // compute bounds — skip the full-page scan on the hot path when maxHops is
+  // already known.
   const topPageIds = topPages.map((p) => p.pageId);
-  const allPages = await metadataStore.getAllPages();
-  const subgraphBounds = computeSubgraphBounds(allPages.length);
-  const effectiveMaxHops = options.maxHops ?? subgraphBounds.maxHops;
+  let effectiveMaxHops: number;
+  if (options.maxHops !== undefined) {
+    effectiveMaxHops = options.maxHops;
+  } else {
+    const allPages = await metadataStore.getAllPages();
+    effectiveMaxHops = computeSubgraphBounds(allPages.length).maxHops;
+  }
   const subgraph = await metadataStore.getInducedNeighborSubgraph(topPageIds, effectiveMaxHops);
 
   // --- TSP coherence path ---

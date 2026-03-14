@@ -7,13 +7,21 @@
 // bounded by the Williams-Bound-derived maintenance budget so the idle loop
 // is not starved.
 //
-// Per idle cycle, the scheduler processes at most computeCapacity(graphMass)
-// pairwise comparisons (O(sqrt(t * log(1+t))) growth).
+// Per idle cycle, the scheduler processes at most max(MIN_RECALC_PAIR_BUDGET,
+// computeCapacity(graphMass)) pairwise comparisons.  The minimum floor ensures
+// forward progress for small corpora where the Williams formula may return a
+// value smaller than a single typical volume's pair count.
 // ---------------------------------------------------------------------------
 
 import type { Hash, MetadataStore, SemanticNeighbor, Page, VectorStore } from "../core/types";
 import { computeCapacity, DEFAULT_HOTPATH_POLICY, type HotpathPolicy } from "../core/HotpathPolicy";
 import { batchComputeSalience, runPromotionSweep } from "../core/SalienceEngine";
+
+// Minimum pair budget per idle recalc cycle.
+// Sized to cover the theoretical maximum for a single well-formed volume
+// (BOOKS_PER_VOLUME=4 books × PAGES_PER_BOOK=8 pages = 32 pages,
+//  32 × 31 = 992 pairs).  Using 2048 gives a comfortable margin.
+export const MIN_RECALC_PAIR_BUDGET = 2048;
 
 // ---------------------------------------------------------------------------
 // Options
@@ -97,9 +105,10 @@ export async function runFullNeighborRecalc(
     return { volumesProcessed: 0, pagesProcessed: 0, pairsComputed: 0 };
   }
 
-  // Compute per-cycle pair budget: O(sqrt(t * log(1+t)))
+  // Compute per-cycle pair budget: max of Williams-derived capacity and
+  // the minimum floor so even small corpora make forward progress.
   const totalGraphMass = (await metadataStore.getAllPages()).length;
-  const pairBudget = Math.max(1, computeCapacity(totalGraphMass, policy.c));
+  const pairBudget = Math.max(MIN_RECALC_PAIR_BUDGET, computeCapacity(totalGraphMass, policy.c));
 
   let totalVolumesProcessed = 0;
   let totalPagesProcessed = 0;
@@ -137,9 +146,7 @@ export async function runFullNeighborRecalc(
     // Compute pairwise similarities and build neighbor lists
     const pairsInVolume = volumePages.length * (volumePages.length - 1);
     const remainingBudget = pairBudget - totalPairsComputed;
-    // Always process at least one volume per cycle to guarantee forward
-    // progress; budget exhaustion only defers additional volumes.
-    const budgetExhausted = pairsInVolume > remainingBudget && totalVolumesProcessed > 0;
+    const budgetExhausted = pairsInVolume > remainingBudget;
     if (budgetExhausted) {
       break;
     }
