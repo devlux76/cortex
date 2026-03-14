@@ -110,12 +110,21 @@ class MockMetadataStore implements MetadataStore {
   async getBook(): Promise<undefined> { return undefined; }
   async putVolume(): Promise<void> { /* stub */ }
   async getVolume(): Promise<undefined> { return undefined; }
+  async getAllVolumes(): Promise<never[]> { return []; }
   async deleteVolume(): Promise<void> { /* stub */ }
   async putShelf(): Promise<void> { /* stub */ }
   async getShelf(): Promise<undefined> { return undefined; }
+  async getAllShelves(): Promise<never[]> { return []; }
   async getBooksByPage(): Promise<never[]> { return []; }
   async getVolumesByBook(): Promise<never[]> { return []; }
   async getShelvesByVolume(): Promise<never[]> { return []; }
+  async putMetroidNeighbors(): Promise<void> { /* stub */ }
+  async getMetroidNeighbors(): Promise<never[]> { return []; }
+  async getInducedMetroidSubgraph() { return { nodes: [], edges: [] }; }
+  async needsMetroidRecalc(): Promise<boolean> { return false; }
+  async flagVolumeForMetroidRecalc(): Promise<void> { /* stub */ }
+  async clearMetroidRecalcFlag(): Promise<void> { /* stub */ }
+  async deleteEdge(): Promise<void> { /* stub */ }
   async putSemanticNeighbors(): Promise<void> { /* stub */ }
   async getSemanticNeighbors(): Promise<never[]> { return []; }
   async getInducedNeighborSubgraph() { return { nodes: [], edges: [] }; }

@@ -503,13 +503,13 @@ These items add idle background maintenance and privacy-safe interest sharing. T
 
 **Why:** Need cooperative background loop that doesn't block foreground.
 
-- [ ] **P2-A1:** Implement `daydreamer/IdleScheduler.ts`
+- [x] **P2-A1:** Implement `daydreamer/IdleScheduler.ts`
   - Loop via `requestIdleCallback` (browser) or `setImmediate` (Node)
   - Interruptible (yield after N ms of work)
   - CPU budget awareness (pause if main thread busy)
   - Task queue (prioritize high-value work)
 
-- [ ] **P2-A2:** Add scheduler test coverage
+- [x] **P2-A2:** Add scheduler test coverage
   - `tests/daydreamer/IdleScheduler.test.ts`
   - Test cooperative yielding
   - Test interruption doesn't corrupt state
@@ -522,7 +522,7 @@ These items add idle background maintenance and privacy-safe interest sharing. T
 
 **Why:** Strengthen useful connections, decay unused ones. Edge changes alter σ(v) values and can trigger hotpath promotions or evictions.
 
-- [ ] **P2-B1:** Implement `daydreamer/HebbianUpdater.ts`
+- [x] **P2-B1:** Implement `daydreamer/HebbianUpdater.ts`
   - LTP: strengthen edges traversed during successful queries
   - LTD: decay all edges by small factor each pass
   - Prune: remove edges below threshold; keep Metroid degree within `HotpathPolicy`-derived bounds
@@ -530,7 +530,7 @@ These items add idle background maintenance and privacy-safe interest sharing. T
   - Run promotion/eviction sweep for changed nodes via `SalienceEngine.runPromotionSweep`
   - Update `MetadataStore.putEdges`
 
-- [ ] **P2-B2:** Add Hebbian test coverage
+- [x] **P2-B2:** Add Hebbian test coverage
   - `tests/daydreamer/HebbianUpdater.test.ts`
   - Test strengthen increases weight
   - Test decay decreases weight
@@ -546,7 +546,7 @@ These items add idle background maintenance and privacy-safe interest sharing. T
 
 **Why:** Incremental fast semantic neighbor insert is approximate; need periodic full recalc. Recalc batch size must be bounded by H(t)-derived maintenance budget to avoid blocking the idle loop.
 
-- [ ] **P2-C1:** Implement `daydreamer/FullNeighborRecalc.ts`
+- [x] **P2-C1:** Implement `daydreamer/FullNeighborRecalc.ts`
   - Query `MetadataStore.needsNeighborRecalc(volumeId)` for dirty volumes; prioritise dirtiest first
   - Load all pages in volume; compute pairwise similarities
   - Bound batch: process at most `HotpathPolicy.computeCapacity(graphMass)` pairwise comparisons per idle cycle (O(√(t log t)))
@@ -554,7 +554,7 @@ These items add idle background maintenance and privacy-safe interest sharing. T
   - Clear dirty flag via `MetadataStore.clearNeighborRecalcFlag`
   - Recompute σ(v) for affected nodes via `SalienceEngine.batchComputeSalience`; run promotion sweep
 
-- [ ] **P2-C2:** Add neighbor graph recalc test coverage
+- [x] **P2-C2:** Add neighbor graph recalc test coverage
   - `tests/daydreamer/FullNeighborRecalc.test.ts`
   - Test dirty flag cleared after recalc
   - Test neighbor quality improved vs fast insert
@@ -569,14 +569,14 @@ These items add idle background maintenance and privacy-safe interest sharing. T
 
 **Why:** Keep volume/shelf prototypes accurate as pages/books change. Prototype updates change which entries should occupy the volume and shelf tier quotas.
 
-- [ ] **P2-D1:** Implement `daydreamer/PrototypeRecomputer.ts`
+- [x] **P2-D1:** Implement `daydreamer/PrototypeRecomputer.ts`
   - Recompute volume medoids (select medoid page per volume)
   - Recompute volume centroids (average of book embeddings)
   - Recompute shelf routing prototypes
   - Update vectors in `VectorStore` (append new, update offsets)
   - After recomputing each level: recompute salience for affected representative entries via `SalienceEngine`; run tier-quota promotion/eviction for that tier
 
-- [ ] **P2-D2:** Add prototype recomputer test coverage
+- [x] **P2-D2:** Add prototype recomputer test coverage
   - `tests/daydreamer/PrototypeRecomputer.test.ts`
   - Test medoid selection algorithm
   - Test centroid computation
@@ -590,7 +590,7 @@ These items add idle background maintenance and privacy-safe interest sharing. T
 
 **Why:** Validate Daydreamer improves system health and hotpath stays consistent.
 
-- [ ] **P2-E1:** Implement `tests/integration/Daydreamer.test.ts`
+- [x] **P2-E1:** Implement `tests/integration/Daydreamer.test.ts`
   - Ingest corpus
   - Run queries (generate edge traversals and PageActivity updates)
   - Run Daydreamer for N passes
@@ -607,20 +607,20 @@ These items add idle background maintenance and privacy-safe interest sharing. T
 
 **Why:** Without community detection, a single dense topic can fill the entire page-tier quota, crowding out unrelated memories. Community quotas ensure the hotpath is both hot (high salience) and diverse (topic-representative).
 
-- [ ] **P2-F1:** Add community detection to `daydreamer/ClusterStability.ts`
+- [x] **P2-F1:** Add community detection to `daydreamer/ClusterStability.ts`
   - Implement lightweight label propagation on the semantic neighbor graph
   - Run during idle passes when dirty-volume flags indicate meaningful structural change
   - Store community labels in `PageActivity.communityId` via `MetadataStore.putPageActivity`
   - Rerun when graph topology changes significantly (post-split, post-merge, post-full-recalc)
 
-- [ ] **P2-F2:** Wire community labels into `SalienceEngine` promotion/eviction
+- [x] **P2-F2:** Wire community labels into `SalienceEngine` promotion/eviction
   - `selectEvictionTarget` uses `communityId` to find weakest resident in the community bucket
   - Promotion checks community quota remaining before admitting
   - If community quota is full: candidate must beat weakest resident in that community
   - If community is unknown (`communityId` not yet set): place node in temporary pending pool borrowing from page-tier budget
   - Empty communities release their slots back to the page-tier budget
 
-- [ ] **P2-F3:** Add community-aware eviction tests
+- [x] **P2-F3:** Add community-aware eviction tests
   - `tests/daydreamer/ClusterStability.test.ts`
   - Test that a single dense community cannot consume all page-tier hotpath slots
   - Test that a new community (previously unknown) receives at least one slot
@@ -635,31 +635,31 @@ These items add idle background maintenance and privacy-safe interest sharing. T
 
 **Why:** When knowledge gaps are detected, CORTEX must be able to broadcast the incomplete Metroid as a curiosity probe to connected peers. Peers respond with relevant fragments, enabling collaborative learning. Additionally, interest sharing is a core product value for both app and library surfaces. v1 must share public-interest graph sections while preventing personal data leakage.
 
-- [ ] **P2-G0:** Implement `sharing/CuriosityBroadcaster.ts`
+- [x] **P2-G0:** Implement `sharing/CuriosityBroadcaster.ts`
   - Consume pending `CuriosityProbe` objects queued by `KnowledgeGapDetector`
   - Serialize and broadcast to connected peers via P2P transport
   - Handle responses: deserialize incoming graph fragments; pass to `SubgraphImporter` for integration
   - Rate-limit broadcasts to prevent spam
   - Include `knowledgeBoundary` field in probe so peers can target search precisely
 
-- [ ] **P2-G1:** Implement `sharing/EligibilityClassifier.ts`
+- [x] **P2-G1:** Implement `sharing/EligibilityClassifier.ts`
   - Classify candidate nodes as share-eligible vs blocked before export
   - Detect identity/PII-bearing content (person-specific identifiers, credentials, financial/health traces)
   - Emit deterministic eligibility decisions with reason codes for auditability
 
-- [ ] **P2-G2:** Implement `sharing/SubgraphExporter.ts`
+- [x] **P2-G2:** Implement `sharing/SubgraphExporter.ts`
   - Build topic-scoped graph slices from eligible nodes only
   - For curiosity responses: select graph fragment relevant to the received probe's `knowledgeBoundary`
   - Preserve node/edge signatures and provenance
   - Strip or coarsen personal metadata fields that are not needed for discovery
 
-- [ ] **P2-G3:** Implement `sharing/PeerExchange.ts` and `sharing/SubgraphImporter.ts`
+- [x] **P2-G3:** Implement `sharing/PeerExchange.ts` and `sharing/SubgraphImporter.ts`
   - Opt-in peer exchange over P2P transport
   - Verify signatures and schema on import; reject invalid or tampered payloads
   - Merge imported slices into discovery pathways without exposing sender identity metadata
   - After import, retry MetroidBuilder for any pending knowledge gaps that may be resolved by new data
 
-- [ ] **P2-G4:** Add sharing safety and discovery tests
+- [x] **P2-G4:** Add sharing safety and discovery tests
   - `tests/sharing/EligibilityClassifier.test.ts`
   - `tests/sharing/CuriosityBroadcaster.test.ts`
   - `tests/sharing/SubgraphExchange.test.ts`
