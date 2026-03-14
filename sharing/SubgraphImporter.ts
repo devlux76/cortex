@@ -94,11 +94,16 @@ async function importNodes(
       continue;
     }
 
-    // Strip sender identity: clear public key and signature
+    // Strip sender identity and discard sender-provided embedding metadata.
+    // Remote embeddingOffset/embeddingDim refer to the sender's VectorStore and
+    // are not valid byte offsets in the local store, so we must not persist them.
     const page: Page = {
       ...raw,
       creatorPubKey: "",
       signature: "",
+      // Mark as "no local embedding yet"; downstream code can choose to re-embed.
+      embeddingOffset: 0,
+      embeddingDim: 0,
     };
 
     // Optionally verify that pageId matches SHA-256(content)
@@ -119,8 +124,7 @@ async function importNodes(
       }
     }
 
-    // Persist vector if the page's embedding offset points beyond current store
-    // (simplified: just persist the page record; vector already has offset)
+    // Persist page without trusting remote embedding offsets.
     await metadataStore.putPage(page);
     imported.push(page.pageId);
   }
