@@ -1,0 +1,6 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+# Enforce minimum coverage locally before pushing.
+# This mirrors the CI coverage enforcement and keeps merge-ready branches aligned.
+bun run test:coverage

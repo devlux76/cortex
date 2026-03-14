@@ -20,6 +20,7 @@
     "test:all": "bun run test:unit && bun run test:runtime",
     "guard:model-derived": "bun scripts/guard-model-derived.mjs",
     "guard:hotpath-policy": "bun scripts/guard-hotpath-policy.mjs",
+    "prepare": "husky install",
     "benchmark:dummy": "vitest bench --watch=false tests/benchmarks/DummyEmbedderHotpath.bench.ts",
     "benchmark:query-latency": "vitest bench --watch=false tests/benchmarks/QueryLatency.bench.ts",
     "benchmark:storage-overhead": "vitest bench --watch=false tests/benchmarks/StorageOverhead.bench.ts",
@@ -39,6 +40,7 @@
     "electron": "latest",
     "eslint": "latest",
     "fake-indexeddb": "latest",
+    "husky": "latest",
     "typescript": "latest",
     "typescript-eslint": "latest",
     "vitest": "latest"

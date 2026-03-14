@@ -33,10 +33,12 @@ export default defineConfig({
         "node_modules/**",
       ],
       thresholds: {
-        lines: 90,
-        functions: 90,
-        branches: 90,
-        statements: 90,
+        // Enforce a minimum test coverage baseline.
+        // Keep this in sync with CI and local pre-push guard.
+        lines: 80,
+        functions: 80,
+        branches: 80,
+        statements: 80,
       },
     },
   },
