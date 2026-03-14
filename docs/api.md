@@ -4,15 +4,159 @@
 
 ## Table of Contents
 
-1. [Core Data Types](#core-data-types)
-2. [Storage Interfaces](#storage-interfaces)
-3. [Vector Backends](#vector-backends)
-4. [Embedding Backends](#embedding-backends)
-5. [Model Profiles](#model-profiles)
-6. [Routing Policy](#routing-policy)
-7. [Hippocampus — Ingest API](#hippocampus--ingest-api)
-8. [Cortex — Query API](#cortex--query-api)
-9. [Daydreamer — Background Consolidation](#daydreamer--background-consolidation)
+1. [Architecture Diagrams](#architecture-diagrams)
+2. [Core Data Types](#core-data-types)
+3. [Storage Interfaces](#storage-interfaces)
+4. [Vector Backends](#vector-backends)
+5. [Embedding Backends](#embedding-backends)
+6. [Model Profiles](#model-profiles)
+7. [Routing Policy](#routing-policy)
+8. [Hippocampus — Ingest API](#hippocampus--ingest-api)
+9. [Cortex — Query API](#cortex--query-api)
+10. [Daydreamer — Background Consolidation](#daydreamer--background-consolidation)
+
+---
+
+## Architecture Diagrams
+
+### Data Flow: Ingest Path
+
+```
+┌────────────┐
+│  Raw Text  │
+└─────┬──────┘
+      │
+      ▼
+┌─────────────────┐    maxChunkTokens from
+│  Chunker.ts     │◄── ModelProfile
+│  (token-aware)  │
+└─────┬───────────┘
+      │  chunks: string[]
+      ▼
+┌──────────────────────┐
+│  EmbeddingRunner     │──► resolves backend via ProviderResolver
+│  (lazy init)         │    (WebNN → WebGPU → WebGL → WASM → Dummy)
+└─────┬────────────────┘
+      │  vectors: Float32Array[]
+      ▼
+┌──────────────────────┐
+│  PageBuilder.ts      │──► SHA-256 content hash
+│  (sign + hash)       │──► Ed25519 signature
+└─────┬────────────────┘
+      │  pages: Page[]
+      ├─────────────────────────────────────┐
+      ▼                                     ▼
+┌──────────────┐                   ┌───────────────────┐
+│ VectorStore  │                   │  MetadataStore     │
+│ (OPFS)       │                   │  (IndexedDB)       │
+│ appendVector │                   │  putPage / putBook │
+└──────────────┘                   └────────┬──────────┘
+                                            │
+                                            ▼
+                                   ┌───────────────────┐
+                                   │ runPromotionSweep  │
+                                   │ (hotpath update)   │
+                                   └───────────────────┘
+```
+
+### Data Flow: Query Path
+
+```
+┌──────────────┐
+│  Query Text  │
+└──────┬───────┘
+       │
+       ▼
+┌──────────────────────┐
+│  EmbeddingRunner     │──► embed query text
+│  (embedQueries)      │
+└──────┬───────────────┘
+       │  queryVector: Float32Array
+       ▼
+┌──────────────────────────────────────────┐
+│  Hotpath Scoring (fast path)             │
+│  • getHotpathEntries → resident pages    │
+│  • readVectors → dot product → top-K     │
+└──────┬───────────────────────────────────┘
+       │  hotpath results < topK?
+       ▼
+┌──────────────────────────────────────────┐
+│  Cold Path Scoring (fallback)            │
+│  • getAllPages → full corpus scan         │
+│  • readVectors → dot product → merge     │
+└──────┬───────────────────────────────────┘
+       │  merged top-K results
+       ▼
+┌──────────────────────────────────────────┐
+│  Side Effects                            │
+│  • increment PageActivity.queryHitCount  │
+│  • runPromotionSweep (hotpath update)    │
+└──────┬───────────────────────────────────┘
+       │
+       ▼
+┌────────────────┐
+│  QueryResult   │
+│  { pages,      │
+│    scores,     │
+│    metadata }  │
+└────────────────┘
+```
+
+### Module Dependency Graph
+
+```
+                    ┌─────────────────────────────┐
+                    │         core/                │
+                    │  types · ModelProfile        │
+                    │  HotpathPolicy · Salience    │
+                    │  crypto/ (hash, sign, verify)│
+                    └──────────────┬───────────────┘
+                                   │
+              ┌────────────────────┼────────────────────┐
+              │                    │                     │
+              ▼                    ▼                     ▼
+     ┌────────────────┐   ┌───────────────┐    ┌────────────────┐
+     │  embeddings/   │   │   storage/    │    │  VectorBackend │
+     │  EmbeddingBack │   │  VectorStore  │    │  (WebGPU/GL/   │
+     │  EmbeddingRun  │   │  MetadataStr  │    │   NN/WASM)     │
+     │  ProviderResol │   │  (OPFS, IDB)  │    │  TopK          │
+     └───────┬────────┘   └───────┬───────┘    └───────┬────────┘
+             │                    │                     │
+             └────────┬───────────┼─────────────────────┘
+                      │           │
+           ┌──────────▼───────────▼──────────┐
+           │       hippocampus/              │
+           │  Chunker · PageBuilder · Ingest │
+           │  HierarchyBuilder               │
+           │  FastNeighborInsert             │
+           └──────────────┬──────────────────┘
+                          │
+           ┌──────────────▼──────────────────┐
+           │          cortex/                │
+           │  Query · Ranking                │
+           │  MetroidBuilder                 │
+           │  KnowledgeGapDetector           │
+           │  OpenTSPSolver                  │
+           └──────────────┬──────────────────┘
+                          │
+           ┌──────────────▼──────────────────┐
+           │        daydreamer/              │
+           │  IdleScheduler                  │
+           │  HebbianUpdater                 │
+           │  PrototypeRecomputer            │
+           │  FullNeighborRecalc             │
+           │  ExperienceReplay               │
+           │  ClusterStability               │
+           └──────────────┬──────────────────┘
+                          │
+           ┌──────────────▼──────────────────┐
+           │         sharing/                │
+           │  CuriosityBroadcaster           │
+           │  EligibilityClassifier          │
+           │  SubgraphExporter/Importer      │
+           │  PeerExchange                   │
+           └─────────────────────────────────┘
+```
 
 ---
 
