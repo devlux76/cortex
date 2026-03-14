@@ -27,7 +27,7 @@ jobs:
         run: bun run build
 
       - name: Test
-        run: bun run test
+        run: bun run test:unit
 
       - name: Guard — model-derived numerics
         run: bun run guard:model-derived
