@@ -50,7 +50,7 @@ const ALLOWED_SOURCE_FILE = "core/HotpathPolicy.ts";
  *   - salienceWeights / tierQuotaRatios (policy field names)
  */
 const HOTPATH_FIELD_PATTERN =
-  /\b(salienceWeights|tierQuotaRatios|(?<![a-zA-Z_$])alpha(?![a-zA-Z_$])|(?<![a-zA-Z_$])beta(?![a-zA-Z_$])|(?<![a-zA-Z_$])gamma(?![a-zA-Z_$]))\b/;
+  /\b(salienceWeights|tierQuotaRatios|(?<![a-zA-Z_$])c(?![a-zA-Z_$])|(?<![a-zA-Z_$])alpha(?![a-zA-Z_$])|(?<![a-zA-Z_$])beta(?![a-zA-Z_$])|(?<![a-zA-Z_$])gamma(?![a-zA-Z_$])|(?<![a-zA-Z_$])shelf(?![a-zA-Z_$])|(?<![a-zA-Z_$])volume(?![a-zA-Z_$])|(?<![a-zA-Z_$])book(?![a-zA-Z_$])|(?<![a-zA-Z_$])page(?![a-zA-Z_$]))\b/;
 
 const ASSIGNMENT_PATTERN = /[:=]/;
 const NUMERIC_LITERAL_PATTERN = /(^|[^\w.])-?\d+(?:\.\d+)?([^\w.]|$)/;
