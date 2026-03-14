@@ -159,14 +159,6 @@ async function recomputeVolumePrototypes(
     };
     await metadataStore.putVolume(updatedVolume);
 
-    // Update the book's medoid page record
-    const medoidBook = await metadataStore.getBooksByPage(medoidPageId).then(
-      (books) => books[0],
-    );
-    if (medoidBook) {
-      await metadataStore.putBook({ ...medoidBook, medoidPageId });
-    }
-
     updatedVolumeIds.push(volume.volumeId);
   }
 
