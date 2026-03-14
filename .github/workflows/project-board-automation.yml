@@ -29,8 +29,11 @@ jobs:
     name: Add to project board
     runs-on: ubuntu-latest
     permissions: {}
-    # Skip entirely if the repository variable has not been configured yet
-    if: vars.PROJECT_URL != ''
+    # Skip entirely if the repository variable or token have not been configured,
+    # or if this is a pull request from a fork (no secrets available).
+    if: vars.PROJECT_URL != '' &&
+      secrets.PROJECT_TOKEN != '' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     steps:
       - name: Add issue or PR to project board
         uses: actions/add-to-project@v1.0.2
