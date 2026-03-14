@@ -117,16 +117,10 @@ This document tracks the implementation status of each major module in CORTEX. I
 | Hebbian Updates | ✅ Complete | `daydreamer/HebbianUpdater.ts` | LTP (strengthen), LTD (decay), prune below threshold; recompute σ(v) for changed nodes; run promotion/eviction sweep |
 | Prototype Recomputation | ✅ Complete | `daydreamer/PrototypeRecomputer.ts` | Recalculate volume/shelf medoids and centroids; recompute salience for affected entries; run tier-quota promotion/eviction |
 | Full Neighbor Graph Recalc | ✅ Complete | `daydreamer/FullNeighborRecalc.ts` | Rebuild bounded neighbor lists for dirty volumes; batch size bounded by O(√(t log t)) per idle cycle; recompute salience after recalc. |
-| Idle Scheduler | ❌ Missing | `daydreamer/IdleScheduler.ts` (planned) | Cooperative background loop; interruptible; respects CPU budget |
-| Hebbian Updates | ❌ Missing | `daydreamer/HebbianUpdater.ts` (planned) | LTP (strengthen), LTD (decay), prune below threshold; recompute σ(v) for changed nodes; run promotion/eviction sweep |
-| Prototype Recomputation | ❌ Missing | `daydreamer/PrototypeRecomputer.ts` (planned) | Recalculate volume/shelf medoids and centroids; recompute salience for affected entries; run tier-quota promotion/eviction |
-| Full Neighbor Graph Recalc | ❌ Missing | `daydreamer/FullNeighborRecalc.ts` (planned) | Rebuild bounded neighbor lists for dirty volumes; batch size bounded by O(√(t log t)) per idle cycle; recompute salience after recalc. |
-| Experience Replay | ❌ Missing | `daydreamer/ExperienceReplay.ts` (planned) | Simulate queries to reinforce connections |
-| Cluster Stability | ✅ Complete | `daydreamer/ClusterStability.ts` | Lightweight label propagation for community detection; stores community labels in PageActivity; detects oversized and empty communities |
+| Experience Replay | ✅ Complete | `daydreamer/ExperienceReplay.ts` | Simulate queries to reinforce connections; recent-biased sampling; LTP on traversed edges |
+| Cluster Stability | ✅ Complete | `daydreamer/ClusterStability.ts` | Lightweight label propagation for community detection; stores community labels in PageActivity; detects oversized and empty communities; volume split/merge with orphan deletion |
 
-**Daydreamer Status:** 4/6 complete (66%)
-
-**Note:** Not a v1 blocker — system can ship without background consolidation (manual recalc only). Community detection is required before graph-community quota enforcement is active.
+**Daydreamer Status:** 6/6 complete (100%)
 
 ---
 
@@ -401,9 +395,9 @@ This document tracks the implementation status of each major module in CORTEX. I
 **Impact:** Queries return flat top-K results only; no epistemic balance, no knowledge gap detection, no P2P curiosity.
 **Mitigation:** Phase 2 priority; depends on semantic neighbor graph (Blocker 1) and hierarchy builder.
 
-### Blocker 3: No Privacy-Safe Sharing or Curiosity Broadcasting Pipeline
+### Blocker 3: No Privacy-Safe Sharing or Curiosity Broadcasting Pipeline — RESOLVED
 **Impact:** Core discovery-sharing value proposition is missing; knowledge gaps cannot be resolved via P2P.
-**Mitigation:** Phase 3 required track; implement eligibility classifier + curiosity broadcaster + signed subgraph exchange as v1 scope. CuriosityProbe must include `mimeType` and `modelUrn` to prevent incommensurable graph merges.
+**Resolution:** Phase 3 sharing pipeline fully implemented. `sharing/EligibilityClassifier.ts` blocks PII/credential/financial/health content. `sharing/CuriosityBroadcaster.ts` provides rate-limited probe broadcasting with fragment response handling. `sharing/SubgraphExporter.ts` and `sharing/SubgraphImporter.ts` handle eligibility-filtered export and schema-validated import with sender identity stripping. `sharing/PeerExchange.ts` orchestrates opt-in signed subgraph exchange. CuriosityProbe includes `mimeType` and `modelUrn` to prevent incommensurable graph merges.
 
 ### Blocker 4: Naming Drift (P0-X) — RESOLVED
 **Impact:** The term "Metroid" was used for the proximity graph in all code. MetroidBuilder cannot be introduced without a rename collision.
