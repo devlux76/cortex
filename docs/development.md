@@ -206,18 +206,24 @@ requirements:
   software rendering. WebGL reports as available but WebGPU does not.
   This lane is **not** a GPU-realism gate — it validates application startup,
   IPC wiring, and storage initialisation.
-- Set `CORTEX_ALLOW_ELECTRON_SKIP=1` to exit the Electron lane with code 0
-  when hardware is unavailable, rather than failing the build.
-- The CI workflow does **not** run Electron tests by default. Electron tests
-  are gated behind the `test:electron` / `test:runtime` scripts and should be
-  run manually or in a dedicated GPU-enabled runner.
+- Set `CORTEX_ALLOW_ELECTRON_SKIP=1` to soft-skip the **full Electron runtime
+  tests** (driven by `scripts/run-electron-runtime-tests.mjs`, typically via
+  `npm run test:runtime`) when hardware is unavailable. The smoke-test runner
+  (`scripts/run-electron-runtime-smoke.mjs`, typically via
+  `npm run test:electron`) does **not** honor this variable and will still
+  fail if Electron is not installed or cannot start.
+- The CI workflow does **not** run Electron tests by default. Full Electron
+  runtime tests are gated behind the `test:runtime` script and should be run
+  manually or in a dedicated GPU-enabled runner. The `test:electron` script
+  is a lightweight smoke test and remains a hard failure if Electron is
+  unavailable.
 
 ### Decision Matrix
 
 | Environment | Electron tests run? | GPU available? | Expectation |
 |---|---|---|---|
 | Local (with GPU) | Yes | Yes | Full pass |
-| Local (no GPU) | Skip (`CORTEX_ALLOW_ELECTRON_SKIP=1`) | No | Skip gracefully |
+| Local (no GPU) | Skip full runtime tests (`CORTEX_ALLOW_ELECTRON_SKIP=1`) | No | Skip full harness gracefully; smoke tests may still fail without Electron |
 | CI (ubuntu-latest) | No | No | Unit tests only |
 | Docker lane | Yes (software render) | No | Startup + storage pass; WebGPU tests skipped |
 
