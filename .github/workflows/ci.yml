@@ -26,8 +26,8 @@ jobs:
       - name: Typecheck
         run: bun run build
 
-      - name: Test
-        run: bun run test:unit
+      - name: Test (coverage enforcement)
+        run: bun run test:coverage
 
       - name: Guard — model-derived numerics
         run: bun run guard:model-derived
