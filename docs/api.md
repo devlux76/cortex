@@ -506,9 +506,10 @@ const result = await ingestText("Your text content here...", {
   embeddingRunner,     // EmbeddingRunner — resolves and runs the embedding model
   vectorStore,         // VectorStore — append-only, non-deduplicating vector file (OPFS or in-memory)
   metadataStore,       // MetadataStore — structured hierarchy store (IndexedDB)
-  creatorKeyPair: {
-    publicKey,         // PublicKey — creator's identity for signing pages
-    privateKey,        // CryptoKey — used to sign each page
+  keyPair: {
+    publicKey,         // PublicKey — creator's identity for verifying page signatures
+    privateKeyJwk,     // JsonWebKey — exportable private key material used for signing
+    signingKey,        // CryptoKey — private signing key used to sign each page
   },
 });
 ```
