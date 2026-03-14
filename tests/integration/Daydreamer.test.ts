@@ -278,7 +278,9 @@ describe("Daydreamer integration", () => {
     const broadcastLog: PeerMessage[] = [];
     const transport: P2PTransport = {
       broadcast: async (msg) => { broadcastLog.push(msg); },
-      onMessage: () => {},
+      onMessage: (_handler) => {
+        // Intentionally not wiring inbound messages for this integration test
+      },
     };
 
     const broadcaster = new CuriosityBroadcaster({
