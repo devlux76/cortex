@@ -3,8 +3,8 @@
 // ---------------------------------------------------------------------------
 //
 // Constructs topic-scoped graph slices from pages that pass the eligibility
-// classifier. For curiosity responses, the slice is constrained to content
-// relevant to the probe's knowledge boundary.
+// classifier. For curiosity responses, the slice is built from a BFS expansion
+// around the probe's seed (`m1`), constrained by `maxHops` / `maxNodes`.
 //
 // Personal metadata fields not needed for discovery are stripped or coarsened
 // before export. Node/edge signatures and provenance are preserved.
