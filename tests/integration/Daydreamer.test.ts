@@ -293,7 +293,7 @@ describe("Daydreamer integration", () => {
       m1: eligiblePageId,
       partialMetroid: { m1: eligiblePageId },
       queryContextB64: "AAAA",
-      knowledgeBoundary: EMBEDDING_DIM,
+      knowledgeBoundary: profile.embeddingDimension,
       mimeType: "text/plain",
       modelUrn: "urn:model:test:v1",
       timestamp: new Date(now).toISOString(),
