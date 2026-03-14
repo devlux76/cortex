@@ -31,8 +31,11 @@ const IGNORED_DIRS = new Set([
   "tests",
 ]);
 
-/** The only file allowed to define raw numeric hotpath policy constants. */
-const ALLOWED_SOURCE_FILE = "core/HotpathPolicy.ts";
+/** The only file(s) allowed to define raw numeric hotpath policy constants. */
+const ALLOWED_SOURCE_FILES = new Set([
+  "core/HotpathPolicy.ts",
+  "lib/core/HotpathPolicy.ts",
+]);
 
 /**
  * Field names that must not receive hardcoded numeric literals outside the
@@ -108,7 +111,7 @@ async function main() {
   const violations = [];
 
   for (const relativePath of tsFiles) {
-    if (relativePath === ALLOWED_SOURCE_FILE) {
+    if (ALLOWED_SOURCE_FILES.has(relativePath)) {
       continue;
     }
 
