@@ -5,7 +5,7 @@ export default defineConfig({
     include: ["**/*.test.ts", "**/*.spec.ts"],
     coverage: {
       provider: "v8",
-      enabled: true,
+      enabled: !!process.env.CI,
       clean: true,
       include: ["lib/**/*.ts"],
       reporter: ["text", "html"],
