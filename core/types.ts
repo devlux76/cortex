@@ -64,7 +64,7 @@ export interface Edge {
 }
 
 // ---------------------------------------------------------------------------
-// Semantic neighbour graph
+// Semantic nearest-neighbor graph
 // ---------------------------------------------------------------------------
 
 /** A single directed proximity edge in the sparse semantic neighbor graph. */
@@ -177,7 +177,7 @@ export interface MetadataStore {
   getVolumesByBook(bookId: Hash): Promise<Volume[]>;
   getShelvesByVolume(volumeId: Hash): Promise<Shelf[]>;
 
-  // --- Semantic neighbour radius index ---
+  // --- Semantic neighbor radius index ---
   putSemanticNeighbors(pageId: Hash, neighbors: SemanticNeighbor[]): Promise<void>;
   getSemanticNeighbors(pageId: Hash, maxDegree?: number): Promise<SemanticNeighbor[]>;
 

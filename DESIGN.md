@@ -498,8 +498,6 @@ interface Edge {
 #### Semantic Neighbor (Proximity Edge)
 Sparse radius-graph edge connecting pages with high cosine similarity. Used for subgraph expansion during retrieval.
 
-> **Note:** The current codebase names this type `MetroidNeighbor` — this is an architectural naming error introduced by early conceptual drift. The correct term is `SemanticNeighbor` (or equivalent). A code-level rename is tracked in the TODO. The edge is a proximity concept, not a Metroid concept.
-
 **Critical distinction — two edge types, two roles:**
 
 | Edge type | Storage | Role |
@@ -527,8 +525,6 @@ interface SemanticNeighbor {
 
 #### Semantic Neighbor Subgraph
 Induced subgraph for BFS-based coherence path expansion.
-
-> **Note:** Currently named `MetroidSubgraph` in the codebase — same renaming correction applies.
 
 ```typescript
 interface SemanticNeighborSubgraph {
@@ -590,7 +586,7 @@ Structured entity storage with automatic reverse indexes.
 **Object Stores:**
 - `pages`, `books`, `volumes`, `shelves`
 - `edges_hebbian` (Hebbian weights)
-- `neighbor_graph` (sparse semantic neighbor graph — currently named `metroid_neighbors` in code; rename tracked in TODO)
+- `neighbor_graph` (sparse semantic neighbor graph)
 - `flags` (dirty-volume recalc markers)
 - `page_to_book`, `book_to_volume`, `volume_to_shelf` (reverse indexes)
 - `hotpath_index` (periodic HOT-membership checkpoint, keyed by `entityId`; loaded on startup to reconstruct the RAM resident index; written by Daydreamer each maintenance cycle)
@@ -797,7 +793,7 @@ Matryoshka dimensional unwinding. Runs the thesis→freeze→antithesis→synthe
 search; m2 via cosine-opposite medoid; c computed once and frozen; subsequent candidates evaluated
 relative to frozen c. Planned module: `cortex/MetroidBuilder.ts`.
 
-**Semantic neighbor graph** (also: proximity graph, neighbor graph): The sparse radius-graph of cosine-similarity edges between pages, used for subgraph expansion during retrieval. This is **not** the same as a Metroid. The edges connect pages with high cosine similarity and are used for BFS expansion. Currently named `MetroidNeighbor` / `metroid_neighbors` in the codebase — this is a naming error that must be corrected (tracked in TODO as P0-X).
+**Semantic neighbor graph** (also: proximity graph, neighbor graph): The sparse radius-graph of cosine-similarity edges between pages, used for subgraph expansion during retrieval. This is **not** the same as a Metroid. The edges connect pages with high cosine similarity and are used for BFS expansion.
 
 **Hotpath**: The in-memory resident index of H(t) entries spanning all four hierarchy tiers. The hotpath is the first lookup target for every query; misses spill to WARM/COLD storage. HOT membership and salience are checkpointed to the `hotpath_index` IndexedDB store by Daydreamer each maintenance cycle, allowing the RAM index to be restored after a page reload or machine reboot without full corpus replay.
 

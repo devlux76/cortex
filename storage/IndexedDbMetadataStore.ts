@@ -25,7 +25,7 @@ const STORE = {
   volumes: "volumes",
   shelves: "shelves",
   edges: "edges_hebbian",
-  metroidNeighbors: "neighbor_graph",
+  neighborGraph: "neighbor_graph",
   flags: "flags",
   pageToBook: "page_to_book",
   bookToVolume: "book_to_volume",
@@ -72,16 +72,7 @@ function applyUpgrade(db: IDBDatabase): void {
     edgeStore.createIndex("by-from", "fromPageId");
   }
 
-  if (!db.objectStoreNames.contains(STORE.metroidNeighbors)) {
-    db.createObjectStore(STORE.metroidNeighbors, { keyPath: "pageId" });
-  }
-  // v3: renamed metroid_neighbors → neighbor_graph (SemanticNeighbor).
-  // At this stage of development no one has live data, so we intentionally
-  // drop the old store and let the graph be rebuilt from scratch on next
-  // ingest. No migration is needed or warranted yet.
-  if (db.objectStoreNames.contains("metroid_neighbors")) {
-    db.deleteObjectStore("metroid_neighbors");
-  }
+
   if (!db.objectStoreNames.contains(STORE.flags)) {
     db.createObjectStore(STORE.flags, { keyPath: "volumeId" });
   }
@@ -103,6 +94,11 @@ function applyUpgrade(db: IDBDatabase): void {
   }
   if (!db.objectStoreNames.contains(STORE.pageActivity)) {
     db.createObjectStore(STORE.pageActivity, { keyPath: "pageId" });
+  }
+
+  // v3 stores — neighbor_graph (replaces the old metroid_neighbors name)
+  if (!db.objectStoreNames.contains(STORE.neighborGraph)) {
+    db.createObjectStore(STORE.neighborGraph, { keyPath: "pageId" });
   }
 }
 
@@ -335,11 +331,11 @@ export class IndexedDbMetadataStore implements MetadataStore {
   }
 
   // -------------------------------------------------------------------------
-  // Semantic neighbour radius index
+  // Semantic neighbor radius index
   // -------------------------------------------------------------------------
 
   putSemanticNeighbors(pageId: Hash, neighbors: SemanticNeighbor[]): Promise<void> {
-    return this._put(STORE.metroidNeighbors, { pageId, neighbors });
+    return this._put(STORE.neighborGraph, { pageId, neighbors });
   }
 
   async getSemanticNeighbors(
@@ -347,7 +343,7 @@ export class IndexedDbMetadataStore implements MetadataStore {
     maxDegree?: number,
   ): Promise<SemanticNeighbor[]> {
     const row = await this._get<{ pageId: Hash; neighbors: SemanticNeighbor[] }>(
-      STORE.metroidNeighbors,
+      STORE.neighborGraph,
       pageId,
     );
     if (!row) return [];
