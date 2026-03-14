@@ -1,6 +1,1 @@
-export interface EmbeddingBackend {
-  readonly kind: string;
-  readonly dimension: number;
-
-  embed(texts: string[]): Promise<Float32Array[]>;
-}
+export * from "../lib/embeddings/EmbeddingBackend";

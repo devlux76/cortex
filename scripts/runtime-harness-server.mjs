@@ -9,7 +9,7 @@ import { fileURLToPath, URL } from "node:url";
 const HOST = process.env.HARNESS_HOST ?? "127.0.0.1";
 const PORT = Number.parseInt(process.env.HARNESS_PORT ?? "4173", 10);
 const ROOT = path.resolve(
-  fileURLToPath(new URL("../runtime/harness", import.meta.url)),
+  fileURLToPath(new URL("../ui/harness", import.meta.url)),
 );
 
 const MIME_TYPES = {
