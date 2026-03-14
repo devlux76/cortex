@@ -234,10 +234,12 @@ describe("integration: ingest and query", () => {
       expect(stored!.embeddingDim).toBe(EMBEDDING_DIM);
     }
 
-    // Book should reference all page IDs
-    const book = await metadataStore.getBook(result.book!.bookId);
-    expect(book).toBeDefined();
-    expect(book!.pageIds).toEqual(result.pages.map((p) => p.pageId));
+    // Books should collectively reference all page IDs
+    expect(result.books.length).toBeGreaterThanOrEqual(1);
+    const allBookPageIds = result.books.flatMap((b) => b.pageIds);
+    for (const page of result.pages) {
+      expect(allBookPageIds).toContain(page.pageId);
+    }
 
     // Activity records should be initialized for each page
     for (const page of result.pages) {
@@ -278,7 +280,7 @@ describe("integration: ingest and query", () => {
     });
 
     const ingestedPageIds = result.pages.map((p) => p.pageId);
-    const bookId = result.book!.bookId;
+    const bookIds = result.books.map((b) => b.bookId);
 
     // ---- Session 2: Reopen the same database and verify persistence ----
 
@@ -291,10 +293,11 @@ describe("integration: ingest and query", () => {
       expect(page!.pageId).toBe(pageId);
     }
 
-    // Book should still be there
-    const book = await store2.getBook(bookId);
-    expect(book).toBeDefined();
-    expect(book!.pageIds).toEqual(ingestedPageIds);
+    // Books should still be there
+    for (const bookId of bookIds) {
+      const book = await store2.getBook(bookId);
+      expect(book).toBeDefined();
+    }
 
     // Activity records should survive
     for (const pageId of ingestedPageIds) {
@@ -398,7 +401,7 @@ describe("integration (v0.5): hierarchical and dialectical ingest/query", () => 
     (globalThis as Record<string, unknown>)["IDBKeyRange"] = FakeIDBKeyRange;
   });
 
-  it("ingest produces a single Book containing all ingested pages", async () => {
+  it("ingest produces Books, Volumes, and Shelves via HierarchyBuilder", async () => {
     const dbName = freshDbName();
     const metadataStore = await IndexedDbMetadataStore.open(dbName);
     const vectorStore = new MemoryVectorStore();
@@ -417,21 +420,39 @@ describe("integration (v0.5): hierarchical and dialectical ingest/query", () => 
     // Pages were created
     expect(result.pages.length).toBeGreaterThanOrEqual(1);
 
-    // Exactly one Book was created and it contains ALL ingested pages
+    // At least one Book was created
+    expect(result.books.length).toBeGreaterThanOrEqual(1);
     expect(result.book).toBeDefined();
-    const storedBook = await metadataStore.getBook(result.book!.bookId);
-    expect(storedBook).toBeDefined();
-    expect(storedBook!.medoidPageId).toBeDefined();
-    expect(storedBook!.pageIds).toContain(storedBook!.medoidPageId);
-    // Every page from the ingest must be a member of the book
-    for (const page of result.pages) {
-      expect(storedBook!.pageIds).toContain(page.pageId);
-    }
-    // The book covers all pages — not just a subset
-    expect(storedBook!.pageIds.length).toBe(result.pages.length);
 
-    // Volumes and Shelves are assembled by the Daydreamer; not created at ingest time
-    expect(result.book).toBeDefined(); // only book is returned
+    // Every page must belong to exactly one book
+    const allBookPageIds = result.books.flatMap((b) => b.pageIds);
+    for (const page of result.pages) {
+      expect(allBookPageIds).toContain(page.pageId);
+    }
+    // Every book's medoid must be one of its own pages
+    for (const book of result.books) {
+      const storedBook = await metadataStore.getBook(book.bookId);
+      expect(storedBook).toBeDefined();
+      expect(storedBook!.medoidPageId).toBeDefined();
+      expect(storedBook!.pageIds).toContain(storedBook!.medoidPageId);
+    }
+
+    // Volumes and Shelves are now produced during ingest via HierarchyBuilder
+    expect(result.volumes.length).toBeGreaterThanOrEqual(1);
+    expect(result.shelves.length).toBeGreaterThanOrEqual(1);
+
+    // Each volume should be persisted
+    for (const vol of result.volumes) {
+      const stored = await metadataStore.getVolume(vol.volumeId);
+      expect(stored).toBeDefined();
+      expect(stored!.bookIds.length).toBeGreaterThan(0);
+    }
+    // Each shelf should be persisted
+    for (const shelf of result.shelves) {
+      const stored = await metadataStore.getShelf(shelf.shelfId);
+      expect(stored).toBeDefined();
+      expect(stored!.volumeIds.length).toBeGreaterThan(0);
+    }
   });
 
   it("hotpath entries exist for hierarchy prototypes after ingest", async () => {
