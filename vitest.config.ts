@@ -8,7 +8,6 @@ export default defineConfig({
       enabled: true,
       clean: true,
       include: ["lib/**/*.ts"],
-      all: true,
       reporter: ["text", "html"],
       reportsDirectory: "coverage",
       exclude: [
