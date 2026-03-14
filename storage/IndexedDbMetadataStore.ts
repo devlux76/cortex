@@ -240,6 +240,9 @@ export class IndexedDbMetadataStore implements MetadataStore {
       const req = tx.objectStore(STORE.volumes).getAll();
       req.onsuccess = () => resolve(req.result as Volume[]);
       req.onerror = () => reject(req.error);
+    });
+  }
+
   /**
    * Delete a volume and clean up its reverse-index entries:
    * - Removes the volume from the `bookToVolume` index for each of its books.

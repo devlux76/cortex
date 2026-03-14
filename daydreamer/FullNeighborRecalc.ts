@@ -11,7 +11,7 @@
 // pairwise comparisons (O(sqrt(t * log(1+t))) growth).
 // ---------------------------------------------------------------------------
 
-import type { Hash, MetadataStore, MetroidNeighbor, Page, VectorStore } from "../core/types";
+import type { Hash, MetadataStore, SemanticNeighbor, Page, VectorStore } from "../core/types";
 import { computeCapacity, DEFAULT_HOTPATH_POLICY, type HotpathPolicy } from "../core/HotpathPolicy";
 import { batchComputeSalience, runPromotionSweep } from "../core/SalienceEngine";
 
@@ -61,7 +61,7 @@ function cosineSimilarity(a: Float32Array, b: Float32Array): number {
 /**
  * Run one cycle of full neighbor graph recalculation.
  *
- * Finds all volumes flagged as dirty (via `needsMetroidRecalc`), loads
+ * Finds all volumes flagged as dirty (via `needsNeighborRecalc`), loads
  * their pages, computes pairwise cosine similarities, and updates the
  * Metroid neighbor index. Processing is bounded by the Williams-Bound-derived
  * maintenance budget to avoid blocking the idle loop.
@@ -86,7 +86,7 @@ export async function runFullNeighborRecalc(
     await Promise.all(
       allVolumes.map(async (v) => ({
         volume: v,
-        dirty: await metadataStore.needsMetroidRecalc(v.volumeId),
+        dirty: await metadataStore.needsNeighborRecalc(v.volumeId),
       })),
     )
   )
@@ -122,7 +122,7 @@ export async function runFullNeighborRecalc(
     }
 
     if (volumePages.length === 0) {
-      await metadataStore.clearMetroidRecalcFlag(volume.volumeId);
+      await metadataStore.clearNeighborRecalcFlag(volume.volumeId);
       totalVolumesProcessed++;
       continue;
     }
@@ -137,8 +137,9 @@ export async function runFullNeighborRecalc(
     // Compute pairwise similarities and build neighbor lists
     const pairsInVolume = volumePages.length * (volumePages.length - 1);
     const remainingBudget = pairBudget - totalPairsComputed;
-    if (pairsInVolume > remainingBudget) {
-      // Budget exhausted — leave this volume dirty for next cycle
+    if (pairsInVolume > remainingBudget && totalVolumesProcessed > 0) {
+      // Budget exhausted after processing at least one volume — defer the rest.
+      // We always process at least one volume per cycle to guarantee progress.
       break;
     }
 
@@ -146,7 +147,7 @@ export async function runFullNeighborRecalc(
       const page = volumePages[i];
       const vecI = vectors[i];
 
-      const neighbors: MetroidNeighbor[] = [];
+      const neighbors: SemanticNeighbor[] = [];
 
       for (let j = 0; j < volumePages.length; j++) {
         if (i === j) continue;
@@ -167,12 +168,12 @@ export async function runFullNeighborRecalc(
       );
       const topNeighbors = neighbors.slice(0, maxNeighbors);
 
-      await metadataStore.putMetroidNeighbors(page.pageId, topNeighbors);
+      await metadataStore.putSemanticNeighbors(page.pageId, topNeighbors);
       affectedPageIds.add(page.pageId);
     }
 
     // Clear the dirty flag
-    await metadataStore.clearMetroidRecalcFlag(volume.volumeId);
+    await metadataStore.clearNeighborRecalcFlag(volume.volumeId);
     totalVolumesProcessed++;
     totalPagesProcessed += volumePages.length;
   }

@@ -1,22 +1,36 @@
 // ---------------------------------------------------------------------------
-// ClusterStability — Community detection via label propagation (P2-F)
+// ClusterStability — Community detection via label propagation (P2-F) and
+//                   volume split/merge for balanced cluster maintenance (P2-F3)
 // ---------------------------------------------------------------------------
 //
 // Assigns community labels to pages by running lightweight label propagation
-// on the semantic (Metroid) neighbor graph. Labels are stored in
+// on the semantic neighbor graph. Labels are stored in
 // PageActivity.communityId and propagate into SalienceEngine community quotas.
 //
 // Label propagation terminates when assignments stabilise (no label changes)
 // or a maximum iteration limit is reached.
+//
+// The Daydreamer background worker also calls ClusterStability periodically to
+// detect and fix unstable volumes:
+//   - HIGH-VARIANCE volumes are split into two balanced sub-volumes.
+//   - LOW-COUNT volumes are merged into the nearest neighbour volume.
+//   - Community labels are updated after structural changes.
 // ---------------------------------------------------------------------------
 
-import type { Hash, MetadataStore, PageActivity } from "../core/types";
+import { hashText } from "../core/crypto/hash";
+import type {
+  Book,
+  Hash,
+  MetadataStore,
+  PageActivity,
+  Volume,
+} from "../core/types";
 
 // ---------------------------------------------------------------------------
-// Options
+// Label propagation options
 // ---------------------------------------------------------------------------
 
-export interface ClusterStabilityOptions {
+export interface LabelPropagationOptions {
   metadataStore: MetadataStore;
   /** Maximum number of label propagation iterations. Default: 20. */
   maxIterations?: number;
@@ -55,7 +69,7 @@ async function propagationPass(
   const sorted = [...pageIds].sort();
 
   for (const pageId of sorted) {
-    const neighbors = await metadataStore.getMetroidNeighbors(pageId);
+    const neighbors = await metadataStore.getSemanticNeighbors(pageId);
     if (neighbors.length === 0) continue;
 
     // Count neighbor labels
@@ -103,7 +117,7 @@ async function propagationPass(
  * `MetadataStore.putPageActivity`.
  */
 export async function runLabelPropagation(
-  options: ClusterStabilityOptions,
+  options: LabelPropagationOptions,
 ): Promise<LabelPropagationResult> {
   const {
     metadataStore,
@@ -200,31 +214,11 @@ export function detectEmptyCommunities(
     }
   }
   return empty;
-// ClusterStability — Volume split/merge for balanced cluster maintenance
-// ---------------------------------------------------------------------------
-//
-// The Daydreamer background worker calls ClusterStability periodically to
-// detect and fix unstable volumes:
-//
-//   - HIGH-VARIANCE volumes are split into two balanced sub-volumes using
-//     K-means with K=2 (one pass).
-//   - LOW-COUNT volumes are merged into the nearest neighbour volume
-//     (by medoid distance).
-//   - Community labels on PageActivity records are updated after structural
-//     changes so downstream salience computation stays coherent.
-//
-// All operations are idempotent: re-running on a stable set of volumes is a
-// no-op.
-// ---------------------------------------------------------------------------
+}
 
-import { hashText } from "../core/crypto/hash";
-import type {
-  Book,
-  Hash,
-  MetadataStore,
-  PageActivity,
-  Volume,
-} from "../core/types";
+// ---------------------------------------------------------------------------
+// ClusterStability class — Volume split/merge configuration
+// ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
 // Configuration

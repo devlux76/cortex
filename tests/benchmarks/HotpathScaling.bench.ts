@@ -102,9 +102,12 @@ class BenchMetadataStore implements MetadataStore {
   async getBook(): Promise<undefined> { return undefined; }
   async putVolume(): Promise<void> { /* stub */ }
   async getVolume(): Promise<undefined> { return undefined; }
+  async getAllVolumes(): Promise<Volume[]> { return []; }
   async deleteVolume(): Promise<void> { /* stub */ }
   async putShelf(): Promise<void> { /* stub */ }
   async getShelf(): Promise<undefined> { return undefined; }
+  async getAllShelves(): Promise<Shelf[]> { return []; }
+  async deleteEdge(): Promise<void> { /* stub */ }
   async getBooksByPage(): Promise<Book[]> { return []; }
   async getVolumesByBook(): Promise<Volume[]> { return []; }
   async getShelvesByVolume(): Promise<Shelf[]> { return []; }

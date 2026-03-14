@@ -13,8 +13,8 @@ import type {
   Hash,
   HotpathEntry,
   MetadataStore,
-  MetroidNeighbor,
-  MetroidSubgraph,
+  SemanticNeighbor,
+  SemanticNeighborSubgraph,
   Page,
   PageActivity,
   Shelf,
@@ -71,7 +71,7 @@ class FullMockMetadataStore implements MetadataStore {
   private edgeMap = new Map<string, Edge>();
   private activities = new Map<Hash, PageActivity>();
   private hotpath = new Map<Hash, HotpathEntry>();
-  private metroidNeighbors = new Map<Hash, MetroidNeighbor[]>();
+  private metroidNeighbors = new Map<Hash, SemanticNeighbor[]>();
   private dirtyFlags = new Map<Hash, boolean>();
 
   async putPage(page: Page) { this.pages.set(page.pageId, page); }
@@ -84,6 +84,7 @@ class FullMockMetadataStore implements MetadataStore {
   async putVolume(v: Volume) { this.volumes.set(v.volumeId, v); }
   async getVolume(id: Hash) { return this.volumes.get(id); }
   async getAllVolumes() { return [...this.volumes.values()]; }
+  async deleteVolume(id: Hash) { this.volumes.delete(id); }
 
   async putShelf(s: Shelf) { this.shelves.set(s.shelfId, s); }
   async getShelf(id: Hash) { return this.shelves.get(id); }
@@ -101,17 +102,17 @@ class FullMockMetadataStore implements MetadataStore {
   async getVolumesByBook() { return []; }
   async getShelvesByVolume() { return []; }
 
-  async putMetroidNeighbors(pageId: Hash, neighbors: MetroidNeighbor[]) {
+  async putSemanticNeighbors(pageId: Hash, neighbors: SemanticNeighbor[]) {
     this.metroidNeighbors.set(pageId, [...neighbors]);
   }
-  async getMetroidNeighbors(pageId: Hash) {
+  async getSemanticNeighbors(pageId: Hash) {
     return this.metroidNeighbors.get(pageId) ?? [];
   }
-  async getInducedMetroidSubgraph(): Promise<MetroidSubgraph> { return { nodes: [], edges: [] }; }
+  async getInducedNeighborSubgraph(): Promise<SemanticNeighborSubgraph> { return { nodes: [], edges: [] }; }
 
-  async needsMetroidRecalc(id: Hash) { return this.dirtyFlags.get(id) === true; }
-  async flagVolumeForMetroidRecalc(id: Hash) { this.dirtyFlags.set(id, true); }
-  async clearMetroidRecalcFlag(id: Hash) { this.dirtyFlags.set(id, false); }
+  async needsNeighborRecalc(id: Hash) { return this.dirtyFlags.get(id) === true; }
+  async flagVolumeForNeighborRecalc(id: Hash) { this.dirtyFlags.set(id, true); }
+  async clearNeighborRecalcFlag(id: Hash) { this.dirtyFlags.set(id, false); }
 
   async putHotpathEntry(entry: HotpathEntry) { this.hotpath.set(entry.entityId, { ...entry }); }
   async getHotpathEntries(tier?: HotpathEntry["tier"]) {
@@ -131,7 +132,7 @@ class FullMockMetadataStore implements MetadataStore {
   async getPageActivity(id: Hash) { return this.activities.get(id); }
 
   isDirty(volumeId: Hash): boolean { return this.dirtyFlags.get(volumeId) === true; }
-  getMetroidNeighborsSync(pageId: Hash) { return this.metroidNeighbors.get(pageId) ?? []; }
+  getSemanticNeighborsSync(pageId: Hash) { return this.metroidNeighbors.get(pageId) ?? []; }
 }
 
 // ---------------------------------------------------------------------------
@@ -181,7 +182,7 @@ async function buildStoreWithVolume(
   await store.putVolume(volume);
 
   if (dirty) {
-    await store.flagVolumeForMetroidRecalc(volumeId);
+    await store.flagVolumeForNeighborRecalc(volumeId);
   }
 
   return { store, vectorStore, volumeId };
@@ -206,12 +207,12 @@ describe("FullNeighborRecalc", () => {
     const { store, vectorStore } = await buildStoreWithVolume(3, true);
 
     // Initially no neighbors
-    expect(store.getMetroidNeighborsSync("page-0")).toHaveLength(0);
+    expect(store.getSemanticNeighborsSync("page-0")).toHaveLength(0);
 
     await runFullNeighborRecalc({ metadataStore: store, vectorStore, now: NOW });
 
     // After recalc, each page should have neighbors
-    const neighbors = store.getMetroidNeighborsSync("page-0");
+    const neighbors = store.getSemanticNeighborsSync("page-0");
     expect(neighbors.length).toBeGreaterThan(0);
     expect(neighbors.length).toBeLessThanOrEqual(2); // 3 pages → max 2 neighbors each
   });
@@ -220,7 +221,7 @@ describe("FullNeighborRecalc", () => {
     const { store, vectorStore } = await buildStoreWithVolume(4, true);
     await runFullNeighborRecalc({ metadataStore: store, vectorStore, now: NOW });
 
-    const neighbors = store.getMetroidNeighborsSync("page-0");
+    const neighbors = store.getSemanticNeighborsSync("page-0");
     for (let i = 1; i < neighbors.length; i++) {
       expect(neighbors[i - 1].cosineSimilarity).toBeGreaterThanOrEqual(
         neighbors[i].cosineSimilarity,
@@ -238,7 +239,7 @@ describe("FullNeighborRecalc", () => {
       now: NOW,
     });
 
-    const neighbors = store.getMetroidNeighborsSync("page-0");
+    const neighbors = store.getSemanticNeighborsSync("page-0");
     expect(neighbors.length).toBeLessThanOrEqual(2);
   });
 
@@ -253,7 +254,7 @@ describe("FullNeighborRecalc", () => {
 
     expect(result.volumesProcessed).toBe(0);
     expect(store.isDirty(volumeId)).toBe(false);
-    expect(store.getMetroidNeighborsSync("page-0")).toHaveLength(0);
+    expect(store.getSemanticNeighborsSync("page-0")).toHaveLength(0);
   });
 
   it("batch pairsComputed does not exceed computeCapacity(graphMass)", async () => {
@@ -286,7 +287,7 @@ describe("FullNeighborRecalc", () => {
     const { store, vectorStore } = await buildStoreWithVolume(2, true);
     await runFullNeighborRecalc({ metadataStore: store, vectorStore, now: NOW });
 
-    const neighbors = store.getMetroidNeighborsSync("page-0");
+    const neighbors = store.getSemanticNeighborsSync("page-0");
     for (const n of neighbors) {
       expect(n.distance).toBeCloseTo(1 - n.cosineSimilarity);
     }
