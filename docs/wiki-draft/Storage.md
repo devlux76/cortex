@@ -14,4 +14,6 @@ This page describes how CORTEX stores vectors and metadata in the browser.
 
 ## Maintenance & Corruption Resistance
 
-CORTEX includes mechanisms to verify cryptographic integrity of stored data and recover from partial failures.
+Today, CORTEX relies on the browser’s OPFS and IndexedDB durability guarantees, with limited, optional integrity checks (for example, content-hash verification on incoming peer fragments).
+
+Planned: a broader integrity verification and corruption-detection/recovery flow for OPFS/IndexedDB-backed data, including cryptographic integrity validation of stored payloads and automated remediation of partial failures.
