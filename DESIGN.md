@@ -1,8 +1,5 @@
 # CORTEX Design Specification
 
-**Version:** 1.3
-**Last Updated:** 2026-03-14
-
 ## Executive Summary
 
 CORTEX (**C**lustered **O**ntic **R**outing **T**hrough **E**ntangled e**X**changes) is a neurobiologically inspired, fully on-device episodic memory engine for autonomous agents. It runs 100% in the browser with no servers, no cloud, and no telemetry. All memory stays local and private.
@@ -699,7 +696,7 @@ Ingest must remain fast and lightweight. At ingest time only two classes of edge
 Full cross-edge reconnection is intentionally deferred: Daydreamer walks the graph during idle passes to build additional edges — connections we never noticed at ingest time — and strengthens or prunes them via LTP/LTD. This keeps ingest cost sublinear while converging to a well-connected graph over time.
 
 **IndexedDB Schema Upgrade Strategy:**
-During early development (pre-v1.0) the schema upgrade path intentionally drops and recreates object stores rather than migrating data. This keeps upgrade code minimal and avoids cruft until the data model stabilises. The neighbor graph is rebuilt from scratch after any ingest replay.
+The schema upgrade path intentionally drops and recreates object stores rather than migrating data. This keeps upgrade code minimal and avoids cruft until the data model stabilises. The neighbor graph is rebuilt from scratch after any ingest replay.
 
 ## Consolidation Design
 
@@ -778,7 +775,7 @@ Keep cryptographic service separate from routing/storage concerns. All hashing/s
 - Benchmark race (small batch inference)
 - Telemetry-informed hint (cached winner from previous session)
 
-### Performance Budgets (v1 Targets)
+### Performance Budgets
 
 | Operation | Target | Hardware Assumption |
 |-----------|--------|---------------------|
@@ -802,22 +799,22 @@ All operations must complete on WASM fallback, albeit slower. The resident hotpa
 
 ## System Boundaries
 
-### In Scope for v1
+### In Scope
 - On-device ingest, query, consolidation, persistence
 - Multi-backend vector compute (`webgpu`, `webgl`, `webnn`, `wasm`)
 - Signed graph entities with hash verification
 - Sparse semantic neighbor graph for coherence routing
 - Smart interest sharing: opt-in signed subgraph exchange over P2P with pre-share eligibility filtering
 
-### Out of Scope for v1
+### Out of Scope
 - Full production-grade distributed consensus
 - Cross-device key escrow or account systems
 - Large-scale multi-tenant synchronization services
 - Raw, unfiltered whole-graph export
 
-### Smart Sharing Guardrails (v1 Required)
+### Smart Sharing Guardrails
 
-Smart sharing is a core capability, not a post-v1 extra. The v1 exchange path must:
+Smart sharing is a core capability. The exchange path must:
 
 - Share only user-opted, public-interest graph sections (topic slices), not identity-bearing personal traces
 - Run an eligibility classifier pass before export to block PII/person-specific leakage
@@ -884,7 +881,7 @@ relative to frozen c. Planned module: `cortex/MetroidBuilder.ts`.
 | `onnx-community/embeddinggemma-300m-ONNX` | 128 | Smallest supported Matryoshka sub-dimension |
 | `nomic-ai/nomic-embed-text-v1.5` | 64 | To be added when nomic provider is wired |
 
-**Enforcement:** `npm run guard:model-derived` scans for violations before CI merge. The guard now checks for `matryoshkaProtectedDim` in addition to the standard embedding dimension and context length fields.
+**Enforcement:** `npm run guard:model-derived` scans for violations before CI merge. The guard checks for `matryoshkaProtectedDim` in addition to the standard embedding dimension and context length fields.
 
 ## Policy-Derived Constants
 
@@ -905,7 +902,7 @@ A parallel class of constants governs the Williams Bound hotpath architecture. T
 
 **Enforcement:** Policy constants must not be hardcoded outside `core/HotpathPolicy.ts`. A companion guard or ESLint rule prevents silent duplication.
 
-## Future Directions (Post-v1)
+## Future Directions
 
 - **Federated Sharing Optimization** — Better peer-ranking, deduplication, and prioritization for high-signal interest updates
 - **Advanced Consolidation** — More sophisticated LTP/LTD policies
