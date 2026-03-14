@@ -93,19 +93,23 @@ export async function ingestText(
     });
   }
 
-  // Insert semantic neighbor edges for the new pages against all stored pages.
-  const allPages = await metadataStore.getAllPages();
-  const allPageIds = allPages.map((p) => p.pageId);
-  await insertSemanticNeighbors(pageIds, allPageIds, {
+  // Build the full hierarchy: Pages → Books → Volumes → Shelves.
+  // buildHierarchy handles medoid selection, adjacency edges, prototype
+  // computation, Williams fanout enforcement, and promotion sweeps.
+  // This must run BEFORE insertSemanticNeighbors so that reverse indexes
+  // (page→book→volume) exist when the neighbor inserter flags dirty volumes.
+  const hierarchy = await buildHierarchy(pageIds, {
     modelProfile,
     vectorStore,
     metadataStore,
   });
 
-  // Build the full hierarchy: Pages → Books → Volumes → Shelves.
-  // buildHierarchy handles medoid selection, adjacency edges, prototype
-  // computation, Williams fanout enforcement, and promotion sweeps.
-  const hierarchy = await buildHierarchy(pageIds, {
+  // Insert semantic neighbor edges for the new pages against all stored pages.
+  // Runs after hierarchy building so that flagVolumeForNeighborRecalc() can
+  // traverse the page→book→volume reverse indexes created above.
+  const allPages = await metadataStore.getAllPages();
+  const allPageIds = allPages.map((p) => p.pageId);
+  await insertSemanticNeighbors(pageIds, allPageIds, {
     modelProfile,
     vectorStore,
     metadataStore,

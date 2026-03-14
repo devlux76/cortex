@@ -54,10 +54,8 @@ export async function query(
   const hotpathBookEntries = await metadataStore.getHotpathEntries("book");
   const hotpathPageEntries = await metadataStore.getHotpathEntries("page");
 
-  // Collect candidate page IDs from hierarchical routing.
-  const hierarchyPageIds = new Set<Hash>();
-
-  // Shelf → Volume → Book → Page drill-down
+  // Shelf drill-down → discover volume candidates
+  const volumeIdsFromShelves = new Set<Hash>();
   if (hotpathShelfEntries.length > 0) {
     const topShelves = await rankShelves(
       queryEmbedding,
@@ -68,18 +66,18 @@ export async function query(
     for (const s of topShelves) {
       const shelf = await metadataStore.getShelf(s.id);
       if (shelf) {
-        for (const vid of shelf.volumeIds) hierarchyPageIds.add(vid);
+        for (const vid of shelf.volumeIds) volumeIdsFromShelves.add(vid);
       }
     }
   }
 
-  // Rank volumes — include both hotpath volumes and those found via shelf drill-down
+  // Volume ranking → discover book candidates
   const volumeCandidateIds = new Set<Hash>([
     ...hotpathVolumeEntries.map((e) => e.entityId),
-    ...hierarchyPageIds,
+    ...volumeIdsFromShelves,
   ]);
-  hierarchyPageIds.clear();
 
+  const bookIdsFromVolumes = new Set<Hash>();
   if (volumeCandidateIds.size > 0) {
     const topVolumes = await rankVolumes(
       queryEmbedding,
@@ -90,18 +88,18 @@ export async function query(
     for (const v of topVolumes) {
       const volume = await metadataStore.getVolume(v.id);
       if (volume) {
-        for (const bid of volume.bookIds) hierarchyPageIds.add(bid);
+        for (const bid of volume.bookIds) bookIdsFromVolumes.add(bid);
       }
     }
   }
 
-  // Rank books — include both hotpath books and those found via volume drill-down
+  // Book ranking → discover page candidates
   const bookCandidateIds = new Set<Hash>([
     ...hotpathBookEntries.map((e) => e.entityId),
-    ...hierarchyPageIds,
+    ...bookIdsFromVolumes,
   ]);
-  hierarchyPageIds.clear();
 
+  const pageIdsFromBooks = new Set<Hash>();
   if (bookCandidateIds.size > 0) {
     const topBooks = await rankBooks(
       queryEmbedding,
@@ -112,14 +110,14 @@ export async function query(
     for (const b of topBooks) {
       const book = await metadataStore.getBook(b.id);
       if (book) {
-        for (const pid of book.pageIds) hierarchyPageIds.add(pid);
+        for (const pid of book.pageIds) pageIdsFromBooks.add(pid);
       }
     }
   }
 
   // --- HOT path: score resident pages merged with hierarchy-discovered pages ---
   const hotpathIds = hotpathPageEntries.map((e) => e.entityId);
-  const combinedPageIds = new Set<Hash>([...hotpathIds, ...hierarchyPageIds]);
+  const combinedPageIds = new Set<Hash>([...hotpathIds, ...pageIdsFromBooks]);
 
   const hotResults = await rankPages(queryEmbedding, [...combinedPageIds], topK, rankingOptions);
   const seenIds = new Set(hotResults.map((r) => r.id));
