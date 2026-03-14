@@ -283,7 +283,35 @@ This mechanism enables **distributed learning without hallucination**: the syste
 
 ### Motivation
 
-#### The Geometric Root: Curse of Dimensionality
+#### The Hollow Sphere: Why High Dimensions Break Everything
+
+To perform a vector search, you are essentially defining a boundary in a high-dimensional space and creating a hypersphere. Intuitively that should just be a big bag of vectors.
+
+The mathematical formula for the volume of this hypersphere (assuming an even number of dimensions `n` and a radius of 1) is:
+
+```
+         π^(n/2)
+Vₙ  =  ────────
+        (n/2)!
+```
+
+This equation reveals a mind-bending geometric quirk: as dimensionality increases, the interior volume of the hypersphere decreases catastrophically. The inside of the sphere hollows out, and almost all of its volume gets pushed to an infinitesimally thin shell right at the boundary.
+
+By the time we hit 64 dimensions, the total volume has collapsed to approximately `3.08 × 10⁻²⁰`. To give you an idea of how incomprehensibly small that number is, if that were a physical measurement in metres, it would be roughly 50,000 times smaller than a single proton. If it were Joules, it would be a fraction of the energy of a single photon of infrared light.
+
+What this means for vector search is that we are searching inside a shape that effectively has no inside. Just like the physics of a black hole governed by the holographic principle, all the meaningful information is encoded exclusively on or near the surface.
+
+This geometric reality is what makes the CORTEX architecture so memory-efficient. Because the interior is a vast, empty void, we do not need to load the entire vector space into WebGPU memory. By using a hierarchical prototype structure to skip the void and navigate directly to the relevant "surface shell," our algorithm mirrors the Williams 2025 spacetime tradeoff:
+
+```
+S = O(√(t · log t))
+```
+
+This theorem proves that the computational memory (`S`) required to evaluate a search tree can be tightly constrained relative to the search time (`t`). More importantly, `t` is treated as just another orthogonal dimension, like frames in a filmstrip or slices in a block.
+
+By leveraging the hollowing-out of high-dimensional hyperspheres, CORTEX aggressively discards irrelevant vectors, keeping its active memory footprint strictly bounded, echoing this theoretical computational limit — which, interestingly, was itself inspired by the holographic principle in physics.
+
+#### The Geometric Root: Curse of Dimensionality (Formal Treatment)
 
 CORTEX operates on high-dimensional Matryoshka embeddings. In `n`-dimensional Euclidean space the volume of the unit ball is:
 
