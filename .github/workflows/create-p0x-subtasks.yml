@@ -229,7 +229,11 @@ where it refers to the proximity graph (not to the \`{ m1, m2, c }\` probe type)
               { owner, repo, state: 'all', per_page: 100 },
             )) {
               for (const issue of page.data) {
-                existing.add(issue.title);
+                // `issues.listForRepo` returns both issues and pull requests.
+                // Only track real issues here so idempotency isn't affected by PR titles.
+                if (!issue.pull_request) {
+                  existing.add(issue.title);
+                }
               }
             }
 
