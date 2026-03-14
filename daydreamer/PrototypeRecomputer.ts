@@ -12,7 +12,7 @@
 
 import type { Hash, HotpathEntry, MetadataStore, Shelf, Volume, VectorStore } from "../core/types";
 import { DEFAULT_HOTPATH_POLICY, type HotpathPolicy } from "../core/HotpathPolicy";
-import { batchComputeSalience, runPromotionSweep } from "../core/SalienceEngine";
+import { runPromotionSweep } from "../core/SalienceEngine";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -119,8 +119,6 @@ async function recomputeVolumePrototypes(
   const {
     metadataStore,
     vectorStore,
-    policy = DEFAULT_HOTPATH_POLICY,
-    now = Date.now(),
   } = options;
 
   const allVolumes = await metadataStore.getAllVolumes();
@@ -144,8 +142,6 @@ async function recomputeVolumePrototypes(
     if (pageEntries.length === 0) continue;
 
     const vectors = pageEntries.map((e) => e.vector);
-    const medoidIdx = selectMedoidIndex(vectors);
-    const medoidPageId = pageEntries[medoidIdx].pageId;
     const centroidVec = computeCentroid(vectors);
 
     // Append centroid to vector store
