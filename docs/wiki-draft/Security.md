@@ -4,7 +4,7 @@ This page covers trust assumptions, cryptographic integrity, and smart sharing g
 
 ## Cryptographic Integrity
 
-CORTEX uses cryptographic signing to ensure that stored vectors and metadata cannot be tampered with.
+CORTEX supports cryptographic signing (and optional verification) for stored vectors and metadata to help detect tampering and integrity issues.
 
 ## Smart Sharing Guardrails
 
