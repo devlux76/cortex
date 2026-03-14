@@ -18,7 +18,7 @@
     "test:runtime": "bun run test:browser && bun run test:electron",
     "test:all": "bun run test:unit && bun run test:runtime",
     "guard:model-derived": "bun scripts/guard-model-derived.mjs",
-    "guard:hotpath-policy": "node scripts/guard-hotpath-policy.mjs",
+    "guard:hotpath-policy": "bun scripts/guard-hotpath-policy.mjs",
     "benchmark:dummy": "vitest bench --watch=false tests/benchmarks/DummyEmbedderHotpath.bench.ts",
     "benchmark:query-latency": "vitest bench --watch=false tests/benchmarks/QueryLatency.bench.ts",
     "benchmark:storage-overhead": "vitest bench --watch=false tests/benchmarks/StorageOverhead.bench.ts",
