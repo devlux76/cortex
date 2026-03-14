@@ -67,14 +67,27 @@ export class IdleScheduler {
   private active = false;
   private stopped = false;
   private readonly budgetMs: number;
+  private readonly errorHandler: (error: unknown, task: ScheduledTask) => void;
 
   /**
    * @param budgetMs  Approximate milliseconds of work per idle slice.
    *                  Defaults to 5 ms. The scheduler yields after this
    *                  budget is consumed even if the queue is non-empty.
+   * @param onError   Optional error handler invoked when a task throws.
+   *                  Defaults to logging to console.error (if available).
    */
-  constructor(budgetMs = DEFAULT_BUDGET_MS) {
+  constructor(
+    budgetMs = DEFAULT_BUDGET_MS,
+    onError?: (error: unknown, task: ScheduledTask) => void,
+  ) {
     this.budgetMs = budgetMs;
+    this.errorHandler =
+      onError ??
+      ((error: unknown, task: ScheduledTask): void => {
+        if (typeof console !== "undefined" && typeof console.error === "function") {
+          console.error("[IdleScheduler] Task failed", { error, task });
+        }
+      });
   }
 
   /**
@@ -142,9 +155,10 @@ export class IdleScheduler {
       if (!entry) break;
       try {
         await entry.task.run();
-      } catch {
-        // Swallow errors so a single bad task cannot crash the idle loop.
-        // In production, wire in structured logging here.
+      } catch (error) {
+        // Report errors so failing tasks can be diagnosed, but do not
+        // allow a single bad task to crash the idle loop.
+        this.errorHandler(error, entry.task);
       }
     }
 
