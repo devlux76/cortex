@@ -8,6 +8,9 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      # Opt into Node.js 24 for actions (GitHub Actions will default to Node.js 24 in 2026).
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
