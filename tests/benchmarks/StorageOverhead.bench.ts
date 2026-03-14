@@ -66,18 +66,18 @@ async function ingestBatch(size: number): Promise<MemoryVectorStore> {
   return vectorStore;
 }
 
-describe("Storage Overhead — 50 pages", async () => {
-  const store = await ingestBatch(50);
+const store50 = await ingestBatch(50);
+const store200 = await ingestBatch(200);
 
+describe("Storage Overhead — 50 pages", () => {
   bench("read all vectors after 50 ingests", async () => {
-    await store.readVector(0, EMBEDDING_DIM);
+    await store50.readVector(0, EMBEDDING_DIM);
   });
 });
 
-describe("Storage Overhead — 200 pages", async () => {
-  const store = await ingestBatch(200);
-
+describe("Storage Overhead — 200 pages", () => {
   bench("read all vectors after 200 ingests", async () => {
-    await store.readVector(0, EMBEDDING_DIM);
+    await store200.readVector(0, EMBEDDING_DIM);
   });
 });
+
