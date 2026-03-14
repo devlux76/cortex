@@ -20,4 +20,4 @@ These values are derived from the embedding model profile (not hardcoded):
 
 Policy constants (e.g. fanout caps, quota ratios) are defined in the code and kept in sync with the design.
 
-> For the authoritative source of policy constants, see `core/Policy.ts` and `core/HotpathPolicy.ts`.
+> For the authoritative source of policy constants, see `core/HotpathPolicy.ts`.
