@@ -67,12 +67,14 @@ export interface Edge {
 // Semantic nearest-neighbor graph
 // ---------------------------------------------------------------------------
 
+/** A single directed proximity edge in the sparse semantic neighbor graph. */
 export interface SemanticNeighbor {
   neighborPageId: Hash;
   cosineSimilarity: number;   // threshold is defined by runtime policy
   distance: number;           // 1 - cosineSimilarity (ready for TSP)
 }
 
+/** Induced subgraph returned by BFS expansion of the semantic neighbor graph. */
 export interface SemanticNeighborSubgraph {
   nodes: Hash[];
   edges: { from: Hash; to: Hash; distance: number }[];

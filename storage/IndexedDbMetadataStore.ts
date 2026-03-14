@@ -72,6 +72,7 @@ function applyUpgrade(db: IDBDatabase): void {
     edgeStore.createIndex("by-from", "fromPageId");
   }
 
+
   if (!db.objectStoreNames.contains(STORE.flags)) {
     db.createObjectStore(STORE.flags, { keyPath: "volumeId" });
   }
