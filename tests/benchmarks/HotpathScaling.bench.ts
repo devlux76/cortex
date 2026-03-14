@@ -132,33 +132,41 @@ async function assertWilliamsBound(
 // Benchmark suites
 // ---------------------------------------------------------------------------
 
-describe("Hotpath Scaling — 1K nodes", async () => {
-  const SCALE = 1_000;
-  const store = new BenchMetadataStore();
-  store.seedPages(SCALE);
-  const allPages = await store.getAllPages();
+const SCALE_1K = 1_000;
+const store1k = new BenchMetadataStore();
+store1k.seedPages(SCALE_1K);
+const allPages1k = await store1k.getAllPages();
 
-  await bootstrapHotpath(store, DEFAULT_HOTPATH_POLICY, allPages.map((p) => p.pageId));
-  await assertWilliamsBound(store, SCALE);
+await bootstrapHotpath(
+  store1k,
+  DEFAULT_HOTPATH_POLICY,
+  allPages1k.map((p) => p.pageId),
+);
+await assertWilliamsBound(store1k, SCALE_1K);
 
+describe("Hotpath Scaling — 1K nodes", () => {
   bench("promotion sweep — 1K node graph", async () => {
-    const sample = allPages.slice(0, 20).map((p) => p.pageId);
-    await runPromotionSweep(sample, store);
+    const sample = allPages1k.slice(0, 20).map((p) => p.pageId);
+    await runPromotionSweep(sample, store1k);
   });
 });
 
-describe("Hotpath Scaling — 5K nodes", async () => {
-  const SCALE = 5_000;
-  const store = new BenchMetadataStore();
-  store.seedPages(SCALE);
-  const allPages = await store.getAllPages();
+const SCALE_5K = 5_000;
+const store5k = new BenchMetadataStore();
+store5k.seedPages(SCALE_5K);
+const allPages5k = await store5k.getAllPages();
 
-  await bootstrapHotpath(store, DEFAULT_HOTPATH_POLICY, allPages.map((p) => p.pageId));
-  await assertWilliamsBound(store, SCALE);
+await bootstrapHotpath(
+  store5k,
+  DEFAULT_HOTPATH_POLICY,
+  allPages5k.map((p) => p.pageId),
+);
+await assertWilliamsBound(store5k, SCALE_5K);
 
+describe("Hotpath Scaling — 5K nodes", () => {
   bench("promotion sweep — 5K node graph", async () => {
-    const sample = allPages.slice(0, 20).map((p) => p.pageId);
-    await runPromotionSweep(sample, store);
+    const sample = allPages5k.slice(0, 20).map((p) => p.pageId);
+    await runPromotionSweep(sample, store5k);
   });
 });
 
