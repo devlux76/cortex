@@ -96,7 +96,7 @@ function applyUpgrade(db: IDBDatabase): void {
     db.createObjectStore(STORE.pageActivity, { keyPath: "pageId" });
   }
 
-  // v3 stores — neighbor_graph (replaces the old metroid_neighbors name)
+  // v3 stores — neighbor_graph (semantic neighbor proximity index)
   if (!db.objectStoreNames.contains(STORE.neighborGraph)) {
     db.createObjectStore(STORE.neighborGraph, { keyPath: "pageId" });
   }

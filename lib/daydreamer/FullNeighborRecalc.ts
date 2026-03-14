@@ -14,7 +14,7 @@
 // ---------------------------------------------------------------------------
 
 import type { Hash, MetadataStore, SemanticNeighbor, Page, VectorStore } from "../core/types";
-import { computeCapacity, DEFAULT_HOTPATH_POLICY, type HotpathPolicy } from "../core/HotpathPolicy";
+import { computeCapacity, computeNeighborMaxDegree, DEFAULT_HOTPATH_POLICY, type HotpathPolicy } from "../core/HotpathPolicy";
 import { batchComputeSalience, runPromotionSweep } from "../core/SalienceEngine";
 
 // Minimum pair budget per idle recalc cycle.
@@ -31,7 +31,8 @@ export interface FullNeighborRecalcOptions {
   metadataStore: MetadataStore;
   vectorStore: VectorStore;
   policy?: HotpathPolicy;
-  /** Maximum Metroid neighbors stored per page. Default: 16. */
+  /** Maximum semantic neighbors stored per page.
+   *  When omitted, uses Williams-derived `computeNeighborMaxDegree(graphMass)`. */
   maxNeighbors?: number;
   /** Current timestamp (ms since epoch). Defaults to Date.now(). */
   now?: number;
@@ -71,7 +72,7 @@ function cosineSimilarity(a: Float32Array, b: Float32Array): number {
  *
  * Finds all volumes flagged as dirty (via `needsNeighborRecalc`), loads
  * their pages, computes pairwise cosine similarities, and updates the
- * Metroid neighbor index. Processing is bounded by the Williams-Bound-derived
+ * semantic neighbor index. Processing is bounded by the Williams-Bound-derived
  * maintenance budget to avoid blocking the idle loop.
  *
  * After recalculation, salience is recomputed for affected pages and a
@@ -84,7 +85,6 @@ export async function runFullNeighborRecalc(
     metadataStore,
     vectorStore,
     policy = DEFAULT_HOTPATH_POLICY,
-    maxNeighbors = 16,
     now = Date.now(),
   } = options;
 
@@ -109,6 +109,9 @@ export async function runFullNeighborRecalc(
   // the minimum floor so even small corpora make forward progress.
   const totalGraphMass = (await metadataStore.getAllPages()).length;
   const pairBudget = Math.max(MIN_RECALC_PAIR_BUDGET, computeCapacity(totalGraphMass, policy.c));
+
+  // Derive max neighbor degree from Williams bounds if not explicitly provided.
+  const maxNeighbors = options.maxNeighbors ?? computeNeighborMaxDegree(totalGraphMass, policy.c);
 
   let totalVolumesProcessed = 0;
   let totalPagesProcessed = 0;

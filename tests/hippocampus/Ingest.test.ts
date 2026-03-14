@@ -67,9 +67,20 @@ describe("hippocampus ingest", () => {
       lastQueryAt: result.pages[0].createdAt,
     });
 
-    // Book should contain the pages
+    // Book should contain some of the pages (hierarchy builder chunks by PAGES_PER_BOOK)
+    expect(result.book).toBeDefined();
     const storedBook = await metadataStore.getBook(result.book!.bookId);
     expect(storedBook).toEqual(result.book);
+
+    // All pages should be covered by the books
+    const allBookPageIds = result.books.flatMap((b) => b.pageIds);
+    for (const page of result.pages) {
+      expect(allBookPageIds).toContain(page.pageId);
+    }
+
+    // Volumes and shelves should be produced
+    expect(result.volumes.length).toBeGreaterThanOrEqual(1);
+    expect(result.shelves.length).toBeGreaterThanOrEqual(1);
 
     // Vector store should have data stored for each page
     expect(vectorStore.byteLength).toBeGreaterThan(0);

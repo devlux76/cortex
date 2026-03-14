@@ -11,7 +11,7 @@
 // ---------------------------------------------------------------------------
 
 import type { Edge, Hash, MetadataStore } from "../core/types";
-import { DEFAULT_HOTPATH_POLICY, type HotpathPolicy } from "../core/HotpathPolicy";
+import { computeNeighborMaxDegree, DEFAULT_HOTPATH_POLICY, type HotpathPolicy } from "../core/HotpathPolicy";
 import { batchComputeSalience, runPromotionSweep } from "../core/SalienceEngine";
 
 // ---------------------------------------------------------------------------
@@ -43,7 +43,8 @@ export interface HebbianUpdaterOptions {
   ltdDecay?: number;
   /** Prune edges whose weight drops below this value. Default: DEFAULT_PRUNE_THRESHOLD. */
   pruneThreshold?: number;
-  /** Maximum outgoing degree per node. Default: DEFAULT_MAX_DEGREE. */
+  /** Maximum outgoing Hebbian edges per node.
+   *  When omitted, uses Williams-derived `computeNeighborMaxDegree(graphMass)`. */
   maxDegree?: number;
   /** Current timestamp (ms since epoch). Defaults to Date.now(). */
   now?: number;
@@ -135,12 +136,14 @@ export async function decayAndPrune(
     policy = DEFAULT_HOTPATH_POLICY,
     ltdDecay = DEFAULT_LTD_DECAY,
     pruneThreshold = DEFAULT_PRUNE_THRESHOLD,
-    maxDegree = DEFAULT_MAX_DEGREE,
     now = Date.now(),
   } = options;
 
   const allPages = await metadataStore.getAllPages();
   if (allPages.length === 0) return { decayed: 0, pruned: 0 };
+
+  // Derive max degree from Williams bounds if not explicitly provided.
+  const maxDegree = options.maxDegree ?? computeNeighborMaxDegree(allPages.length, policy.c);
 
   const changedNodeIds = new Set<Hash>();
   let totalDecayed = 0;

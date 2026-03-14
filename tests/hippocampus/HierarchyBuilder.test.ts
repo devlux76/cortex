@@ -257,7 +257,7 @@ describe("HierarchyBuilder", () => {
     expect(result.shelves).toHaveLength(0);
   });
 
-  it("ingestText produces exactly one Book covering all ingested pages", async () => {
+  it("ingestText produces Books, Volumes, and Shelves via HierarchyBuilder", async () => {
     const metadataStore = await IndexedDbMetadataStore.open(freshDbName());
     const vectorStore = new MemoryVectorStore();
     const keyPair = await generateKeyPair();
@@ -280,18 +280,21 @@ describe("HierarchyBuilder", () => {
       keyPair,
     });
 
-    // Exactly one Book — the entire ingest
+    // At least one Book produced
+    expect(result.books.length).toBeGreaterThanOrEqual(1);
     expect(result.book).toBeDefined();
-    // The book must contain every ingested page
+    // Every page must belong to at least one book
+    const allBookPageIds = result.books.flatMap((b) => b.pageIds);
     for (const page of result.pages) {
-      expect(result.book!.pageIds).toContain(page.pageId);
+      expect(allBookPageIds).toContain(page.pageId);
     }
-    expect(result.book!.pageIds.length).toBe(result.pages.length);
-    // The medoid must be one of the ingested pages
-    expect(result.book!.pageIds).toContain(result.book!.medoidPageId);
-    // Volumes and Shelves are Daydreamer responsibilities, not created at ingest time
-    expect((result as { volumes?: unknown }).volumes).toBeUndefined();
-    expect((result as { shelves?: unknown }).shelves).toBeUndefined();
+    // Every book's medoid must be one of its own pages
+    for (const book of result.books) {
+      expect(book.pageIds).toContain(book.medoidPageId);
+    }
+    // Volumes and Shelves are now produced during ingest via HierarchyBuilder
+    expect(result.volumes.length).toBeGreaterThanOrEqual(1);
+    expect(result.shelves.length).toBeGreaterThanOrEqual(1);
   });
 
   it("adds SemanticNeighbor edges between consecutive pages within each book slice", async () => {

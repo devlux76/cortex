@@ -71,7 +71,7 @@ class FullMockMetadataStore implements MetadataStore {
   private edgeMap = new Map<string, Edge>();
   private activities = new Map<Hash, PageActivity>();
   private hotpath = new Map<Hash, HotpathEntry>();
-  private metroidNeighbors = new Map<Hash, SemanticNeighbor[]>();
+  private semanticNeighbors = new Map<Hash, SemanticNeighbor[]>();
   private dirtyFlags = new Map<Hash, boolean>();
 
   async putPage(page: Page) { this.pages.set(page.pageId, page); }
@@ -103,10 +103,10 @@ class FullMockMetadataStore implements MetadataStore {
   async getShelvesByVolume() { return []; }
 
   async putSemanticNeighbors(pageId: Hash, neighbors: SemanticNeighbor[]) {
-    this.metroidNeighbors.set(pageId, [...neighbors]);
+    this.semanticNeighbors.set(pageId, [...neighbors]);
   }
   async getSemanticNeighbors(pageId: Hash) {
-    return this.metroidNeighbors.get(pageId) ?? [];
+    return this.semanticNeighbors.get(pageId) ?? [];
   }
   async getInducedNeighborSubgraph(): Promise<SemanticNeighborSubgraph> { return { nodes: [], edges: [] }; }
 
@@ -132,7 +132,7 @@ class FullMockMetadataStore implements MetadataStore {
   async getPageActivity(id: Hash) { return this.activities.get(id); }
 
   isDirty(volumeId: Hash): boolean { return this.dirtyFlags.get(volumeId) === true; }
-  getSemanticNeighborsSync(pageId: Hash) { return this.metroidNeighbors.get(pageId) ?? []; }
+  getSemanticNeighborsSync(pageId: Hash) { return this.semanticNeighbors.get(pageId) ?? []; }
 }
 
 // ---------------------------------------------------------------------------

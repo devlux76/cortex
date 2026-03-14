@@ -350,7 +350,7 @@ class MockMetadataStore implements MetadataStore {
     return [...this.shelves.values()].filter((s) => s.volumeIds.includes(volumeId));
   }
 
-  // Metroid / Semantic neighbor stubs
+  // Semantic neighbor stubs
   async putSemanticNeighbors(): Promise<void> { /* stub */ }
   async getSemanticNeighbors(): Promise<SemanticNeighbor[]> { return []; }
   async getInducedNeighborSubgraph(): Promise<SemanticNeighborSubgraph> { return { nodes: [], edges: [] }; }

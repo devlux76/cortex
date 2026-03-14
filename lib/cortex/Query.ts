@@ -4,7 +4,7 @@ import type { EmbeddingRunner } from "../embeddings/EmbeddingRunner";
 import { runPromotionSweep } from "../core/SalienceEngine";
 import { computeSubgraphBounds } from "../core/HotpathPolicy";
 import type { QueryResult } from "./QueryResult";
-import { rankPages, spillToWarm } from "./Ranking";
+import { rankPages, rankBooks, rankVolumes, rankShelves, spillToWarm, type RankedResult } from "./Ranking";
 import { buildMetroid } from "./MetroidBuilder";
 import { detectKnowledgeGap } from "./KnowledgeGapDetector";
 import { solveOpenTSP } from "./OpenTSPSolver";
@@ -46,15 +46,75 @@ export async function query(
 
   const rankingOptions = { vectorStore, metadataStore };
 
-  // --- HOT path: score resident pages ---
-  const hotpathEntries = await metadataStore.getHotpathEntries("page");
-  const hotpathIds = hotpathEntries.map((e) => e.entityId);
+  // --- Hierarchical routing: Shelf → Volume → Book → Page ---
+  // When higher-tier hotpath entries exist, we route through the hierarchy
+  // to narrow the candidate set before flat page scoring.
+  const hotpathShelfEntries = await metadataStore.getHotpathEntries("shelf");
+  const hotpathVolumeEntries = await metadataStore.getHotpathEntries("volume");
+  const hotpathBookEntries = await metadataStore.getHotpathEntries("book");
+  const hotpathPageEntries = await metadataStore.getHotpathEntries("page");
 
-  const hotResults = await rankPages(queryEmbedding, hotpathIds, topK, rankingOptions);
+  // Shelf drill-down → discover volume candidates
+  const volumeIdsFromShelves = new Set<Hash>();
+  if (hotpathShelfEntries.length > 0) {
+    const topShelves = await rankShelves(
+      queryEmbedding,
+      hotpathShelfEntries.map((e) => e.entityId),
+      Math.max(2, Math.ceil(hotpathShelfEntries.length / 2)),
+      rankingOptions,
+    );
+    for (const s of topShelves) {
+      for (const vid of s.childIds) volumeIdsFromShelves.add(vid);
+    }
+  }
+
+  // Volume ranking → discover book candidates
+  const volumeCandidateIds = new Set<Hash>([
+    ...hotpathVolumeEntries.map((e) => e.entityId),
+    ...volumeIdsFromShelves,
+  ]);
+
+  const bookIdsFromVolumes = new Set<Hash>();
+  if (volumeCandidateIds.size > 0) {
+    const topVolumes = await rankVolumes(
+      queryEmbedding,
+      [...volumeCandidateIds],
+      Math.max(2, Math.ceil(volumeCandidateIds.size / 2)),
+      rankingOptions,
+    );
+    for (const v of topVolumes) {
+      for (const bid of v.childIds) bookIdsFromVolumes.add(bid);
+    }
+  }
+
+  // Book ranking → discover page candidates
+  const bookCandidateIds = new Set<Hash>([
+    ...hotpathBookEntries.map((e) => e.entityId),
+    ...bookIdsFromVolumes,
+  ]);
+
+  const pageIdsFromBooks = new Set<Hash>();
+  if (bookCandidateIds.size > 0) {
+    const topBooks = await rankBooks(
+      queryEmbedding,
+      [...bookCandidateIds],
+      Math.max(2, Math.ceil(bookCandidateIds.size / 2)),
+      rankingOptions,
+    );
+    for (const b of topBooks) {
+      for (const pid of b.childIds) pageIdsFromBooks.add(pid);
+    }
+  }
+
+  // --- HOT path: score resident pages merged with hierarchy-discovered pages ---
+  const hotpathIds = hotpathPageEntries.map((e) => e.entityId);
+  const combinedPageIds = new Set<Hash>([...hotpathIds, ...pageIdsFromBooks]);
+
+  const hotResults = await rankPages(queryEmbedding, [...combinedPageIds], topK, rankingOptions);
   const seenIds = new Set(hotResults.map((r) => r.id));
 
   // --- Warm spill: fill up to topK if hot path is insufficient ---
-  let warmResults: Array<{ id: Hash; score: number }> = [];
+  let warmResults: RankedResult[] = [];
   if (hotResults.length < topK) {
     const allWarm = await spillToWarm("page", queryEmbedding, topK, rankingOptions);
     warmResults = allWarm.filter((r) => !seenIds.has(r.id));
@@ -75,8 +135,7 @@ export async function query(
     .map((r) => r.score);
 
   // --- MetroidBuilder: build dialectical probe ---
-  // Candidates: hotpath book medoid pages + hotpath pages themselves
-  const hotpathBookEntries = await metadataStore.getHotpathEntries("book");
+  // Candidates: hotpath book medoid pages + top-ranked pages
   const bookCandidates = (
     await Promise.all(
       hotpathBookEntries.map(async (e) => {
@@ -121,16 +180,16 @@ export async function query(
 
   // --- Subgraph expansion ---
   // Use dynamic Williams-derived bounds unless the caller has pinned an
-  // explicit maxHops value.  Only load all pages when we actually need to
-  // compute bounds — skip the full-page scan on the hot path when maxHops is
-  // already known.
+  // explicit maxHops value.  Prefer the hotpath resident count as an efficient
+  // proxy for corpus size to avoid scanning all pages on the hot path.
   const topPageIds = topPages.map((p) => p.pageId);
   let effectiveMaxHops: number;
   if (options.maxHops !== undefined) {
     effectiveMaxHops = options.maxHops;
   } else {
-    const allPages = await metadataStore.getAllPages();
-    effectiveMaxHops = computeSubgraphBounds(allPages.length).maxHops;
+    const residentCount = await metadataStore.getResidentCount();
+    const graphMass = residentCount > 0 ? residentCount : combinedPageIds.size;
+    effectiveMaxHops = computeSubgraphBounds(Math.max(1, graphMass)).maxHops;
   }
   const subgraph = await metadataStore.getInducedNeighborSubgraph(topPageIds, effectiveMaxHops);
 

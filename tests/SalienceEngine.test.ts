@@ -118,12 +118,7 @@ class MockMetadataStore implements MetadataStore {
   async getBooksByPage(): Promise<never[]> { return []; }
   async getVolumesByBook(): Promise<never[]> { return []; }
   async getShelvesByVolume(): Promise<never[]> { return []; }
-  async putMetroidNeighbors(): Promise<void> { /* stub */ }
-  async getMetroidNeighbors(): Promise<never[]> { return []; }
-  async getInducedMetroidSubgraph() { return { nodes: [], edges: [] }; }
-  async needsMetroidRecalc(): Promise<boolean> { return false; }
-  async flagVolumeForMetroidRecalc(): Promise<void> { /* stub */ }
-  async clearMetroidRecalcFlag(): Promise<void> { /* stub */ }
+
   async deleteEdge(): Promise<void> { /* stub */ }
   async putSemanticNeighbors(): Promise<void> { /* stub */ }
   async getSemanticNeighbors(): Promise<never[]> { return []; }
