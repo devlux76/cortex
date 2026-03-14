@@ -14,11 +14,12 @@ The engine models three biological brain regions:
 | File | Purpose |
 |---|---|
 | `README.md` | Product vision and quick start |
-| `DESIGN.md` | Complete architecture specification and design principles |
+| **CORTEX Wiki** | Canonical architecture specification and design principles |
+| `DESIGN.md` | Repo landing page / TOC into the wiki |
 | `PLAN.md` | Module-by-module implementation status and development phases |
 | `TODO.md` | Prioritized actionable tasks to ship v1.0 |
 
-Keep `DESIGN.md` synchronized with the real code state after every implementation pass.
+Keep the wiki and `DESIGN.md` synchronized with the real code state after every implementation pass.
 
 ## Project Management
 
