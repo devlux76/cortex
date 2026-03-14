@@ -511,9 +511,7 @@ const result = await ingestText("Your text content here...", {
 ```typescript
 interface IngestResult {
   pages: Page[];        // all pages created for this ingest
-  book: Book;           // the Book grouping all created pages
-  chunkCount: number;   // number of text chunks (= number of pages)
-  modelId: string;      // embedding model ID used
+  book?: Book;          // optional Book grouping all created pages
 }
 ```
 
